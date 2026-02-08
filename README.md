@@ -96,8 +96,7 @@ This reduces seller workload, ensures category consistency across different shop
 │   ├── components/       # Reusable React components
 │   ├── lib/             # Utility functions and helpers
 │   ├── hooks/           # Custom React hooks
-│   ├── types/           # TypeScript type definitions
-│   └── styles/          # Global styles
+│   └── types/           # TypeScript type definitions
 ├── public/              # Static assets
 └── tests/               # Test files
 ```
