@@ -3,13 +3,10 @@
 import * as React from "react"
 import {
   IconCamera,
-  IconChartBar,
   IconDashboard,
   IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
   IconFolder,
+  IconGavel,
   IconHelp,
   IconInnerShadowTop,
   IconListDetails,
@@ -19,7 +16,7 @@ import {
   IconUsers,
 } from "@tabler/icons-react"
 
-import { NavDocuments } from "@/components/nav-documents"
+import { NavSellers } from "@/components/nav-sellers"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
@@ -41,111 +38,116 @@ const data = {
   },
   navMain: [
     {
-      title: "Dashboard",
+      title: "Tổng quan",
       url: "#",
       icon: IconDashboard,
     },
     {
-      title: "Lifecycle",
+      title: "Quản lý sản phẩm",
       url: "#",
-      icon: IconListDetails,
+      icon: IconCamera,
+      isActive: true,
+      items: [
+        {
+          title: "Tất cả sản phẩm",
+          url: "#",
+        },
+        {
+          title: "Thêm sản phẩm mới",
+          url: "#",
+        },
+        {
+          title: "Sản phẩm nổi bật",
+          url: "#",
+        },
+        {
+          title: "Kho hàng",
+          url: "#",
+        },
+      ],
     },
     {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
+      title: "Quản lý đơn hàng",
       url: "#",
       icon: IconFolder,
+      items: [
+        {
+          title: "Tất cả đơn hàng",
+          url: "#",
+        },
+      ],
     },
     {
-      title: "Team",
+      title: "Quản lý tranh chấp",
+      url: "#",
+      icon: IconGavel,
+      items: [
+        {
+          title: "Tất cả tranh chấp",
+          url: "#",
+        },
+        {
+          title: "Duyệt hoàn tiền",
+          url: "#",
+        },
+        {
+          title: "Từ chối tranh chấp",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Danh mục và tags",
+      url: "#",
+      icon: IconListDetails,
+      items: [
+        {
+          title: "Danh mục",
+          url: "#",
+        },
+        {
+          title: "Tags",
+          url: "#",
+        },
+        {
+          title: "Thuộc tính",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Quản lý người dùng",
       url: "#",
       icon: IconUsers,
     },
   ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-  ],
   navSecondary: [
     {
-      title: "Settings",
+      title: "Cài đặt",
       url: "#",
       icon: IconSettings,
     },
     {
-      title: "Get Help",
+      title: "Hỗ trợ",
       url: "#",
       icon: IconHelp,
     },
     {
-      title: "Search",
+      title: "Tìm kiếm",
       url: "#",
       icon: IconSearch,
     },
   ],
-  documents: [
+  sellers: [
     {
-      name: "Data Library",
+      name: "Quản lý người bán",
       url: "#",
       icon: IconDatabase,
     },
     {
-      name: "Reports",
+      name: "Yêu cầu rút tiền",
       url: "#",
       icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
     },
   ],
 }
@@ -162,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <a href="#">
                 <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <span className="text-base font-semibold">Shopio</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -170,7 +172,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavSellers items={data.sellers} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
