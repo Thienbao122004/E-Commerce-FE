@@ -6,14 +6,21 @@ import {
   IconDashboard,
   IconDatabase,
   IconFolder,
+  IconFolderOpen,
   IconGavel,
   IconHelp,
   IconInnerShadowTop,
+  IconList,
   IconListDetails,
+  IconLock,
+  IconPackage,
   IconReport,
   IconSearch,
   IconSettings,
+  IconStar,
+  IconTag,
   IconUsers,
+  IconUserSearch,
 } from "@tabler/icons-react"
 
 import { NavSellers } from "@/components/nav-sellers"
@@ -39,86 +46,84 @@ const data = {
   navMain: [
     {
       title: "Tổng quan",
-      url: "#",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
       title: "Quản lý sản phẩm",
-      url: "#",
+      url: "/dashboard/products",
       icon: IconCamera,
       isActive: true,
       items: [
         {
           title: "Tất cả sản phẩm",
-          url: "#",
-        },
-        {
-          title: "Thêm sản phẩm mới",
-          url: "#",
+          url: "/dashboard/products",
+          icon: IconList,
         },
         {
           title: "Sản phẩm nổi bật",
-          url: "#",
+          url: "/dashboard/products/featured",
+          icon: IconStar,
         },
         {
           title: "Kho hàng",
-          url: "#",
+          url: "/dashboard/products/inventory",
+          icon: IconPackage,
         },
       ],
     },
     {
       title: "Quản lý đơn hàng",
-      url: "#",
+      url: "/dashboard/orders",
       icon: IconFolder,
       items: [
         {
           title: "Tất cả đơn hàng",
-          url: "#",
+          url: "/dashboard/orders",
+          icon: IconListDetails,
         },
       ],
     },
     {
       title: "Quản lý tranh chấp",
-      url: "#",
+      url: "/dashboard/disputes",
       icon: IconGavel,
       items: [
         {
           title: "Tất cả tranh chấp",
-          url: "#",
-        },
-        {
-          title: "Duyệt hoàn tiền",
-          url: "#",
-        },
-        {
-          title: "Từ chối tranh chấp",
-          url: "#",
+          url: "/dashboard/disputes",
+          icon: IconList,
         },
       ],
     },
     {
       title: "Danh mục và tags",
-      url: "#",
+      url: "/dashboard/categories",
       icon: IconListDetails,
       items: [
         {
           title: "Danh mục",
-          url: "#",
+          url: "/dashboard/categories",
+          icon: IconFolderOpen,
         },
         {
           title: "Tags",
-          url: "#",
-        },
-        {
-          title: "Thuộc tính",
-          url: "#",
+          url: "/dashboard/tags",
+          icon: IconTag,
         },
       ],
     },
     {
       title: "Quản lý người dùng",
-      url: "#",
+      url: "/dashboard/users",
       icon: IconUsers,
+      items: [
+        {
+          title: "Tất cả người dùng",
+          url: "/dashboard/users",
+          icon: IconUserSearch,
+        },
+      ],
     },
   ],
   navSecondary: [
