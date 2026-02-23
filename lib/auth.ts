@@ -105,6 +105,51 @@ export async function signUp({ email, password, fullName }: SignUpData) {
 }
 
 /**
+ * Sign in with Google OAuth using a popup window
+ */
+export async function signInWithGoogle() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+            skipBrowserRedirect: true,
+        },
+    })
+
+    if (error) {
+        throw new Error(translateAuthError(error))
+    }
+
+    if (!data.url) {
+        throw new Error('Không thể lấy URL đăng nhập Google')
+    }
+
+    // Open Google login in a popup
+    const popup = window.open(data.url, 'google-oauth', 'width=500,height=600,left=400,top=100')
+
+    return new Promise<void>((resolve, reject) => {
+        const interval = setInterval(async () => {
+            try {
+                // Check if popup was closed
+                if (popup?.closed) {
+                    clearInterval(interval)
+                    // Check if we got a session after popup closed
+                    const { data: sessionData } = await supabase.auth.getSession()
+                    if (sessionData.session) {
+                        resolve()
+                    } else {
+                        reject(new Error('Đăng nhập Google đã bị hủy'))
+                    }
+                }
+            } catch {
+                clearInterval(interval)
+                reject(new Error('Đã xảy ra lỗi khi đăng nhập Google'))
+            }
+        }, 500)
+    })
+}
+
+/**
  * Sign in an existing user
  */
 export async function signIn({ email, password }: SignInData) {

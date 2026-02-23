@@ -130,7 +130,7 @@ export function RegisterForm() {
         </div>
 
         <button
-          className="w-full h-12 mt-2 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg shadow-sm shadow-primary/30 transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-12 mt-2 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg shadow-sm shadow-primary/30 transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           type="submit"
           disabled={loading}
         >
@@ -150,7 +150,7 @@ export function RegisterForm() {
       </div>
 
       <button
-        className="w-full h-12 bg-white dark:bg-surface-dark border border-[#e7dbcf] dark:border-[#4a3b2f] hover:bg-gray-50 dark:hover:bg-[#36291e] text-text-main dark:text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-3"
+        className="w-full h-12 bg-white dark:bg-surface-dark border border-[#e7dbcf] dark:border-[#4a3b2f] hover:bg-gray-50 dark:hover:bg-[#36291e] text-text-main dark:text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer"
         type="button"
       >
         <svg className="h-5 w-5" aria-hidden="true" viewBox="0 0 24 24">
