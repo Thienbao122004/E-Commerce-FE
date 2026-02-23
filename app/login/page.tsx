@@ -1,15 +1,30 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { LoginForm } from '@/components/auth/login-form'
+import { LoadingScreen } from '@/components/ui/loading-screen'
 
 export default function LoginPage() {
+  const { session, isLoading } = useAuth()
+
+  useEffect(() => {
+    if (!isLoading && session) {
+      window.location.href = '/dashboard'
+    }
+  }, [isLoading, session])
+
+  if (isLoading || session) return <LoadingScreen />
+
   return (
     <div className="font-display bg-background-light dark:bg-background-dark text-text-main dark:text-[#e7dbcf] min-h-screen flex flex-col md:flex-row overflow-x-hidden transition-colors duration-300">
       <div className="hidden md:flex md:w-1/2 lg:w-5/12 xl:w-1/2 h-screen relative overflow-hidden bg-stone-200">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 hover:scale-105"
           style={{
             backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDM3QI4TpOU-uiVr-llHuc95ubjIKJZa_APXVVMsQVNGRUaxb7mp0ISY0-7By8BI3dKHeOTRXTU_FJtV1XUZy0iR-XuoZo7-amgzCkNtalFUh6ba0SPMe5z1Im6eaVLnZP6Xs3MhGN3YdHfJyR_Ly6Mhcwpb9g4_83_O0ElkkXIUx4LVfP9rY5uS6DU3CIujfBODZ2uU2T2IvSHaeujDVgQrCMBhftq3BA5jcJNhQnNBPOhsEOAkPmnFbHNvrUPqZX60HdywU1AfW4')"
           }}
-        > 
+        >
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
         </div>
         <div className="absolute bottom-10 left-10 z-10 text-white max-w-md">

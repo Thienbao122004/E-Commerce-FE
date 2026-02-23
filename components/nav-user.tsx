@@ -1,13 +1,11 @@
 "use client"
 
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
-  IconNotification,
+  IconShield,
   IconUserCircle,
 } from "@tabler/icons-react"
-
 import {
   Avatar,
   AvatarFallback,
@@ -28,17 +26,35 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/contexts/auth-context"
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string
-    email: string
-    avatar: string
+const ROLE_LABELS: Record<string, string> = {
+  customer: 'Khách hàng',
+  seller: 'Người bán',
+  admin: 'Admin',
+}
+
+function getInitials(name: string | null | undefined, email: string | null | undefined): string {
+  if (name) {
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   }
-}) {
+  if (email) return email[0].toUpperCase()
+  return 'U'
+}
+
+export function NavUser() {
   const { isMobile } = useSidebar()
+  const { user, profile, signOut } = useAuth()
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Người dùng'
+  const displayEmail = user?.email || ''
+  const initials = getInitials(profile?.full_name, user?.email)
+  const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? profile.role) : ''
+
+  const handleSignOut = async () => {
+    await signOut()
+    window.location.href = '/login'
+  }
 
   return (
     <SidebarMenu>
@@ -50,13 +66,13 @@ export function NavUser({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
+                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate font-medium">{displayName}</span>
                 <span className="text-muted-foreground truncate text-xs">
-                  {user.email}
+                  {displayEmail}
                 </span>
               </div>
               <IconDotsVertical className="ml-auto size-4" />
@@ -71,36 +87,39 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
+                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="truncate font-medium">{displayName}</span>
                   <span className="text-muted-foreground truncate text-xs">
-                    {user.email}
+                    {displayEmail}
                   </span>
                 </div>
               </div>
             </DropdownMenuLabel>
+            {roleLabel && (
+              <>
+                <DropdownMenuSeparator />
+                <div className="px-2 py-1">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <IconShield className="size-3" />
+                    {roleLabel}
+                  </span>
+                </div>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { window.location.href = '/dashboard/settings' }}>
                 <IconUserCircle />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconCreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
+                Tài khoản
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut} className="text-red-500 focus:text-red-500">
               <IconLogout />
-              Log out
+              Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

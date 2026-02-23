@@ -12,7 +12,6 @@ import {
   IconInnerShadowTop,
   IconList,
   IconListDetails,
-  IconLock,
   IconPackage,
   IconReport,
   IconSearch,
@@ -36,128 +35,86 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/contexts/auth-context"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+const ALL_NAV_ITEMS = [
+  {
+    title: "Tổng quan",
+    url: "/dashboard",
+    icon: IconDashboard,
+    roles: ['admin', 'seller'],
   },
-  navMain: [
-    {
-      title: "Tổng quan",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Quản lý sản phẩm",
-      url: "/dashboard/products",
-      icon: IconCamera,
-      isActive: true,
-      items: [
-        {
-          title: "Tất cả sản phẩm",
-          url: "/dashboard/products",
-          icon: IconList,
-        },
-        {
-          title: "Sản phẩm nổi bật",
-          url: "/dashboard/products/featured",
-          icon: IconStar,
-        },
-        {
-          title: "Kho hàng",
-          url: "/dashboard/products/inventory",
-          icon: IconPackage,
-        },
-      ],
-    },
-    {
-      title: "Quản lý đơn hàng",
-      url: "/dashboard/orders",
-      icon: IconFolder,
-      items: [
-        {
-          title: "Tất cả đơn hàng",
-          url: "/dashboard/orders",
-          icon: IconListDetails,
-        },
-      ],
-    },
-    {
-      title: "Quản lý tranh chấp",
-      url: "/dashboard/disputes",
-      icon: IconGavel,
-      items: [
-        {
-          title: "Tất cả tranh chấp",
-          url: "/dashboard/disputes",
-          icon: IconList,
-        },
-      ],
-    },
-    {
-      title: "Danh mục và tags",
-      url: "/dashboard/categories",
-      icon: IconListDetails,
-      items: [
-        {
-          title: "Danh mục",
-          url: "/dashboard/categories",
-          icon: IconFolderOpen,
-        },
-        {
-          title: "Tags",
-          url: "/dashboard/tags",
-          icon: IconTag,
-        },
-      ],
-    },
-    {
-      title: "Quản lý người dùng",
-      url: "/dashboard/users",
-      icon: IconUsers,
-      items: [
-        {
-          title: "Tất cả người dùng",
-          url: "/dashboard/users",
-          icon: IconUserSearch,
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Cài đặt",
-      url: "/dashboard/settings",
-      icon: IconSettings,
-    },
-    {
-      title: "Hỗ trợ",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Tìm kiếm",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  sellers: [
-    {
-      name: "Quản lý người bán",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Yêu cầu rút tiền",
-      url: "#",
-      icon: IconReport,
-    },
-  ],
-}
+  {
+    title: "Quản lý sản phẩm",
+    url: "/dashboard/products",
+    icon: IconCamera,
+    isActive: true,
+    roles: ['admin', 'seller'],
+    items: [
+      { title: "Tất cả sản phẩm", url: "/dashboard/products", icon: IconList },
+      { title: "Sản phẩm nổi bật", url: "/dashboard/products/featured", icon: IconStar },
+      { title: "Kho hàng", url: "/dashboard/products/inventory", icon: IconPackage },
+    ],
+  },
+  {
+    title: "Quản lý đơn hàng",
+    url: "/dashboard/orders",
+    icon: IconFolder,
+    roles: ['admin', 'seller'],
+    items: [
+      { title: "Tất cả đơn hàng", url: "/dashboard/orders", icon: IconListDetails },
+    ],
+  },
+  {
+    title: "Quản lý tranh chấp",
+    url: "/dashboard/disputes",
+    icon: IconGavel,
+    roles: ['admin'],
+    items: [
+      { title: "Tất cả tranh chấp", url: "/dashboard/disputes", icon: IconList },
+    ],
+  },
+  {
+    title: "Danh mục và tags",
+    url: "/dashboard/categories",
+    icon: IconListDetails,
+    roles: ['admin'],
+    items: [
+      { title: "Danh mục", url: "/dashboard/categories", icon: IconFolderOpen },
+      { title: "Tags", url: "/dashboard/tags", icon: IconTag },
+    ],
+  },
+  {
+    title: "Quản lý người dùng",
+    url: "/dashboard/users",
+    icon: IconUsers,
+    roles: ['admin'],
+    items: [
+      { title: "Tất cả người dùng", url: "/dashboard/users", icon: IconUserSearch },
+    ],
+  },
+]
+
+const SELLERS_ITEMS = [
+  { name: "Quản lý người bán", url: "#", icon: IconDatabase },
+  { name: "Yêu cầu rút tiền", url: "#", icon: IconReport },
+]
+
+const NAV_SECONDARY = [
+  { title: "Cài đặt", url: "/dashboard/settings", icon: IconSettings },
+  { title: "Hỗ trợ", url: "#", icon: IconHelp },
+  { title: "Tìm kiếm", url: "#", icon: IconSearch },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { role } = useAuth()
+
+  const visibleNavItems = ALL_NAV_ITEMS.filter(item =>
+    !item.roles || (role && item.roles.includes(role))
+  )
+
+  const showSellers = role === 'admin'
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -176,12 +133,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSellers items={data.sellers} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={visibleNavItems} />
+        {showSellers && <NavSellers items={SELLERS_ITEMS} />}
+        <NavSecondary items={NAV_SECONDARY} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
     </Sidebar>
   )
