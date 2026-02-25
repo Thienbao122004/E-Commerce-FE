@@ -22,8 +22,6 @@ export function LoginForm() {
       if (event.origin !== window.location.origin) return
 
       if (event.data?.type === 'supabase:auth:success') {
-        setGoogleLoading(false)
-        router.push('/dashboard')
       } else if (event.data?.type === 'supabase:auth:error') {
         setGoogleLoading(false)
         setError(event.data.error || 'Đăng nhập Google thất bại')
@@ -41,10 +39,8 @@ export function LoginForm() {
 
     try {
       await signIn({ email, password })
-      router.push('/dashboard')
     } catch (err: any) {
       setError(err.message || 'Failed to sign in')
-    } finally {
       setLoading(false)
     }
   }
@@ -59,6 +55,9 @@ export function LoginForm() {
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           skipBrowserRedirect: true,
+          queryParams: {
+            prompt: 'select_account',
+          },
         },
       })
 
@@ -66,7 +65,6 @@ export function LoginForm() {
         throw new Error(error?.message || 'Không thể lấy URL đăng nhập Google')
       }
 
-      // Close previous popup if still open
       if (popupRef.current && !popupRef.current.closed) {
         popupRef.current.close()
       }
@@ -82,7 +80,6 @@ export function LoginForm() {
         `width=${popupWidth},height=${popupHeight},left=${left},top=${top}`
       )
 
-      // If popup was blocked by browser
       if (!popupRef.current) {
         setError('Popup bị chặn. Vui lòng cho phép popup trong trình duyệt và thử lại.')
         setGoogleLoading(false)

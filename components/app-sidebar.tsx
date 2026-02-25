@@ -111,7 +111,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const visibleNavItems = ALL_NAV_ITEMS.filter(item =>
     !item.roles || (role && item.roles.includes(role))
-  )
+  ).map(item => {
+    const basePath = role === 'admin' ? '/admin' : (role === 'seller' ? '/seller' : '')
+    return {
+      ...item,
+      url: item.url.startsWith('/dashboard') ? `${basePath}${item.url}` : item.url,
+      items: item.items?.map(subItem => ({
+        ...subItem,
+        url: subItem.url.startsWith('/dashboard') ? `${basePath}${subItem.url}` : subItem.url,
+      }))
+    }
+  })
+
+  const secondaryNavItems = NAV_SECONDARY.map(item => {
+    const basePath = role === 'admin' ? '/admin' : (role === 'seller' ? '/seller' : '')
+    return {
+      ...item,
+      url: item.url.startsWith('/dashboard') ? `${basePath}${item.url}` : item.url,
+    }
+  })
 
   const showSellers = role === 'admin'
 
@@ -135,7 +153,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={visibleNavItems} />
         {showSellers && <NavSellers items={SELLERS_ITEMS} />}
-        <NavSecondary items={NAV_SECONDARY} className="mt-auto" />
+        <NavSecondary items={secondaryNavItems} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

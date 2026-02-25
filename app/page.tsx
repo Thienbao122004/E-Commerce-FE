@@ -27,7 +27,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/login"
@@ -44,7 +43,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Features */}
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl shadow-md p-6">
               <div className="text-4xl mb-3">🔐</div>
@@ -71,7 +69,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Test Info */}
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-blue-900 mb-3">
               🧪 Testing the Integration

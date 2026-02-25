@@ -3,7 +3,6 @@
 import {
   IconDotsVertical,
   IconLogout,
-  IconShield,
   IconUserCircle,
 } from "@tabler/icons-react"
 import {
@@ -27,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/auth-context"
+import Link from "next/link"
 
 const ROLE_LABELS: Record<string, string> = {
   customer: 'Khách hàng',
@@ -44,16 +44,20 @@ function getInitials(name: string | null | undefined, email: string | null | und
 
 export function NavUser() {
   const { isMobile } = useSidebar()
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, role, signOut } = useAuth()
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Người dùng'
   const displayEmail = user?.email || ''
   const initials = getInitials(profile?.full_name, user?.email)
-  const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? profile.role) : ''
 
   const handleSignOut = async () => {
-    await signOut()
-    window.location.href = '/login'
+    try {
+      await signOut()
+    } catch (error) {
+
+    } finally {
+      window.location.href = '/login'
+    }
   }
 
   return (
@@ -98,26 +102,17 @@ export function NavUser() {
                 </div>
               </div>
             </DropdownMenuLabel>
-            {roleLabel && (
-              <>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1">
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <IconShield className="size-3" />
-                    {roleLabel}
-                  </span>
-                </div>
-              </>
-            )}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => { window.location.href = '/dashboard/settings' }}>
-                <IconUserCircle />
-                Tài khoản
+              <DropdownMenuItem asChild>
+                <Link href={role === 'admin' ? '/admin/dashboard/settings' : (role === 'seller' ? '/seller/dashboard/settings' : '/dashboard/settings')} className="cursor-pointer">
+                  <IconUserCircle />
+                  Tài khoản
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} className="text-red-500 focus:text-red-500">
+            <DropdownMenuItem onSelect={handleSignOut} className="text-red-500 focus:text-red-500">
               <IconLogout />
               Đăng xuất
             </DropdownMenuItem>

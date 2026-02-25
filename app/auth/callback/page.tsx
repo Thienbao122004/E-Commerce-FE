@@ -20,17 +20,26 @@ export default function AuthCallbackPage() {
                 return
             }
 
+            let sessionRetrieved = false
+
             if (code) {
-                await supabase.auth.exchangeCodeForSession(code)
+                // supabase-js automatically exchanges the code in the background when it detects it in the URL.
+                // We just need to wait for the session to be available.
+                for (let i = 0; i < 20; i++) {
+                    const { data } = await supabase.auth.getSession()
+                    if (data.session) {
+                        sessionRetrieved = true
+                        break
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                }
             }
 
-            // Notify the parent window and close this popup
             if (window.opener && !window.opener.closed) {
                 window.opener.postMessage({ type: 'supabase:auth:success' }, window.location.origin)
                 window.close()
             } else {
-                // Fallback: if not in popup, redirect normally
-                window.location.href = '/dashboard'
+                window.location.href = '/login'
             }
         }
 

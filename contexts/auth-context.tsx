@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [isProfileLoading, setIsProfileLoading] = useState(true)
 
     const fetchProfile = async (userId: string, userMeta?: Record<string, any>) => {
         const { data, error } = await supabase
@@ -45,8 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .eq('id', userId)
             .single()
 
-        if (error) {
-            if (error.code !== 'PGRST116') {
+        if (error || !data) {
+            if (error && error.code !== 'PGRST116') {
                 console.warn('Could not fetch user profile (check RLS policy):', error.code)
             }
             const fallbackRole = (userMeta?.role ?? userMeta?.user_role ?? 'customer') as UserRole
@@ -68,28 +69,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     useEffect(() => {
+        let mounted = true
+        const initializeAuth = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession()
+                if (!mounted) return
+                setSession(session)
+                setUser(session?.user ?? null)
+            } catch (error) {
+
+            } finally {
+                if (mounted) setIsLoading(false)
+            }
+        }
+
+        initializeAuth()
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            (event, session) => {
+                if (!mounted) return
+                if (event === 'INITIAL_SESSION') return
+
+                console.log(`[Auth] Auth event triggered: ${event}`, session ? session.user.email : 'null')
                 setSession(session)
                 setUser(session?.user ?? null)
 
-                if (session?.user) {
-                    const profile = await fetchProfile(session.user.id, session.user.app_metadata)
-                    setProfile(profile)
-                } else {
+                if (event === 'SIGNED_OUT') {
+                    console.log('[Auth] User signed out, clearing profile')
                     setProfile(null)
                 }
 
-                setIsLoading(false)
+                if (mounted) setIsLoading(false)
             }
         )
 
-        return () => subscription.unsubscribe()
+        return () => {
+            mounted = false
+            subscription.unsubscribe()
+        }
     }, [])
 
+    useEffect(() => {
+        let mounted = true
+        const loadProfile = async () => {
+            if (!user) {
+                if (mounted) {
+                    setProfile(null)
+                    setIsProfileLoading(false)
+                }
+                return
+            }
+            try {
+                if (mounted) setIsProfileLoading(true)
+                const profileData = await fetchProfile(user.id, user.app_metadata)
+                if (mounted) setProfile(profileData)
+            } catch (error) {
+        
+            } finally {
+                if (mounted) setIsProfileLoading(false)
+            }
+        }
+
+        loadProfile()
+
+        return () => {
+            mounted = false
+        }
+    }, [user?.id])
+
     const signOut = async () => {
-        await supabase.auth.signOut()
-        setProfile(null)
+        try {
+            await supabase.auth.signOut()
+        } catch (error) {
+
+        } finally {
+            setProfile(null)
+            setSession(null)
+            setUser(null)
+        }
     }
 
     const role = profile?.role ?? null
@@ -99,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         profile,
         role,
-        isLoading,
+        isLoading: isLoading || isProfileLoading,
         isAdmin: role === 'admin',
         isSeller: role === 'seller',
         signOut,

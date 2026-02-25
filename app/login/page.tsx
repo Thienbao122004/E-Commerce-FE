@@ -6,13 +6,19 @@ import { LoginForm } from '@/components/auth/login-form'
 import { LoadingScreen } from '@/components/ui/loading-screen'
 
 export default function LoginPage() {
-  const { session, isLoading } = useAuth()
+  const { session, isLoading, role } = useAuth()
 
   useEffect(() => {
     if (!isLoading && session) {
-      window.location.href = '/dashboard'
+      if (role === 'admin') {
+        window.location.href = '/admin/dashboard'
+      } else if (role === 'seller') {
+        window.location.href = '/seller/dashboard'
+      } else {
+        window.location.href = '/'
+      }
     }
-  }, [isLoading, session])
+  }, [isLoading, session, role])
 
   if (isLoading || session) return <LoadingScreen />
 
