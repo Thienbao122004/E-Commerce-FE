@@ -49,7 +49,6 @@ import {
 } from "@/lib/types/order"
 import type { AdminOrder } from "@/lib/types/order"
 
-// ---------- Formatters ----------
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -66,7 +65,6 @@ const formatDate = (ts: string) =>
     minute: "2-digit",
   })
 
-// ---------- Status tabs ----------
 const statusTabs = [
   { label: "Tất cả", value: null },
   { label: "Chờ thanh toán", value: OrderStatus.PendingPayment },
@@ -80,7 +78,6 @@ const statusTabs = [
   { label: "Hoàn tiền", value: OrderStatus.Refunded },
 ]
 
-// ---------- UpdateStatusDialog ----------
 function UpdateStatusDialog({
   open,
   onOpenChange,
@@ -164,7 +161,6 @@ function UpdateStatusDialog({
   )
 }
 
-// ---------- Table skeleton ----------
 function TableSkeleton() {
   return (
     <>
@@ -183,7 +179,6 @@ function TableSkeleton() {
   )
 }
 
-// ---------- Main component ----------
 export default function OrdersPage() {
   const {
     orders,
@@ -219,21 +214,6 @@ export default function OrdersPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Quản lý đơn hàng</h1>
-              <p className="text-muted-foreground text-sm">
-                {loading ? "Đang tải..." : `Tổng cộng ${totalCount} đơn hàng`}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />
-              Làm mới
-            </Button>
-          </div>
-
-          {/* Filter toolbar */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
@@ -264,7 +244,6 @@ export default function OrdersPage() {
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">

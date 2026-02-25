@@ -15,7 +15,6 @@ import {
   IconPackage,
   IconReport,
   IconSearch,
-  IconSettings,
   IconStar,
   IconTag,
   IconUsers,
@@ -100,7 +99,6 @@ const SELLERS_ITEMS = [
 ]
 
 const NAV_SECONDARY = [
-  { title: "Cài đặt", url: "/dashboard/settings", icon: IconSettings },
   { title: "Hỗ trợ", url: "#", icon: IconHelp },
   { title: "Tìm kiếm", url: "#", icon: IconSearch },
 ]

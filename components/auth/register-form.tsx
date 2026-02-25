@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signUp } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export function RegisterForm() {
   const router = useRouter()
@@ -177,9 +178,9 @@ export function RegisterForm() {
       <div className="text-center mt-2">
         <p className="text-text-main dark:text-gray-300">
           Bạn đã có tài khoản?
-          <a className="font-semibold text-primary hover:text-primary-hover hover:underline ml-1" href="/login">
+          <Link className="font-semibold text-primary hover:text-primary-hover hover:underline ml-1" href="/login">
             Đăng nhập
-          </a>
+          </Link>
         </p>
       </div>
     </div>

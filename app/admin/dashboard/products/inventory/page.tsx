@@ -61,24 +61,6 @@ export default function InventoryPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <IconPackage className="size-6 text-orange-500" />
-                Kho hàng
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                {loading ? "Đang tải..." : `${totalCount} sản phẩm hết hàng`}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />
-              Làm mới
-            </Button>
-          </div>
-
-          {/* Summary card */}
           {!loading && (
             <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 dark:border-orange-800">
               <CardHeader className="flex-row items-center gap-4">

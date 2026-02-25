@@ -125,7 +125,7 @@ export function LoginForm() {
             <label className="text-sm font-semibold text-text-main dark:text-gray-200" htmlFor="password">
               Mật khẩu
             </label>
-            <a tabIndex={-1} className="text-sm font-medium text-primary hover:text-primary-hover hover:underline transition-colors" href="#">
+            <a tabIndex={-1} className="text-sm font-medium text-primary hover:text-primary-hover hover:underline transition-colors" href="/forgot-password">
               Quên mật khẩu?
             </a>
           </div>

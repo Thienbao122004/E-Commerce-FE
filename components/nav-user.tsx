@@ -3,7 +3,7 @@
 import {
   IconDotsVertical,
   IconLogout,
-  IconUserCircle,
+  IconSettings,
 } from "@tabler/icons-react"
 import {
   Avatar,
@@ -88,26 +88,11 @@ export function NavUser() {
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{displayName}</span>
-                  <span className="text-muted-foreground truncate text-xs">
-                    {displayEmail}
-                  </span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
                 <Link href={role === 'admin' ? '/admin/dashboard/settings' : (role === 'seller' ? '/seller/dashboard/settings' : '/dashboard/settings')} className="cursor-pointer">
-                  <IconUserCircle />
-                  Tài khoản
+                  <IconSettings />
+                  Cài đặt
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
