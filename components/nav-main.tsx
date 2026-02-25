@@ -38,8 +38,8 @@ export function NavMain({
 }) {
   const pathname = usePathname()
 
-  const isActive = (url: string) =>
-    pathname === url || pathname.startsWith(url + "/")
+  const isActive = (url: string, exact?: boolean) =>
+    exact ? pathname === url : pathname === url || pathname.startsWith(url + "/")
 
   const isGroupActive = (item: { url: string; items?: { url: string }[] }) =>
     isActive(item.url) || (item.items?.some((sub) => isActive(sub.url)) ?? false)
@@ -71,7 +71,7 @@ export function NavMain({
                     <SidebarMenuSub>
                       {item.items.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild isActive={isActive(subItem.url)}>
+                          <SidebarMenuSubButton asChild isActive={isActive(subItem.url, subItem.url === item.url)}>
                             <Link href={subItem.url}>
                               {subItem.icon && <subItem.icon className="size-4" />}
                               <span>{subItem.title}</span>
@@ -85,7 +85,7 @@ export function NavMain({
               </Collapsible>
             ) : (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild tooltip={item.title} isActive={isActive(item.url)}>
+                <SidebarMenuButton asChild tooltip={item.title} isActive={isActive(item.url, true)}>
                   <Link href={item.url}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>

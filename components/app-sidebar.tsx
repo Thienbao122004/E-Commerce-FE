@@ -48,7 +48,6 @@ const ALL_NAV_ITEMS = [
     title: "Quản lý sản phẩm",
     url: "/dashboard/products",
     icon: IconCamera,
-    isActive: true,
     roles: ['admin', 'seller'],
     items: [
       { title: "Tất cả sản phẩm", url: "/dashboard/products", icon: IconList },

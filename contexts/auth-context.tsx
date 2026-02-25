@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const profileData = await fetchProfile(user.id, user.app_metadata)
                 if (mounted) setProfile(profileData)
             } catch (error) {
-        
+
             } finally {
                 if (mounted) setIsProfileLoading(false)
             }
@@ -151,12 +151,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const role = profile?.role ?? null
 
+    const stillLoading = isLoading || isProfileLoading || (!!user && !profile)
+
     const value: AuthContextValue = {
         session,
         user,
         profile,
         role,
-        isLoading: isLoading || isProfileLoading,
+        isLoading: stillLoading,
         isAdmin: role === 'admin',
         isSeller: role === 'seller',
         signOut,
