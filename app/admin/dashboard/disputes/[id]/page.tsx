@@ -59,6 +59,11 @@ export default function DisputeDetailPage() {
 
   const handleAction = async () => {
     if (!dispute || !resolution) return
+    if (dlgType === "approve" && amount) {
+      const amt = Number(amount)
+      if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
+      if (amt > dispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
+    }
     setBusy(true)
     const { data } = await supabase.auth.getSession()
     const tk = data.session?.access_token
@@ -195,6 +200,9 @@ export default function DisputeDetailPage() {
                 <label className="text-sm font-medium mb-1.5 block">Số tiền duyệt</label>
                 <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
                 <p className="text-xs text-muted-foreground mt-1">Yêu cầu: {dispute ? currency(dispute.requestedAmount) : ""}</p>
+                {amount && Number(amount) > (dispute?.requestedAmount ?? 0) && (
+                  <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>
+                )}
               </div>
             )}
             <div>

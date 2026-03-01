@@ -134,7 +134,7 @@ export default function InventoryPage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/dashboard/products/${product.id}`}
+                          href={`/admin/dashboard/products/${product.id}`}
                           className="font-medium hover:underline line-clamp-1 max-w-[200px]"
                         >
                           {product.name}
@@ -160,7 +160,7 @@ export default function InventoryPage() {
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="size-8" asChild>
-                          <Link href={`/dashboard/products/${product.id}`}>
+                          <Link href={`/admin/dashboard/products/${product.id}`}>
                             <IconExternalLink className="size-4" />
                           </Link>
                         </Button>

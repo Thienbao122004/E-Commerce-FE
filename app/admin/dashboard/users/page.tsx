@@ -186,14 +186,17 @@ export default function UsersPage() {
                       <Badge variant="secondary" className={`text-xs ${UserStatusColors[u.status] ?? ""}`}>
                         {UserStatusLabels[u.status] ?? u.statusName}
                       </Badge>
+                      {u.status === UserStatus.Suspended && u.suspensionReason && (
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-0.5 max-w-[160px] truncate" title={u.suspensionReason}>{u.suspensionReason}</p>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(u.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" className="size-8" asChild>
-                          <Link href={`/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
+                          <Link href={`/admin/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
                         </Button>
-                        {u.status === UserStatus.Active && (
+                        {u.status === UserStatus.Active && u.role !== "admin" && (
                           <Button variant="outline" size="sm" className="h-8 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setSuspendTarget(u); setReason("") }} disabled={busy}>
                             <IconLock className="mr-1 size-3.5" />Khóa
                           </Button>
@@ -228,6 +231,20 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>Khóa tài khoản</DialogTitle>
             <DialogDescription>Người dùng: {suspendTarget?.fullName ?? suspendTarget?.id.slice(0, 8)}</DialogDescription>
+          </DialogHeader>
+          {suspendTarget?.role === "seller" && (
+            <div className="rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-3">
+              <p className="text-sm font-medium text-orange-800 dark:text-orange-300">⚠️ Người dùng này là Seller</p>
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Khóa tài khoản sẽ khiến cửa hàng không thể hoạt động và ảnh hưởng đến đơn hàng.</p>
+            </div>
+          )}
+          {suspendTarget?.hasOrders && (
+            <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
+              <p className="text-sm font-medium text-red-800 dark:text-red-300">⚠️ Người dùng có đơn hàng đang xử lý</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Khóa tài khoản có thể ảnh hưởng đến các đơn hàng đang hoạt động.</p>
+            </div>
+          )}
+          <DialogHeader className="sr-only">
           </DialogHeader>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Lý do khóa *</label>

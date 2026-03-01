@@ -58,7 +58,7 @@ const ALL_NAV_ITEMS = [
     title: "Quản lý đơn hàng",
     url: "/dashboard/orders",
     icon: IconFolder,
-    roles: ['admin', 'seller'],
+    roles: ['seller'],
     items: [
       { title: "Tất cả đơn hàng", url: "/dashboard/orders", icon: IconListDetails },
     ],
@@ -94,8 +94,8 @@ const ALL_NAV_ITEMS = [
 ]
 
 const SELLERS_ITEMS = [
-  { name: "Quản lý người bán", url: "#", icon: IconDatabase },
-  { name: "Yêu cầu rút tiền", url: "#", icon: IconReport },
+  { name: "Quản lý người bán", url: "/admin/dashboard/sellers", icon: IconDatabase },
+  { name: "Yêu cầu rút tiền", url: "/admin/dashboard/withdrawals", icon: IconReport },
 ]
 
 const NAV_SECONDARY = [

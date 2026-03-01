@@ -147,6 +147,11 @@ export default function DisputesPage() {
 
   const handleAction = async () => {
     if (!dialogDispute || !resolution) return
+    if (dialogType === "approve" && approvedAmount) {
+      const amt = Number(approvedAmount)
+      if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
+      if (amt > dialogDispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
+    }
     setActionLoading(true)
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
@@ -238,7 +243,7 @@ export default function DisputesPage() {
                       <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
                       <TableCell>
                         <Link
-                          href={`/dashboard/disputes/${d.id}`}
+                          href={`/admin/dashboard/disputes/${d.id}`}
                           className="font-mono text-sm font-medium hover:underline"
                         >
                           {d.id.slice(0, 8)}...
@@ -268,7 +273,7 @@ export default function DisputesPage() {
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" asChild>
-                            <Link href={`/dashboard/disputes/${d.id}`}>
+                            <Link href={`/admin/dashboard/disputes/${d.id}`}>
                               <IconExternalLink className="size-4" />
                             </Link>
                           </Button>
@@ -295,6 +300,12 @@ export default function DisputesPage() {
                                 Từ chối
                               </Button>
                             </>
+                          )}
+                          {d.status === DisputeStatus.WaitingSeller && (
+                            <span className="text-xs text-orange-500 italic">Đang chờ seller</span>
+                          )}
+                          {d.resolution && d.status > DisputeStatus.WaitingCustomer && (
+                            <span className="text-xs text-muted-foreground max-w-[120px] truncate inline-block" title={d.resolution}>{d.resolution}</span>
                           )}
                         </div>
                       </TableCell>
@@ -348,6 +359,9 @@ export default function DisputesPage() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Yêu cầu: {dialogDispute ? currency(dialogDispute.requestedAmount) : ""}
                 </p>
+                {approvedAmount && Number(approvedAmount) > (dialogDispute?.requestedAmount ?? 0) && (
+                  <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>
+                )}
               </div>
             )}
             <div>

@@ -273,7 +273,7 @@ export default function OrdersPage() {
                       <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 20 + idx + 1}</TableCell>
                       <TableCell>
                         <Link
-                          href={`/dashboard/orders/${order.id}`}
+                          href={`/admin/dashboard/orders/${order.id}`}
                           className="font-mono text-sm font-medium hover:underline"
                         >
                           {order.id.slice(0, 8)}...
@@ -305,7 +305,7 @@ export default function OrdersPage() {
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" asChild>
-                            <Link href={`/dashboard/orders/${order.id}`}>
+                            <Link href={`/admin/dashboard/orders/${order.id}`}>
                               <IconExternalLink className="size-4" />
                             </Link>
                           </Button>

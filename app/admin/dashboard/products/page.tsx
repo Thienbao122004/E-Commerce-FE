@@ -52,7 +52,7 @@ import {
 } from "@/lib/types/product"
 import type { ProductModeration } from "@/lib/types/product"
 
-// ---------- Formatters ----------
+
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -67,7 +67,7 @@ const formatDate = (ts: string) =>
     year: "numeric",
   })
 
-// ---------- Status tabs ----------
+
 const statusTabs = [
   { label: "Tất cả", value: null },
   { label: "Đang bán", value: ProductStatus.Active },
@@ -77,7 +77,7 @@ const statusTabs = [
   { label: "Đã gỡ", value: ProductStatus.Removed },
 ]
 
-// ---------- ActionDialog ----------
+
 function ActionDialog({
   open,
   onOpenChange,
@@ -133,7 +133,7 @@ function ActionDialog({
   )
 }
 
-// ---------- Skeleton table ----------
+
 function TableSkeleton() {
   return (
     <>
@@ -152,7 +152,7 @@ function TableSkeleton() {
   )
 }
 
-// ---------- Main component ----------
+
 export default function ProductsPage() {
   const {
     products,
@@ -203,7 +203,7 @@ export default function ProductsPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Filter toolbar */}
+
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
@@ -234,7 +234,7 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Table */}
+
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -277,7 +277,7 @@ export default function ProductsPage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/dashboard/products/${product.id}`}
+                          href={`/admin/dashboard/products/${product.id}`}
                           className="font-medium hover:underline line-clamp-1 max-w-[250px]"
                         >
                           {product.name}
@@ -313,7 +313,7 @@ export default function ProductsPage() {
                             className="size-8"
                             asChild
                           >
-                            <Link href={`/dashboard/products/${product.id}`}>
+                            <Link href={`/admin/dashboard/products/${product.id}`}>
                               <IconExternalLink className="size-4" />
                             </Link>
                           </Button>
@@ -346,7 +346,7 @@ export default function ProductsPage() {
                             </Button>
                           ) : null}
 
-                          {product.status !== ProductStatus.Removed && (
+                          {product.status !== ProductStatus.Removed && product.status !== ProductStatus.Draft && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -369,7 +369,7 @@ export default function ProductsPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
+
           {!loading && totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-muted-foreground text-sm">
@@ -400,7 +400,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Action dialogs */}
+
       < ActionDialog
         open={dialogState.type === "hide"}
         onOpenChange={(v) => !v && setDialogState({ type: null, product: null })
@@ -424,7 +424,7 @@ export default function ProductsPage() {
         open={dialogState.type === "remove"}
         onOpenChange={(v) => !v && setDialogState({ type: null, product: null })}
         title="Gỡ sản phẩm vĩnh viễn"
-        description={`Thao tác này sẽ gỡ "${dialogState.product?.name ?? ""}" khỏi hệ thống. Hành động này không thể hoàn tác.`}
+        description={`Thao tác này sẽ gỡ "${dialogState.product?.name ?? ""}" (shop: ${dialogState.product?.shopName ?? ""}) khỏi nền tảng. Hành động này không thể hoàn tác.`}
         loading={actionLoading}
         onConfirm={handleAction}
         requireReason

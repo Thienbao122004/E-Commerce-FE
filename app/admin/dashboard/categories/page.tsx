@@ -65,6 +65,8 @@ export default function CategoriesPage() {
   // Delete
   const [deleteCat, setDeleteCat] = React.useState<Category | null>(null)
 
+  const [toggleCat, setToggleCat] = React.useState<Category | null>(null)
+
   const load = React.useCallback(async () => {
     setLoading(true)
     const { data } = await supabase.auth.getSession()
@@ -127,6 +129,15 @@ export default function CategoriesPage() {
   }
 
   const handleToggle = async (c: Category) => {
+    if (c.isActive && c.productCount > 0) {
+      setToggleCat(c)
+      return
+    }
+    await doToggle(c)
+  }
+
+  const doToggle = async (c: Category) => {
+    setToggleCat(null)
     setActionLoading(true)
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
@@ -333,6 +344,27 @@ export default function CategoriesPage() {
             <Button variant="outline" onClick={() => setDeleteCat(null)} disabled={actionLoading}>Hủy</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={actionLoading}>
               {actionLoading ? "Đang xóa..." : "Xóa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={toggleCat !== null} onOpenChange={(v) => { if (!v) setToggleCat(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vô hiệu hóa danh mục</DialogTitle>
+            <DialogDescription>
+              Danh mục &quot;{toggleCat?.name}&quot; hiện có <strong>{toggleCat?.productCount}</strong> sản phẩm.
+              Vô hiệu hóa sẽ ảnh hưởng đến hiển thị của các sản phẩm này.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 p-3">
+            <p className="text-sm text-orange-800 dark:text-orange-300">⚠️ Sản phẩm thuộc danh mục này có thể không hiển thị đúng trên trang chủ.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setToggleCat(null)} disabled={actionLoading}>Hủy</Button>
+            <Button variant="destructive" onClick={() => toggleCat && doToggle(toggleCat)} disabled={actionLoading}>
+              {actionLoading ? "Đang xử lý..." : "Vô hiệu hóa"}
             </Button>
           </DialogFooter>
         </DialogContent>
