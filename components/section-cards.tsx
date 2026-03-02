@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import type { DashboardStats } from "@/lib/types/dashboard"
+import type { DashboardStats } from "@/types/dashboard"
 
 type Props = {
   stats?: DashboardStats

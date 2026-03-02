@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/api/tags"
-import type { Tag } from "@/lib/types/tag"
+import { fetchTags, createTag, updateTag, deleteTag } from "@/services/tags"
+import type { Tag } from "@/types/tag"
 
 const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 

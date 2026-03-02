@@ -1,4 +1,4 @@
-import type { TagListResponse, TagResponse } from "@/lib/types/tag"
+import type { TagListResponse, TagResponse } from "@/types/tag"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

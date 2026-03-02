@@ -53,7 +53,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { supabase } from "@/lib/supabase"
-import { fetchOrderById, updateOrderStatus } from "@/lib/api/orders"
+import { fetchOrderById, updateOrderStatus } from "@/services/orders"
 import {
   OrderStatus,
   OrderStatusLabels,
@@ -61,8 +61,8 @@ import {
   OrderStatusSteps,
   ValidOrderTransitions,
   getStatusStepIndex,
-} from "@/lib/types/order"
-import type { AdminOrderDetail } from "@/lib/types/order"
+} from "@/types/order"
+import type { AdminOrderDetail } from "@/types/order"
 
 // ---------- Formatters ----------
 const currency = (v: number) =>

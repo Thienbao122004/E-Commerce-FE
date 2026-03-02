@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useProducts } from "@/hooks/use-products"
-import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/lib/types/product"
+import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/types/product"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {

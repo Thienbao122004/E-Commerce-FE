@@ -2,7 +2,7 @@ import type {
   ProductListResponse,
   ProductDetailResponse,
   ProductActionResponse,
-} from "@/lib/types/product"
+} from "@/types/product"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL 
 

@@ -2,7 +2,7 @@ import type {
   UserListResponse,
   UserResponse,
   AuditLogResponse,
-} from "@/lib/types/user"
+} from "@/types/user"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

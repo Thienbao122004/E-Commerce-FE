@@ -8,14 +8,14 @@ import {
   fetchStats,
   fetchTopProducts,
   fetchTopShops,
-} from "@/lib/api/dashboard"
+} from "@/services/dashboard"
 import { supabase } from "@/lib/supabase"
 import type {
   DashboardStats,
   RecentActivity,
   TopProduct,
   TopShop,
-} from "@/lib/types/dashboard"
+} from "@/types/dashboard"
 
 export interface DashboardData {
   stats: DashboardStats | null

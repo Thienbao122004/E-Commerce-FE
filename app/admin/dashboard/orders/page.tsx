@@ -46,8 +46,8 @@ import {
   OrderStatusLabels,
   OrderStatusColors,
   ValidOrderTransitions,
-} from "@/lib/types/order"
-import type { AdminOrder } from "@/lib/types/order"
+} from "@/types/order"
+import type { AdminOrder } from "@/types/order"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {

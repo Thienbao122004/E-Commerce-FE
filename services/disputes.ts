@@ -1,7 +1,7 @@
 import type {
   DisputeListResponse,
   DisputeResponse,
-} from "@/lib/types/dispute"
+} from "@/types/dispute"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

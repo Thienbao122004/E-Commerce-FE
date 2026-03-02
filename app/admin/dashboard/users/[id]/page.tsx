@@ -17,9 +17,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { supabase } from "@/lib/supabase"
-import { fetchUserById, suspendUser, unsuspendUser, fetchUserAuditLogs } from "@/lib/api/users"
-import { UserStatus, UserStatusLabels, UserStatusColors } from "@/lib/types/user"
-import type { AdminUser, UserAuditLog } from "@/lib/types/user"
+import { fetchUserById, suspendUser, unsuspendUser, fetchUserAuditLogs } from "@/services/users"
+import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
+import type { AdminUser, UserAuditLog } from "@/types/user"
 
 const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 

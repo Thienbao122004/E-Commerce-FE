@@ -36,7 +36,7 @@ import type {
   RecentActivity,
   TopProduct,
   TopShop,
-} from "@/lib/types/dashboard"
+} from "@/types/dashboard"
 import {
   IconChevronLeft,
   IconChevronRight,
