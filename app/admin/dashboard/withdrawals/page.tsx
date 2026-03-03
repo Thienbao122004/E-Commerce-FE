@@ -10,17 +10,14 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchWithdrawals, approveWithdrawal, rejectWithdrawal } from "@/lib/api/withdrawals"
-import { WithdrawStatus, WithdrawStatusLabels, WithdrawStatusColors } from "@/lib/types/withdraw"
-import type { WithdrawRequest } from "@/lib/types/withdraw"
+import { fetchWithdrawals, approveWithdrawal, rejectWithdrawal } from "@/services/withdrawals"
+import { WithdrawStatus, WithdrawStatusLabels, WithdrawStatusColors } from "@/types/withdraw"
+import type { WithdrawRequest } from "@/types/withdraw"
+import { WithdrawalDialogs } from "./_components/withdrawal-dialogs"
 
 const fmtDate = (t: string | null) =>
   t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
@@ -40,7 +37,6 @@ export default function WithdrawalsPage() {
   const ps = 10
   const tp = Math.ceil(total / ps)
 
-  // Search
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const searchTimeout = React.useRef<NodeJS.Timeout | null>(null)
@@ -50,19 +46,11 @@ export default function WithdrawalsPage() {
     searchTimeout.current = setTimeout(() => { setSearch(val); setPg(1) }, 400)
   }
 
-  // Dialogs
   const [dialogType, setDialogType] = React.useState<DialogType>(null)
   const [target, setTarget] = React.useState<WithdrawRequest | null>(null)
-  const [reason, setReason] = React.useState("")
-  const [adminNote, setAdminNote] = React.useState("")
 
-  const openDialog = (type: DialogType, req: WithdrawRequest) => {
-    setDialogType(type)
-    setTarget(req)
-    setReason("")
-    setAdminNote("")
-  }
-  const closeDialog = () => { setDialogType(null); setTarget(null); setReason(""); setAdminNote("") }
+  const openDialog = (type: DialogType, req: WithdrawRequest) => { setDialogType(type); setTarget(req) }
+  const closeDialog = () => { setDialogType(null); setTarget(null) }
 
   const getToken = async () => {
     const { data } = await supabase.auth.getSession()
@@ -82,7 +70,7 @@ export default function WithdrawalsPage() {
 
   React.useEffect(() => { load() }, [load])
 
-  const handleApprove = async () => {
+  const handleApprove = async (adminNote: string) => {
     if (!target) return
     setBusy(true)
     const tk = await getToken()
@@ -95,7 +83,7 @@ export default function WithdrawalsPage() {
     finally { setBusy(false) }
   }
 
-  const handleReject = async () => {
+  const handleReject = async (reason: string, adminNote: string) => {
     if (!target || !reason) return
     setBusy(true)
     const tk = await getToken()
@@ -122,7 +110,6 @@ export default function WithdrawalsPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -135,23 +122,15 @@ export default function WithdrawalsPage() {
             </Button>
           </div>
 
-          {/* Filters */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input
-                placeholder="Tìm người bán, tên TK, số TK..."
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-9 bg-background"
-              />
+              <Input placeholder="Tìm người bán, tên TK, số TK..." value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} className="pl-9 bg-background" />
             </div>
             <div className="flex items-center gap-2">
               <IconFilter className="size-4 text-muted-foreground" />
               <Select value={status === null ? "all" : String(status)} onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}>
-                <SelectTrigger className="w-[160px] bg-background">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả</SelectItem>
                   <SelectItem value={String(WithdrawStatus.Pending)}>Chờ xử lý</SelectItem>
@@ -162,7 +141,6 @@ export default function WithdrawalsPage() {
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -222,7 +200,6 @@ export default function WithdrawalsPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
           {!loading && tp > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-muted-foreground text-sm">Trang {pg} / {tp} · {total} yêu cầu</p>
@@ -235,70 +212,14 @@ export default function WithdrawalsPage() {
         </div>
       </div>
 
-      {/* Approve Dialog */}
-      <Dialog open={dialogType === "approve"} onOpenChange={(v) => { if (!v) closeDialog() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Duyệt yêu cầu rút tiền</DialogTitle>
-            <DialogDescription>
-              Xác nhận duyệt rút {target ? fmtMoney(target.amount, target.currency) : ""} cho {target?.sellerName}?
-            </DialogDescription>
-          </DialogHeader>
-          {target && (
-            <div className="rounded-md bg-muted/50 border p-3 space-y-1.5">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Thông tin chuyển khoản</p>
-              <div className="grid grid-cols-2 gap-1 text-sm">
-                <span className="text-muted-foreground">Ngân hàng:</span>
-                <span className="font-medium">{target.bankName}</span>
-                <span className="text-muted-foreground">Số TK:</span>
-                <span className="font-mono font-medium">{target.bankAccountNumber}</span>
-                <span className="text-muted-foreground">Chủ TK:</span>
-                <span className="font-medium">{target.bankAccountName}</span>
-                <span className="text-muted-foreground">Số tiền:</span>
-                <span className="font-bold text-emerald-600">{fmtMoney(target.amount, target.currency)}</span>
-              </div>
-            </div>
-          )}
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Ghi chú admin (tùy chọn)</label>
-            <Textarea placeholder="Ghi chú..." value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className="min-h-[60px]" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={busy}>Hủy</Button>
-            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleApprove} disabled={busy}>
-              {busy ? "Đang xử lý..." : "Duyệt"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reject Dialog */}
-      <Dialog open={dialogType === "reject"} onOpenChange={(v) => { if (!v) closeDialog() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Từ chối yêu cầu rút tiền</DialogTitle>
-            <DialogDescription>
-              Từ chối rút {target ? fmtMoney(target.amount, target.currency) : ""} của {target?.sellerName}?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Lý do từ chối *</label>
-              <Textarea placeholder="Nhập lý do..." value={reason} onChange={(e) => setReason(e.target.value)} className="min-h-[60px]" />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Ghi chú admin (tùy chọn)</label>
-              <Textarea placeholder="Ghi chú..." value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className="min-h-[60px]" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeDialog} disabled={busy}>Hủy</Button>
-            <Button variant="destructive" onClick={handleReject} disabled={busy || !reason}>
-              {busy ? "Đang xử lý..." : "Từ chối"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WithdrawalDialogs
+        dialogType={dialogType}
+        target={target}
+        busy={busy}
+        onClose={closeDialog}
+        onApprove={handleApprove}
+        onReject={handleReject}
+      />
     </>
   )
 }

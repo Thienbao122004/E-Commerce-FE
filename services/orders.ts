@@ -2,7 +2,7 @@ import type {
   OrderListResponse,
   OrderDetailResponse,
   OrderActionResponse,
-} from "@/lib/types/order"
+} from "@/types/order"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL 
 

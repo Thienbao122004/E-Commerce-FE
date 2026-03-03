@@ -1,31 +1,34 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   IconSearch, IconChevronLeft, IconChevronRight, IconRefresh,
-  IconExternalLink, IconLock, IconLockOpen, IconFilter,
+  IconLock, IconLockOpen, IconFilter, IconEye, IconUsers,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchUsers, suspendUser, unsuspendUser } from "@/lib/api/users"
-import { UserStatus, UserStatusLabels, UserStatusColors } from "@/lib/types/user"
-import type { AdminUser } from "@/lib/types/user"
+import { fetchUsers, fetchUserById, suspendUser, unsuspendUser, fetchUserAuditLogs } from "@/services/users"
+import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
+import type { AdminUser, UserAuditLog } from "@/types/user"
+import { UserDetailView } from "./_components/user-detail-view"
 
 const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 export default function UsersPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const userIdFromUrl = searchParams.get("id")
+
   const [users, setUsers] = React.useState<AdminUser[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
@@ -33,15 +36,19 @@ export default function UsersPage() {
   const [pg, setPg] = React.useState(1)
   const [role, setRole] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<number | null>(null)
-  const [search, setSearch] = React.useState("")
   const ps = 10
   const tp = Math.ceil(total / ps)
+
+  const [selectedUser, setSelectedUser] = React.useState<AdminUser | null>(null)
+  const [selectedLogs, setSelectedLogs] = React.useState<UserAuditLog[]>([])
+  const [detailLoading, setDetailLoading] = React.useState(false)
 
   const [suspendTarget, setSuspendTarget] = React.useState<AdminUser | null>(null)
   const [reason, setReason] = React.useState("")
 
   const searchTimeout = React.useRef<NodeJS.Timeout | null>(null)
   const [searchInput, setSearchInput] = React.useState("")
+  const [search, setSearch] = React.useState("")
 
   const handleSearchChange = (val: string) => {
     setSearchInput(val)
@@ -49,10 +56,14 @@ export default function UsersPage() {
     searchTimeout.current = setTimeout(() => { setSearch(val); setPg(1) }, 400)
   }
 
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token
+  }
+
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
+    const tk = await getToken()
     if (!tk) { setLoading(false); return }
     try {
       const r = await fetchUsers(tk, pg, ps, role, status)
@@ -63,31 +74,78 @@ export default function UsersPage() {
 
   React.useEffect(() => { load() }, [load])
 
-  const handleSuspend = async () => {
-    if (!suspendTarget || !reason) return
+  const loadUserById = React.useCallback(async (id: string) => {
+    setDetailLoading(true)
+    setSelectedLogs([])
+    const tk = await getToken()
+    if (!tk) { setDetailLoading(false); return }
+    try {
+      const [ur, lr] = await Promise.all([
+        fetchUserById(tk, id),
+        fetchUserAuditLogs(tk, id),
+      ])
+      if (ur.success && ur.user) setSelectedUser(ur.user)
+      if (lr.success) setSelectedLogs(lr.logs)
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
+    finally { setDetailLoading(false) }
+  }, [])
+
+  React.useEffect(() => {
+    if (userIdFromUrl) {
+      loadUserById(userIdFromUrl)
+    } else {
+      setSelectedUser(null)
+      setSelectedLogs([])
+    }
+  }, [userIdFromUrl, loadUserById])
+
+  const viewDetail = (user: AdminUser) => {
+    setSelectedUser(user)
+    router.push(`/admin/dashboard/users?id=${user.id}`, { scroll: false })
+    loadUserById(user.id)
+  }
+
+  const goBack = () => {
+    setSelectedUser(null)
+    setSelectedLogs([])
+    router.push("/admin/dashboard/users", { scroll: false })
+  }
+
+  const handleSuspendAction = async (userId: string, reasonVal: string) => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
+    const tk = await getToken()
     if (!tk) { setBusy(false); return }
     try {
-      const r = await suspendUser(tk, suspendTarget.id, reason)
-      if (r.success) { toast.success(r.message ?? "Đã khóa"); setSuspendTarget(null); setReason(""); load() }
-      else toast.error(r.message ?? "Lỗi")
+      const r = await suspendUser(tk, userId, reasonVal)
+      if (r.success) {
+        toast.success(r.message ?? "Đã khóa")
+        if (selectedUser?.id === userId && r.user) setSelectedUser(r.user)
+        load()
+      } else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setBusy(false) }
   }
 
-  const handleUnsuspend = async (u: AdminUser) => {
+  const handleUnsuspendAction = async (userId: string) => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
+    const tk = await getToken()
     if (!tk) { setBusy(false); return }
     try {
-      const r = await unsuspendUser(tk, u.id)
-      if (r.success) { toast.success(r.message ?? "Đã mở khóa"); load() }
-      else toast.error(r.message ?? "Lỗi")
+      const r = await unsuspendUser(tk, userId)
+      if (r.success) {
+        toast.success(r.message ?? "Đã mở khóa")
+        if (selectedUser?.id === userId && r.user) setSelectedUser(r.user)
+        load()
+      } else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setBusy(false) }
+  }
+
+  const handleListSuspend = async () => {
+    if (!suspendTarget || !reason) return
+    await handleSuspendAction(suspendTarget.id, reason)
+    setSuspendTarget(null)
+    setReason("")
   }
 
   const filtered = React.useMemo(() => {
@@ -100,13 +158,29 @@ export default function UsersPage() {
     )
   }, [users, search])
 
+  if (selectedUser) {
+    return (
+      <UserDetailView
+        user={selectedUser}
+        logs={selectedLogs}
+        detailLoading={detailLoading}
+        busy={busy}
+        onBack={goBack}
+        onSuspend={handleSuspendAction}
+        onUnsuspend={handleUnsuspendAction}
+      />
+    )
+  }
+
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Quản lý người dùng</h1>
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                <IconUsers className="size-7" />Quản lý người dùng
+              </h1>
               <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${total} người dùng`}</p>
             </div>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -117,19 +191,12 @@ export default function UsersPage() {
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input
-                placeholder="Tìm tên, email, SĐT..."
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-9 bg-background"
-              />
+              <Input placeholder="Tìm tên, email, SĐT..." value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} className="pl-9 bg-background" />
             </div>
             <div className="flex items-center gap-2">
               <IconFilter className="size-4 text-muted-foreground" />
               <Select value={role ?? "all"} onValueChange={(v) => { setRole(v === "all" ? null : v); setPg(1) }}>
-                <SelectTrigger className="w-[130px] bg-background">
-                  <SelectValue placeholder="Vai trò" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[130px] bg-background"><SelectValue placeholder="Vai trò" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả vai trò</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
@@ -138,9 +205,7 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
               <Select value={status === null ? "all" : String(status)} onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}>
-                <SelectTrigger className="w-[150px] bg-background">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[150px] bg-background"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả trạng thái</SelectItem>
                   <SelectItem value={String(UserStatus.Active)}>Hoạt động</SelectItem>
@@ -171,7 +236,7 @@ export default function UsersPage() {
                 )) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Không có người dùng nào.</TableCell></TableRow>
                 ) : filtered.map((u, idx) => (
-                  <TableRow key={u.id}>
+                  <TableRow key={u.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewDetail(u)}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                     <TableCell className="font-mono text-xs">{u.id.slice(0, 8)}...</TableCell>
                     <TableCell>
@@ -191,10 +256,10 @@ export default function UsersPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(u.createdAt)}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="size-8" asChild>
-                          <Link href={`/admin/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
+                        <Button variant="ghost" size="icon" className="size-8" onClick={() => viewDetail(u)}>
+                          <IconEye className="size-4" />
                         </Button>
                         {u.status === UserStatus.Active && u.role !== "admin" && (
                           <Button variant="outline" size="sm" className="h-8 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setSuspendTarget(u); setReason("") }} disabled={busy}>
@@ -202,7 +267,7 @@ export default function UsersPage() {
                           </Button>
                         )}
                         {u.status === UserStatus.Suspended && (
-                          <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handleUnsuspend(u)} disabled={busy}>
+                          <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handleUnsuspendAction(u.id)} disabled={busy}>
                             <IconLockOpen className="mr-1 size-3.5" />Mở khóa
                           </Button>
                         )}
@@ -244,15 +309,13 @@ export default function UsersPage() {
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">Khóa tài khoản có thể ảnh hưởng đến các đơn hàng đang hoạt động.</p>
             </div>
           )}
-          <DialogHeader className="sr-only">
-          </DialogHeader>
           <div>
             <label className="text-sm font-medium mb-1.5 block">Lý do khóa *</label>
             <Textarea placeholder="Nhập lý do..." value={reason} onChange={(e) => setReason(e.target.value)} className="min-h-[60px]" />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSuspendTarget(null)} disabled={busy}>Hủy</Button>
-            <Button variant="destructive" onClick={handleSuspend} disabled={busy || !reason}>{busy ? "Đang xử lý..." : "Khóa tài khoản"}</Button>
+            <Button variant="destructive" onClick={handleListSuspend} disabled={busy || !reason}>{busy ? "Đang xử lý..." : "Khóa tài khoản"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

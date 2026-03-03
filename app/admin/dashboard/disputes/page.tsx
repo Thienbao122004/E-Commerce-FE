@@ -1,74 +1,31 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-  IconSearch,
-  IconChevronLeft,
-  IconChevronRight,
-  IconRefresh,
-  IconExternalLink,
-  IconCheck,
-  IconX,
-  IconFilter,
+  IconChevronLeft, IconChevronRight, IconRefresh,
+  IconCheck, IconX, IconFilter, IconScale, IconEye,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchDisputes, approveRefund, rejectDispute } from "@/lib/api/disputes"
+import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes"
 import {
-  DisputeStatus,
-  DisputeStatusLabels,
-  DisputeStatusColors,
-  DisputeTypeLabels,
-} from "@/lib/types/dispute"
-import type { AdminDispute } from "@/lib/types/dispute"
+  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels,
+} from "@/types/dispute"
+import type { AdminDispute } from "@/types/dispute"
+import { DisputeActionDialog } from "./_components/dispute-action-dialog"
 
-// ---------- Formatters ----------
 const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
 const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const statusTabs = [
   { label: "Tất cả", value: null },
@@ -80,27 +37,8 @@ const statusTabs = [
   { label: "Đã hoàn tiền", value: DisputeStatus.Refunded },
 ]
 
-// ---------- Table Skeleton ----------
-function TableSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <TableRow key={i}>
-          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-          <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-        </TableRow>
-      ))}
-    </>
-  )
-}
-
 export default function DisputesPage() {
+  const router = useRouter()
   const [disputes, setDisputes] = React.useState<AdminDispute[]>([])
   const [totalCount, setTotalCount] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
@@ -110,12 +48,8 @@ export default function DisputesPage() {
   const pageSize = 20
   const totalPages = Math.ceil(totalCount / pageSize)
 
-  // Dialog state
   const [dialogDispute, setDialogDispute] = React.useState<AdminDispute | null>(null)
-  const [dialogType, setDialogType] = React.useState<"approve" | "reject">("approve")
-  const [resolution, setResolution] = React.useState("")
-  const [adminNote, setAdminNote] = React.useState("")
-  const [approvedAmount, setApprovedAmount] = React.useState("")
+  const [dialogType, setDialogType] = React.useState<"approve" | "reject" | null>(null)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -124,15 +58,9 @@ export default function DisputesPage() {
     if (!token) { setLoading(false); return }
     try {
       const res = await fetchDisputes(token, page, pageSize, status)
-      if (res.success) {
-        setDisputes(res.disputes)
-        setTotalCount(res.totalCount)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi tải tranh chấp")
-    } finally {
-      setLoading(false)
-    }
+      if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
+    finally { setLoading(false) }
   }, [page, status])
 
   React.useEffect(() => { load() }, [load])
@@ -140,57 +68,44 @@ export default function DisputesPage() {
   const openDialog = (d: AdminDispute, type: "approve" | "reject") => {
     setDialogDispute(d)
     setDialogType(type)
-    setResolution("")
-    setAdminNote("")
-    setApprovedAmount(type === "approve" ? String(d.requestedAmount) : "")
   }
 
-  const handleAction = async () => {
+  const handleAction = async (resolution: string, adminNote: string, approvedAmount?: number) => {
     if (!dialogDispute || !resolution) return
     if (dialogType === "approve" && approvedAmount) {
-      const amt = Number(approvedAmount)
-      if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
-      if (amt > dialogDispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
+      if (approvedAmount <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
+      if (approvedAmount > dialogDispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
     }
     setActionLoading(true)
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     if (!token) { setActionLoading(false); return }
     try {
-      const res =
-        dialogType === "approve"
-          ? await approveRefund(
-            token,
-            dialogDispute.id,
-            approvedAmount ? Number(approvedAmount) : undefined,
-            resolution,
-            adminNote || undefined
-          )
-          : await rejectDispute(
-            token,
-            dialogDispute.id,
-            resolution,
-            adminNote || undefined
-          )
-      if (res.success) {
-        toast.success(res.message ?? "Thao tác thành công")
-        setDialogDispute(null)
-        load()
-      } else {
-        toast.error(res.message ?? "Lỗi thao tác")
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Lỗi thao tác")
-    } finally {
-      setActionLoading(false)
-    }
+      const res = dialogType === "approve"
+        ? await approveRefund(token, dialogDispute.id, approvedAmount, resolution, adminNote || undefined)
+        : await rejectDispute(token, dialogDispute.id, resolution, adminNote || undefined)
+      if (res.success) { toast.success(res.message ?? "Thao tác thành công"); setDialogDispute(null); setDialogType(null); load() }
+      else toast.error(res.message ?? "Lỗi")
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
+    finally { setActionLoading(false) }
   }
 
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Filter */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                <IconScale className="size-7" />Quản lý tranh chấp
+              </h1>
+              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${totalCount} tranh chấp`}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <IconRefresh className="mr-1.5 size-4" />Làm mới
+            </Button>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="flex items-center gap-2">
               <IconFilter className="size-4 text-muted-foreground" />
@@ -198,21 +113,16 @@ export default function DisputesPage() {
                 value={status === null ? "all" : String(status)}
                 onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPage(1) }}
               >
-                <SelectTrigger className="w-[160px] bg-background">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
                 <SelectContent>
                   {statusTabs.map((tab) => (
-                    <SelectItem key={tab.value ?? "all"} value={tab.value === null ? "all" : String(tab.value)}>
-                      {tab.label}
-                    </SelectItem>
+                    <SelectItem key={tab.value ?? "all"} value={tab.value === null ? "all" : String(tab.value)}>{tab.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Table */}
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -230,74 +140,40 @@ export default function DisputesPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableSkeleton />
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 9 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}
+                    </TableRow>
+                  ))
                 ) : disputes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                      Không tìm thấy tranh chấp nào.
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Không tìm thấy tranh chấp nào.</TableCell></TableRow>
                 ) : (
                   disputes.map((d, idx) => (
-                    <TableRow key={d.id}>
+                    <TableRow key={d.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/dashboard/disputes/${d.id}`)}>
                       <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/admin/dashboard/disputes/${d.id}`}
-                          className="font-mono text-sm font-medium hover:underline"
-                        >
-                          {d.id.slice(0, 8)}...
-                        </Link>
-                      </TableCell>
+                      <TableCell><span className="font-mono text-sm font-medium">{d.id.slice(0, 8)}...</span></TableCell>
                       <TableCell className="text-sm">{d.customerName}</TableCell>
                       <TableCell className="text-sm">{d.shopName}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{DisputeTypeLabels[d.type] ?? d.typeName}</Badge></TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">{currency(d.requestedAmount)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {DisputeTypeLabels[d.type] ?? d.typeName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {currency(d.requestedAmount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs ${DisputeStatusColors[d.status] ?? ""}`}
-                        >
+                        <Badge variant="secondary" className={`text-xs ${DisputeStatusColors[d.status] ?? ""}`}>
                           {DisputeStatusLabels[d.status] ?? d.statusName}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm tabular-nums">
-                        {formatDate(d.createdAt)}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDate(d.createdAt)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="size-8" asChild>
-                            <Link href={`/admin/dashboard/disputes/${d.id}`}>
-                              <IconExternalLink className="size-4" />
-                            </Link>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => router.push(`/admin/dashboard/disputes/${d.id}`)}>
+                            <IconEye className="size-4" />
                           </Button>
                           {d.status <= DisputeStatus.WaitingCustomer && (
                             <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs text-green-600"
-                                onClick={() => openDialog(d, "approve")}
-                                disabled={actionLoading}
-                              >
-                                <IconCheck className="mr-1 size-3.5" />
-                                Duyệt
+                              <Button variant="outline" size="sm" className="h-8 text-xs text-green-600" onClick={() => openDialog(d, "approve")} disabled={actionLoading}>
+                                <IconCheck className="mr-1 size-3.5" />Duyệt
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs text-red-600"
-                                onClick={() => openDialog(d, "reject")}
-                                disabled={actionLoading}
-                              >
-                                <IconX className="mr-1 size-3.5" />
-                                Từ chối
+                              <Button variant="outline" size="sm" className="h-8 text-xs text-red-600" onClick={() => openDialog(d, "reject")} disabled={actionLoading}>
+                                <IconX className="mr-1 size-3.5" />Từ chối
                               </Button>
                             </>
                           )}
@@ -316,87 +192,25 @@ export default function DisputesPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
           {!loading && totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">
-                Trang {page} / {totalPages} · {totalCount} tranh chấp
-              </p>
+              <p className="text-muted-foreground text-sm">Trang {page} / {totalPages} · {totalCount} tranh chấp</p>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-                  <IconChevronLeft className="size-4" />
-                </Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
-                  <IconChevronRight className="size-4" />
-                </Button>
+                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page - 1)} disabled={page <= 1}><IconChevronLeft className="size-4" /></Button>
+                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page + 1)} disabled={page >= totalPages}><IconChevronRight className="size-4" /></Button>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Action dialog */}
-      <Dialog open={dialogDispute !== null} onOpenChange={(v) => { if (!v) setDialogDispute(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {dialogType === "approve" ? "Duyệt hoàn tiền" : "Từ chối tranh chấp"}
-            </DialogTitle>
-            <DialogDescription>
-              Tranh chấp: {dialogDispute?.id.slice(0, 8)}... · {dialogDispute?.title}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            {dialogType === "approve" && (
-              <div>
-                <label className="text-sm font-medium mb-1.5 block">Số tiền duyệt</label>
-                <Input
-                  type="number"
-                  placeholder="Nhập số tiền..."
-                  value={approvedAmount}
-                  onChange={(e) => setApprovedAmount(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Yêu cầu: {dialogDispute ? currency(dialogDispute.requestedAmount) : ""}
-                </p>
-                {approvedAmount && Number(approvedAmount) > (dialogDispute?.requestedAmount ?? 0) && (
-                  <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>
-                )}
-              </div>
-            )}
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Kết luận *</label>
-              <Textarea
-                placeholder="Nhập kết luận xử lý..."
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-                className="min-h-[60px]"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Ghi chú admin (tùy chọn)</label>
-              <Textarea
-                placeholder="Ghi chú nội bộ..."
-                value={adminNote}
-                onChange={(e) => setAdminNote(e.target.value)}
-                className="min-h-[40px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogDispute(null)} disabled={actionLoading}>
-              Hủy
-            </Button>
-            <Button
-              onClick={handleAction}
-              disabled={actionLoading || !resolution}
-              variant={dialogType === "approve" ? "default" : "destructive"}
-            >
-              {actionLoading ? "Đang xử lý..." : dialogType === "approve" ? "Duyệt hoàn tiền" : "Từ chối"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DisputeActionDialog
+        dispute={dialogDispute}
+        dialogType={dialogType}
+        onClose={() => { setDialogDispute(null); setDialogType(null) }}
+        loading={actionLoading}
+        onConfirm={handleAction}
+      />
     </>
   )
 }

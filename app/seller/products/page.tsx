@@ -49,8 +49,8 @@ import {
   ProductStatus,
   ProductStatusLabels,
   ProductStatusColors,
-} from "@/lib/types/product"
-import type { ProductModeration } from "@/lib/types/product"
+} from "@/types/product"
+import type { ProductModeration } from "@/types/product"
 
 // ---------- Formatters ----------
 const currency = (v: number) =>

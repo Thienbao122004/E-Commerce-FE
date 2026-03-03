@@ -3,7 +3,7 @@ import {
   RecentActivity,
   TopProduct,
   TopShop,
-} from "@/lib/types/dashboard"
+} from "@/types/dashboard"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL 
 

@@ -30,8 +30,8 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchTopProducts } from "@/lib/api/dashboard"
-import type { TopProduct } from "@/lib/types/dashboard"
+import { fetchTopProducts } from "@/services/dashboard"
+import type { TopProduct } from "@/types/dashboard"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {

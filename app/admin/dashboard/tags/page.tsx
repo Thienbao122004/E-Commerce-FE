@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/api/tags"
-import type { Tag } from "@/lib/types/tag"
+import { fetchTags, createTag, updateTag, deleteTag } from "@/services/tags"
+import type { Tag } from "@/types/tag"
 
 const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 
@@ -94,7 +94,7 @@ export default function TagsPage() {
               <Button size="sm" onClick={openCreate}><IconPlus className="mr-1.5 size-4" />Thêm tag</Button>
             </div>
           </div>
-          {/* Filter toolbar */}
+
           <div className="rounded-lg border bg-muted/30 p-3">
             <div className="relative max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />

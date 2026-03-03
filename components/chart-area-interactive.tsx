@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import type { DashboardStats } from "@/lib/types/dashboard"
+import type { DashboardStats } from "@/types/dashboard"
 
 export const description = "An interactive area chart"
 

@@ -1,4 +1,4 @@
-import type { ShopListResponse, ShopResponse } from "@/lib/types/seller"
+import type { ShopListResponse, ShopResponse } from "@/types/seller"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

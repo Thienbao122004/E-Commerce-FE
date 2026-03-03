@@ -44,14 +44,14 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
-import { fetchDisputes, approveRefund, rejectDispute } from "@/lib/api/disputes"
+import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes"
 import {
   DisputeStatus,
   DisputeStatusLabels,
   DisputeStatusColors,
   DisputeTypeLabels,
-} from "@/lib/types/dispute"
-import type { AdminDispute } from "@/lib/types/dispute"
+} from "@/types/dispute"
+import type { AdminDispute } from "@/types/dispute"
 
 // ---------- Formatters ----------
 const currency = (v: number) =>

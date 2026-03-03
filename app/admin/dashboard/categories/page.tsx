@@ -43,8 +43,8 @@ import {
   activateCategory,
   deactivateCategory,
   deleteCategory,
-} from "@/lib/api/categories"
-import type { Category } from "@/lib/types/category"
+} from "@/services/categories"
+import type { Category } from "@/types/category"
 
 export default function CategoriesPage() {
   const [categories, setCategories] = React.useState<Category[]>([])
@@ -55,14 +55,14 @@ export default function CategoriesPage() {
   const pageSize = 20
   const totalPages = Math.ceil(totalCount / pageSize)
 
-  // Dialog
+
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editCat, setEditCat] = React.useState<Category | null>(null)
   const [formCode, setFormCode] = React.useState("")
   const [formName, setFormName] = React.useState("")
   const [formParentId, setFormParentId] = React.useState("")
 
-  // Delete
+
   const [deleteCat, setDeleteCat] = React.useState<Category | null>(null)
 
   const [toggleCat, setToggleCat] = React.useState<Category | null>(null)
@@ -185,7 +185,7 @@ export default function CategoriesPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Header */}
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Danh mục</h1>
@@ -205,7 +205,7 @@ export default function CategoriesPage() {
             </div>
           </div>
 
-          {/* Table */}
+
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -280,7 +280,7 @@ export default function CategoriesPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
+
           {!loading && totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-muted-foreground text-sm">
@@ -299,7 +299,7 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Create/Edit dialog */}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -331,7 +331,7 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirm dialog */}
+
       <Dialog open={deleteCat !== null} onOpenChange={(v) => { if (!v) setDeleteCat(null) }}>
         <DialogContent>
           <DialogHeader>

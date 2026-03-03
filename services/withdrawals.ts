@@ -1,4 +1,4 @@
-import type { WithdrawListResponse, WithdrawResponse } from "@/lib/types/withdraw"
+import type { WithdrawListResponse, WithdrawResponse } from "@/types/withdraw"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

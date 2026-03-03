@@ -43,8 +43,8 @@ import {
   activateCategory,
   deactivateCategory,
   deleteCategory,
-} from "@/lib/api/categories"
-import type { Category } from "@/lib/types/category"
+} from "@/services/categories"
+import type { Category } from "@/types/category"
 
 export default function CategoriesPage() {
   const [categories, setCategories] = React.useState<Category[]>([])

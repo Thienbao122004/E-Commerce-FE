@@ -6,9 +6,9 @@ import { toast } from "sonner"
 import {
   fetchOrders,
   updateOrderStatus as apiUpdateStatus,
-} from "@/lib/api/orders"
+} from "@/services/orders"
 import { supabase } from "@/lib/supabase"
-import type { AdminOrder } from "@/lib/types/order"
+import type { AdminOrder } from "@/types/order"
 
 type Params = {
   page: number

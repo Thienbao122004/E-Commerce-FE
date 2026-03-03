@@ -31,13 +31,13 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 import { supabase } from "@/lib/supabase"
-import { fetchProductById, hideProduct, unhideProduct, removeProduct } from "@/lib/api/products"
+import { fetchProductById, hideProduct, unhideProduct, removeProduct } from "@/services/products"
 import {
   ProductStatus,
   ProductStatusLabels,
   ProductStatusColors,
-} from "@/lib/types/product"
-import type { ProductModeration } from "@/lib/types/product"
+} from "@/types/product"
+import type { ProductModeration } from "@/types/product"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", {

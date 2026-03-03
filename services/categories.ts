@@ -3,7 +3,7 @@ import type {
   CategoryResponse,
   CategoryTreeResponse,
   MigrateProductsResponse,
-} from "@/lib/types/category"
+} from "@/types/category"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 

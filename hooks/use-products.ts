@@ -9,9 +9,9 @@ import {
   hideProduct as apiHide,
   unhideProduct as apiUnhide,
   removeProduct as apiRemove,
-} from "@/lib/api/products"
+} from "@/services/products"
 import { supabase } from "@/lib/supabase"
-import type { ProductModeration } from "@/lib/types/product"
+import type { ProductModeration } from "@/types/product"
 
 type Params = {
   page: number
