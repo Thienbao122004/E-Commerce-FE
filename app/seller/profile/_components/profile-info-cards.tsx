@@ -11,7 +11,15 @@ import {
   ShopStatusColors,
 } from "@/types/seller"
 import type { SellerShopInfo } from "@/types/seller-dashboard"
-import { IconCircleCheckFilled, IconClock, IconHash, IconShieldCheck } from "@tabler/icons-react"
+import {
+  IconCircleCheckFilled,
+  IconClock,
+  IconCopy,
+  IconHash,
+  IconLink,
+  IconShieldCheck,
+} from "@tabler/icons-react"
+import { toast } from "sonner"
 
 type Props = {
   shop: SellerShopInfo | null
@@ -22,20 +30,18 @@ export function ProfileInfoCards({ shop, loading }: Props) {
   if (loading || !shop) {
     return (
       <div className="flex flex-col gap-4">
-        <Card>
-          <CardContent className="p-4 space-y-3">
+        <Card className="shadow-sm">
+          <CardContent className="p-4 lg:p-5 space-y-4">
             <Skeleton className="h-4 w-28" />
             <Skeleton className="h-6 w-20 rounded-full" />
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-6 w-24 rounded-full" />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 space-y-3">
+        <Card className="shadow-sm">
+          <CardContent className="p-4 lg:p-5 space-y-4">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-32" />
           </CardContent>
         </Card>
       </div>
@@ -44,25 +50,33 @@ export function ProfileInfoCards({ shop, loading }: Props) {
 
   const isVerified = shop.verificationStatus === VerificationStatus.Verified
 
+  const copyId = () => {
+    navigator.clipboard.writeText(shop.id)
+    toast.success("Đã sao chép ID")
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader className="py-3 px-4 border-b">
+      {/* Status Card */}
+      <Card className="shadow-sm">
+        <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
           <CardTitle className="text-sm flex items-center gap-2">
-            <IconShieldCheck className="size-4 text-muted-foreground" />
+            <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+              <IconShieldCheck className="size-3.5 text-muted-foreground" />
+            </div>
             Trạng thái
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 grid gap-3">
+        <CardContent className="p-4 lg:p-5 grid gap-4">
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Xác thực thương hiệu</p>
+            <p className="text-xs text-muted-foreground mb-2">Xác thực thương hiệu</p>
             <Badge className={`text-xs gap-1 ${VerificationStatusColors[shop.verificationStatus] ?? ""}`}>
               {isVerified && <IconCircleCheckFilled className="size-3" />}
               {VerificationStatusLabels[shop.verificationStatus] ?? "Không rõ"}
             </Badge>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Trạng thái cửa hàng</p>
+            <p className="text-xs text-muted-foreground mb-2">Trạng thái cửa hàng</p>
             <Badge variant="outline" className={`text-xs ${ShopStatusColors[shop.status] ?? ""}`}>
               {ShopStatusLabels[shop.status] ?? "Không rõ"}
             </Badge>
@@ -70,23 +84,38 @@ export function ProfileInfoCards({ shop, loading }: Props) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="py-3 px-4 border-b">
+      {/* System Info Card */}
+      <Card className="shadow-sm">
+        <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
           <CardTitle className="text-sm flex items-center gap-2">
-            <IconHash className="size-4 text-muted-foreground" />
+            <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+              <IconHash className="size-3.5 text-muted-foreground" />
+            </div>
             Thông tin hệ thống
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 grid gap-3">
+        <CardContent className="p-4 lg:p-5 grid gap-3.5">
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">ID cửa hàng</p>
-            <p className="text-xs font-mono truncate text-foreground">{shop.id}</p>
+            <p className="text-xs text-muted-foreground mb-1">ID cửa hàng</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-mono truncate text-foreground flex-1">{shop.id}</p>
+              <button
+                type="button"
+                onClick={copyId}
+                className="shrink-0 flex items-center justify-center size-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <IconCopy className="size-3" />
+              </button>
+            </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Đường dẫn (slug)</p>
-            <p className="text-xs font-mono text-foreground">/shop/{shop.slug}</p>
+            <p className="text-xs text-muted-foreground mb-1">Đường dẫn cửa hàng</p>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-foreground">
+              <IconLink className="size-3 text-muted-foreground shrink-0" />
+              <span>/shop/{shop.slug}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t">
             <IconClock className="size-3.5 shrink-0" />
             <span>
               Tạo ngày{" "}
