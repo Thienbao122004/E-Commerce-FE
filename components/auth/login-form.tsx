@@ -38,7 +38,11 @@ export function LoginForm() {
     setError(null)
 
     try {
-      await signIn({ email, password })
+      const data = await signIn({ email, password })
+      if (data.session?.access_token) {
+        sessionStorage.setItem('debug_token', data.session.access_token)
+        console.log('🔑 Token đã lưu vào sessionStorage. Gõ: sessionStorage.getItem("debug_token")')
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in')
       setLoading(false)
