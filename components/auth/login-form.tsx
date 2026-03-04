@@ -32,6 +32,19 @@ export function LoginForm() {
     return () => window.removeEventListener('message', handleMessage)
   }, [router])
 
+  useEffect(() => {
+    if (!googleLoading) return
+
+    const interval = setInterval(() => {
+      if (popupRef.current && popupRef.current.closed) {
+        setGoogleLoading(false)
+        popupRef.current = null
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [googleLoading])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
