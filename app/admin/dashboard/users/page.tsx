@@ -3,17 +3,14 @@
 import * as React from "react"
 import Link from "next/link"
 import {
-  IconSearch, IconChevronLeft, IconChevronRight, IconRefresh,
-  IconExternalLink, IconLock, IconLockOpen, IconFilter,
+  IconChevronLeft, IconChevronRight, IconRefresh,
+  IconExternalLink, IconLock, IconLockOpen,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+import UserFilters from "@/components/user-filters"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -103,66 +100,29 @@ export default function UsersPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Quản lý người dùng</h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${total} người dùng`}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />Làm mới
-            </Button>
-          </div>
+        <div className="flex flex-col gap-4 p-4">
+          <UserFilters
+            searchTerm={searchInput}
+            roleFilter={role ?? "all"}
+            statusFilter={status === null ? "all" : String(status)}
+            onSearchChange={handleSearchChange}
+            onRoleFilterChange={(v) => { setRole(v === "all" ? null : v); setPg(1) }}
+            onStatusFilterChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}
+            onSearch={load}
+          />
 
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input
-                placeholder="Tìm tên, email, SĐT..."
-                value={searchInput}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="pl-9 bg-background"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <IconFilter className="size-4 text-muted-foreground" />
-              <Select value={role ?? "all"} onValueChange={(v) => { setRole(v === "all" ? null : v); setPg(1) }}>
-                <SelectTrigger className="w-[130px] bg-background">
-                  <SelectValue placeholder="Vai trò" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả vai trò</SelectItem>
-                  <SelectItem value="customer">Customer</SelectItem>
-                  <SelectItem value="seller">Seller</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={status === null ? "all" : String(status)} onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}>
-                <SelectTrigger className="w-[150px] bg-background">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
-                  <SelectItem value={String(UserStatus.Active)}>Hoạt động</SelectItem>
-                  <SelectItem value={String(UserStatus.Suspended)}>Bị khóa</SelectItem>
-                  <SelectItem value={String(UserStatus.Inactive)}>Chưa kích hoạt</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-lg border">
-            <Table>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table className="table-fixed w-full">
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Họ tên</TableHead>
-                  <TableHead>SĐT</TableHead>
-                  <TableHead>Vai trò</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead className="w-24">ID</TableHead>
+                  <TableHead className="w-[200px]">Họ tên</TableHead>
+                  <TableHead className="w-28">SĐT</TableHead>
+                  <TableHead className="w-24">Vai trò</TableHead>
+                  <TableHead className="w-28">Trạng thái</TableHead>
+                  <TableHead className="w-24">Ngày tạo</TableHead>
+                  <TableHead className="w-24 text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,34 +133,34 @@ export default function UsersPage() {
                 ) : filtered.map((u, idx) => (
                   <TableRow key={u.id}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
-                    <TableCell className="font-mono text-xs">{u.id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-mono text-xs truncate">{u.id.slice(0, 8)}...</TableCell>
                     <TableCell>
-                      <div>
-                        <span className="text-sm font-medium">{u.fullName ?? "—"}</span>
-                        {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium block truncate">{u.fullName ?? "—"}</span>
+                        {u.email && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{u.phone ?? "—"}</TableCell>
+                    <TableCell className="text-sm truncate">{u.phone ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{u.role}</Badge></TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={`text-xs ${UserStatusColors[u.status] ?? ""}`}>
                         {UserStatusLabels[u.status] ?? u.statusName}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(u.createdAt)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums truncate">{fmtDate(u.createdAt)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                         <Button variant="ghost" size="icon" className="size-8" asChild>
                           <Link href={`/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
                         </Button>
                         {u.status === UserStatus.Active && (
-                          <Button variant="outline" size="sm" className="h-8 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setSuspendTarget(u); setReason("") }} disabled={busy}>
-                            <IconLock className="mr-1 size-3.5" />Khóa
+                          <Button variant="ghost" size="icon" className="h-8 text-xs text-red-600 hover:bg-red-50" onClick={() => { setSuspendTarget(u); setReason("") }} disabled={busy}>
+                            <IconLock className="mr-1 size-3.5" />
                           </Button>
                         )}
                         {u.status === UserStatus.Suspended && (
-                          <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handleUnsuspend(u)} disabled={busy}>
-                            <IconLockOpen className="mr-1 size-3.5" />Mở khóa
+                          <Button variant="ghost" size="icon" className="h-8 text-xs text-green-600 hover:bg-green-50" onClick={() => handleUnsuspend(u)} disabled={busy}>
+                            <IconLockOpen className="mr-1 size-3.5" />
                           </Button>
                         )}
                       </div>

@@ -6,7 +6,6 @@ import type {
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
-// ---------- List ----------
 export async function fetchUsers(
   token: string,
   page = 1,
@@ -28,7 +27,6 @@ export async function fetchUsers(
   return res.json()
 }
 
-// ---------- Detail ----------
 export async function fetchUserById(
   token: string,
   id: string
@@ -40,7 +38,6 @@ export async function fetchUserById(
   return res.json()
 }
 
-// ---------- Update ----------
 export async function updateUser(
   token: string,
   id: string,
@@ -58,7 +55,6 @@ export async function updateUser(
   return res.json()
 }
 
-// ---------- Suspend ----------
 export async function suspendUser(
   token: string,
   id: string,
@@ -76,7 +72,6 @@ export async function suspendUser(
   return res.json()
 }
 
-// ---------- Unsuspend ----------
 export async function unsuspendUser(
   token: string,
   id: string

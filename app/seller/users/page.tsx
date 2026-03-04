@@ -145,7 +145,6 @@ export default function UsersPage() {
                   <SelectItem value="all">Tất cả trạng thái</SelectItem>
                   <SelectItem value={String(UserStatus.Active)}>Hoạt động</SelectItem>
                   <SelectItem value={String(UserStatus.Suspended)}>Bị khóa</SelectItem>
-                  <SelectItem value={String(UserStatus.Inactive)}>Chưa kích hoạt</SelectItem>
                 </SelectContent>
               </Select>
             </div>

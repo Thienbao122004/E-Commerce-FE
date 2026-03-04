@@ -9,7 +9,7 @@ const NAV_LABELS: { url: string; title: string }[] = [
   { url: "/admin/dashboard/products/featured", title: "Sản phẩm nổi bật" },
   { url: "/admin/dashboard/products/inventory", title: "Kho hàng" },
   { url: "/admin/dashboard/products", title: "Quản lý sản phẩm" },
-  { url: "/admin/dashboard/orders", title: "Quản lý đơn hàng" },
+
   { url: "/admin/dashboard/disputes", title: "Quản lý tranh chấp" },
   { url: "/admin/dashboard/categories", title: "Danh mục và tags" },
   { url: "/admin/dashboard/tags", title: "Tags" },

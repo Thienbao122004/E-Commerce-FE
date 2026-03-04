@@ -5,7 +5,6 @@ import {
   IconCamera,
   IconDashboard,
   IconDatabase,
-  IconFolder,
   IconFolderOpen,
   IconGavel,
   IconHelp,
@@ -54,15 +53,7 @@ const ALL_NAV_ITEMS = [
       { title: "Kho hàng", url: "/dashboard/products/inventory", icon: IconPackage },
     ],
   },
-  {
-    title: "Quản lý đơn hàng",
-    url: "/dashboard/orders",
-    icon: IconFolder,
-    roles: ['admin', 'seller'],
-    items: [
-      { title: "Tất cả đơn hàng", url: "/dashboard/orders", icon: IconListDetails },
-    ],
-  },
+
   {
     title: "Quản lý tranh chấp",
     url: "/dashboard/disputes",
