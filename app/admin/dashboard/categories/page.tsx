@@ -4,8 +4,6 @@ import * as React from "react"
 import {
   IconPlus,
   IconRefresh,
-  IconChevronRight,
-  IconChevronLeft,
   IconTrash,
   IconEdit,
   IconToggleLeft,
@@ -13,7 +11,6 @@ import {
   IconFolderOpen,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,6 +30,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
@@ -45,25 +50,36 @@ import {
   deleteCategory,
 } from "@/services/categories"
 import type { Category } from "@/types/category"
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import { useDebounce } from "@/hooks/use-debounce"
+import type { SortConfig } from "@/components/common/table-sorting"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 export default function CategoriesPage() {
   const [categories, setCategories] = React.useState<Category[]>([])
   const [totalCount, setTotalCount] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [actionLoading, setActionLoading] = React.useState(false)
-  const [page, setPage] = React.useState(1)
-  const pageSize = 20
-  const totalPages = Math.ceil(totalCount / pageSize)
+  const [pg, setPg] = React.useState(1)
+  const [searchInput, setSearchInput] = React.useState("")
+  const debouncedSearch = useDebounce(searchInput)
+  const [sort, setSort] = React.useState<SortConfig | null>(null)
+  const [activeFilter, setActiveFilter] = React.useState("all")
+  const ps = 10
+  const tp = Math.ceil(totalCount / ps)
 
-  // Dialog
-  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
   const [editCat, setEditCat] = React.useState<Category | null>(null)
   const [formCode, setFormCode] = React.useState("")
   const [formName, setFormName] = React.useState("")
   const [formParentId, setFormParentId] = React.useState("")
 
-  // Delete
   const [deleteCat, setDeleteCat] = React.useState<Category | null>(null)
+
+  React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -71,7 +87,7 @@ export default function CategoriesPage() {
     const token = data.session?.access_token
     if (!token) { setLoading(false); return }
     try {
-      const res = await fetchCategories(token, page, pageSize)
+      const res = await fetchCategories(token, pg, ps)
       if (res.success) {
         setCategories(res.categories)
         setTotalCount(res.totalCount)
@@ -81,16 +97,70 @@ export default function CategoriesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [pg])
 
   React.useEffect(() => { load() }, [load])
+
+  const filtered = React.useMemo(() => {
+    let result = categories
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      result = result.filter((c) =>
+        c.code.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        (c.parentName?.toLowerCase().includes(q))
+      )
+    }
+    if (activeFilter !== "all") {
+      const isActive = activeFilter === "active"
+      result = result.filter((c) => c.isActive === isActive)
+    }
+    return result
+  }, [categories, debouncedSearch, activeFilter])
+
+  const sorted = React.useMemo(() => {
+    if (!sort) return filtered
+    const { key, direction } = sort
+    const dir = direction === "asc" ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let av: string | number = ""
+      let bv: string | number = ""
+      switch (key) {
+        case "code": av = a.code; bv = b.code; break
+        case "name": av = a.name; bv = b.name; break
+        case "level": av = a.level; bv = b.level; break
+        case "productCount": av = a.productCount; bv = b.productCount; break
+        case "isActive": av = a.isActive ? 1 : 0; bv = b.isActive ? 1 : 0; break
+      }
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sort])
+
+  const handleSort = (key: string) => setSort(getNextSort(sort, key))
+
+  const filters: FilterConfig[] = React.useMemo(() => [
+    {
+      key: "isActive",
+      label: "Trạng thái",
+      value: activeFilter,
+      onChange: (v: string) => { setActiveFilter(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả trạng thái" },
+        { value: "active", label: "Hoạt động" },
+        { value: "inactive", label: "Vô hiệu" },
+      ],
+    },
+  ], [activeFilter])
 
   const openCreate = () => {
     setEditCat(null)
     setFormCode("")
     setFormName("")
     setFormParentId("")
-    setDialogOpen(true)
+    setSheetOpen(true)
   }
 
   const openEdit = (c: Category) => {
@@ -98,7 +168,7 @@ export default function CategoriesPage() {
     setFormCode(c.code)
     setFormName(c.name)
     setFormParentId(c.parentId ? String(c.parentId) : "")
-    setDialogOpen(true)
+    setSheetOpen(true)
   }
 
   const handleSave = async () => {
@@ -114,7 +184,7 @@ export default function CategoriesPage() {
         : await createCategory(token, { code: formCode, name: formName, parentId })
       if (res.success) {
         toast.success(res.message ?? (editCat ? "Cập nhật thành công" : "Tạo thành công"))
-        setDialogOpen(false)
+        setSheetOpen(false)
         load()
       } else {
         toast.error(res.message ?? "Lỗi")
@@ -172,41 +242,35 @@ export default function CategoriesPage() {
 
   return (
     <>
-      <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Danh mục</h1>
-              <p className="text-muted-foreground text-sm">
-                {loading ? "Đang tải..." : `${totalCount} danh mục`}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-                <IconRefresh className="mr-1.5 size-4" />
-                Làm mới
-              </Button>
-              <Button size="sm" onClick={openCreate}>
-                <IconPlus className="mr-1.5 size-4" />
-                Thêm mới
-              </Button>
-            </div>
-          </div>
+      <SetHeaderActions>
+        <Button size="sm" onClick={openCreate}>
+          <IconPlus className="mr-1.5 size-4" />
+          Thêm mới
+        </Button>
+      </SetHeaderActions>
 
-          {/* Table */}
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4 p-4">
+          <FilterBar
+            searchPlaceholder="Tìm theo mã, tên danh mục..."
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
+            onSearch={load}
+            filters={filters}
+          />
+
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
-                  <TableHead>Mã</TableHead>
-                  <TableHead>Tên danh mục</TableHead>
-                  <TableHead>Cấp</TableHead>
-                  <TableHead>Danh mục cha</TableHead>
-                  <TableHead className="text-center">Sản phẩm</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <SortableTableHead sortKey="code" currentSort={sort} onSort={handleSort} className="w-24">Mã</SortableTableHead>
+                  <SortableTableHead sortKey="name" currentSort={sort} onSort={handleSort} className="w-48">Tên danh mục</SortableTableHead>
+                  <SortableTableHead sortKey="level" currentSort={sort} onSort={handleSort} className="w-24">Cấp</SortableTableHead>
+                  <TableHead className="w-48">Danh mục cha</TableHead>
+                  <SortableTableHead sortKey="productCount" currentSort={sort} onSort={handleSort} className="text-center w-12">Sản phẩm</SortableTableHead>
+                  <SortableTableHead sortKey="isActive" currentSort={sort} onSort={handleSort} className="w-24">Trạng thái</SortableTableHead>
+                  <TableHead className="w-24 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,9 +290,9 @@ export default function CategoriesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  categories.map((c, idx) => (
+                  sorted.map((c, idx) => (
                     <TableRow key={c.id}>
-                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
+                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                       <TableCell className="font-mono text-sm">{c.code}</TableCell>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell>
@@ -269,35 +333,27 @@ export default function CategoriesPage() {
             </Table>
           </div>
 
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">
-                Trang {page} / {totalPages}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-                  <IconChevronLeft className="size-4" />
-                </Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page + 1)} disabled={page >= totalPages}>
-                  <IconChevronRight className="size-4" />
-                </Button>
-              </div>
-            </div>
+          {!loading && (
+            <TablePagination
+              currentPage={pg}
+              totalPages={tp}
+              totalItems={totalCount}
+              onPageChange={setPg}
+              itemLabel="danh mục"
+            />
           )}
         </div>
       </div>
 
-      {/* Create/Edit dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editCat ? "Chỉnh sửa danh mục" : "Thêm danh mục mới"}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{editCat ? "Chỉnh sửa danh mục" : "Thêm danh mục mới"}</SheetTitle>
+            <SheetDescription>
               {editCat ? `Đang sửa: ${editCat.name}` : "Nhập thông tin danh mục mới"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-3 px-4">
             <div>
               <label className="text-sm font-medium mb-1.5 block">Mã danh mục *</label>
               <Input value={formCode} onChange={(e) => setFormCode(e.target.value)} placeholder="VD: electronics" />
@@ -311,14 +367,14 @@ export default function CategoriesPage() {
               <Input value={formParentId} onChange={(e) => setFormParentId(e.target.value)} placeholder="Để trống nếu là cấp cao nhất" />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={actionLoading}>Hủy</Button>
+          <SheetFooter>
+            <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={actionLoading}>Hủy</Button>
             <Button onClick={handleSave} disabled={actionLoading || !formCode || !formName}>
               {actionLoading ? "Đang xử lý..." : editCat ? "Cập nhật" : "Tạo mới"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete confirm dialog */}
       <Dialog open={deleteCat !== null} onOpenChange={(v) => { if (!v) setDeleteCat(null) }}>

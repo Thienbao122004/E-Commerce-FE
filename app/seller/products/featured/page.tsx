@@ -71,7 +71,7 @@ export default function FeaturedProductsPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex flex-col gap-4 p-4">
           {/* Top 3 Cards */}
           {!loading && products.length >= 3 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

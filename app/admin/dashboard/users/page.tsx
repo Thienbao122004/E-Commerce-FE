@@ -3,18 +3,22 @@
 import * as React from "react"
 import Link from "next/link"
 import {
-  IconChevronLeft, IconChevronRight, IconRefresh,
   IconExternalLink, IconLock, IconLockOpen,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import UserFilters from "@/components/user-filters"
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useDebounce } from "@/hooks/use-debounce"
 import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
 import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
@@ -30,21 +34,16 @@ export default function UsersPage() {
   const [pg, setPg] = React.useState(1)
   const [role, setRole] = React.useState<string | null>(null)
   const [status, setStatus] = React.useState<number | null>(null)
-  const [search, setSearch] = React.useState("")
+  const [searchInput, setSearchInput] = React.useState("")
+  const debouncedSearch = useDebounce(searchInput)
+  const [sort, setSort] = React.useState<SortConfig | null>(null)
   const ps = 10
   const tp = Math.ceil(total / ps)
 
   const [suspendTarget, setSuspendTarget] = React.useState<AdminUser | null>(null)
   const [reason, setReason] = React.useState("")
 
-  const searchTimeout = React.useRef<NodeJS.Timeout | null>(null)
-  const [searchInput, setSearchInput] = React.useState("")
-
-  const handleSearchChange = (val: string) => {
-    setSearchInput(val)
-    if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => { setSearch(val); setPg(1) }, 400)
-  }
+  React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -88,27 +87,74 @@ export default function UsersPage() {
   }
 
   const filtered = React.useMemo(() => {
-    if (!search) return users
-    const q = search.toLowerCase()
+    if (!debouncedSearch) return users
+    const q = debouncedSearch.toLowerCase()
     return users.filter((u) =>
       (u.fullName?.toLowerCase().includes(q)) ||
       (u.email?.toLowerCase().includes(q)) ||
       (u.phone?.includes(q))
     )
-  }, [users, search])
+  }, [users, debouncedSearch])
+
+  const sorted = React.useMemo(() => {
+    if (!sort) return filtered
+    const { key, direction } = sort
+    const dir = direction === "asc" ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let av: string | number = ""
+      let bv: string | number = ""
+      switch (key) {
+        case "fullName": av = a.fullName ?? ""; bv = b.fullName ?? ""; break
+        case "role": av = a.role; bv = b.role; break
+        case "status": av = a.status; bv = b.status; break
+        case "createdAt": av = a.createdAt; bv = b.createdAt; break
+      }
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sort])
+
+  const handleSort = (key: string) => setSort(getNextSort(sort, key))
+
+  const filters: FilterConfig[] = React.useMemo(() => [
+    {
+      key: "role",
+      label: "Vai trò",
+      value: role ?? "all",
+      onChange: (v: string) => { setRole(v === "all" ? null : v); setPg(1) },
+      width: "w-[140px]",
+      options: [
+        { value: "all", label: "Tất cả vai trò" },
+        { value: "customer", label: "Customer" },
+        { value: "seller", label: "Seller" },
+        { value: "admin", label: "Admin" },
+      ],
+    },
+    {
+      key: "status",
+      label: "Trạng thái",
+      value: status === null ? "all" : String(status),
+      onChange: (v: string) => { setStatus(v === "all" ? null : Number(v)); setPg(1) },
+      width: "w-[180px]",
+      options: [
+        { value: "all", label: "Tất cả trạng thái" },
+        { value: String(UserStatus.Active), label: UserStatusLabels[UserStatus.Active] },
+        { value: String(UserStatus.Suspended), label: UserStatusLabels[UserStatus.Suspended] },
+      ],
+    },
+  ], [role, status])
 
   return (
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
-          <UserFilters
-            searchTerm={searchInput}
-            roleFilter={role ?? "all"}
-            statusFilter={status === null ? "all" : String(status)}
-            onSearchChange={handleSearchChange}
-            onRoleFilterChange={(v) => { setRole(v === "all" ? null : v); setPg(1) }}
-            onStatusFilterChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}
+          <FilterBar
+            searchPlaceholder="Tìm theo tên, email, số điện thoại..."
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
             onSearch={load}
+            filters={filters}
           />
 
           <div className="overflow-x-auto rounded-lg border">
@@ -117,12 +163,12 @@ export default function UsersPage() {
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <TableHead className="w-24">ID</TableHead>
-                  <TableHead className="w-[200px]">Họ tên</TableHead>
+                  <SortableTableHead sortKey="fullName" currentSort={sort} onSort={handleSort} className="w-[200px]">Họ tên</SortableTableHead>
                   <TableHead className="w-28">SĐT</TableHead>
-                  <TableHead className="w-24">Vai trò</TableHead>
-                  <TableHead className="w-28">Trạng thái</TableHead>
-                  <TableHead className="w-24">Ngày tạo</TableHead>
-                  <TableHead className="w-24 text-right">Thao tác</TableHead>
+                  <SortableTableHead sortKey="role" currentSort={sort} onSort={handleSort} className="w-24">Vai trò</SortableTableHead>
+                  <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort} className="w-28">Trạng thái</SortableTableHead>
+                  <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort} className="w-24">Ngày tạo</SortableTableHead>
+                  <TableHead className="w-24 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -130,7 +176,7 @@ export default function UsersPage() {
                   <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
                 )) : filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Không có người dùng nào.</TableCell></TableRow>
-                ) : filtered.map((u, idx) => (
+                ) : sorted.map((u, idx) => (
                   <TableRow key={u.id}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                     <TableCell className="font-mono text-xs truncate">{u.id.slice(0, 8)}...</TableCell>
@@ -171,14 +217,14 @@ export default function UsersPage() {
             </Table>
           </div>
 
-          {!loading && tp > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">Trang {pg} / {tp} · {total} người dùng</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg - 1)} disabled={pg <= 1}><IconChevronLeft className="size-4" /></Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg + 1)} disabled={pg >= tp}><IconChevronRight className="size-4" /></Button>
-              </div>
-            </div>
+          {!loading && (
+            <TablePagination
+              currentPage={pg}
+              totalPages={tp}
+              totalItems={total}
+              onPageChange={setPg}
+              itemLabel="người dùng"
+            />
           )}
         </div>
       </div>

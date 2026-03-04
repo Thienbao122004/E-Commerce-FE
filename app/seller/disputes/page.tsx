@@ -184,7 +184,7 @@ export default function DisputesPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex flex-col gap-4 p-4">
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="flex items-center gap-2">
               <IconFilter className="size-4 text-muted-foreground" />
