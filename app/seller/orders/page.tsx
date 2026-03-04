@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { IconRefresh, IconSearch } from "@tabler/icons-react"
@@ -21,7 +22,21 @@ const STATUS_OPTIONS = [
 ]
 
 export default function SellerOrdersPage() {
-  const { orders, totalCount, loading, actionLoading, params, totalPages, setPage, setStatus, setSearch, updateStatus, reload } = useSellerOrders()
+  const {
+    orders,
+    totalCount,
+    loading,
+    actionLoading,
+    params,
+    totalPages,
+    setPage,
+    setPageSize,
+    setStatus,
+    setSearch,
+    updateStatus,
+    reload,
+  } = useSellerOrders()
+
   const [searchInput, setSearchInput] = useState("")
   const [statusDialog, setStatusDialog] = useState<{ orderId: string; currentStatus: number } | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -39,55 +54,69 @@ export default function SellerOrdersPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-5 lg:p-5">
+    <div className="flex flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Quản lý đơn hàng</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Theo dõi và quản lý đơn hàng của cửa hàng</p>
+          <h1 className="text-2xl font-bold tracking-tight">Quản lý đơn hàng</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Theo dõi và quản lý đơn hàng của cửa hàng
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-          <IconRefresh className="mr-1.5 size-4" />Làm mới
+          <IconRefresh className={`mr-1.5 size-4 ${loading ? "animate-spin" : ""}`} />
+          Làm mới
         </Button>
       </div>
 
+      {/* Stats Cards */}
       <OrderStats orders={orders} totalCount={totalCount} loading={loading} />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Tìm theo Mã ĐH hoặc Tên khách..."
-            value={searchInput}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9"
+      {/* Orders Table Section */}
+      <Card>
+        <CardContent className="p-4 lg:p-5">
+          {/* Filters */}
+          <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm theo Mã ĐH hoặc Tên khách..."
+                value={searchInput}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={params.status !== undefined ? String(params.status) : "all"}
+              onValueChange={(val) => setStatus(val === "all" ? undefined : Number(val))}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tất cả trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table + Pagination */}
+          <OrderTable
+            orders={orders}
+            loading={loading}
+            totalCount={totalCount}
+            totalPages={totalPages}
+            page={params.page}
+            pageSize={params.pageSize}
+            onOpenStatusDialog={(orderId, currentStatus) => setStatusDialog({ orderId, currentStatus })}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
-        </div>
-        <Select
-          value={params.status !== undefined ? String(params.status) : "all"}
-          onValueChange={(val) => setStatus(val === "all" ? undefined : Number(val))}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Tất cả trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        </CardContent>
+      </Card>
 
-      <OrderTable
-        orders={orders}
-        loading={loading}
-        totalCount={totalCount}
-        totalPages={totalPages}
-        page={params.page}
-        pageSize={params.pageSize}
-        onOpenStatusDialog={(orderId, currentStatus) => setStatusDialog({ orderId, currentStatus })}
-        onPageChange={setPage}
-      />
-
+      {/* Status Dialog */}
       {statusDialog && (
         <OrderStatusDialog
           open={!!statusDialog}

@@ -8,17 +8,29 @@ import { ProfileInfoCards } from "./_components/profile-info-cards"
 export default function SellerProfilePage() {
   const { shop, loading, saving, save } = useSellerShop()
 
+  const handleUpdateLogo = async (url: string) => {
+    return save({ logoUrl: url || undefined })
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-5 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
+      {/* Page Header */}
       <div>
-        <h1 className="text-xl font-bold tracking-tight">Hồ sơ cửa hàng</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <h1 className="text-2xl font-bold tracking-tight">Hồ sơ cửa hàng</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Quản lý thông tin và hình ảnh thương hiệu của bạn.
         </p>
       </div>
 
-      <ProfileCover shop={shop} loading={loading} />
+      {/* Cover + Avatar */}
+      <ProfileCover
+        shop={shop}
+        loading={loading}
+        saving={saving}
+        onUpdateLogo={handleUpdateLogo}
+      />
 
+      {/* Form + Info Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <ProfileEditForm shop={shop} loading={loading} saving={saving} onSave={save} />

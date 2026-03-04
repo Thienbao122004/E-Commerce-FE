@@ -4,14 +4,16 @@ import {
   IconCurrencyDollar,
   IconShoppingCart,
   IconUsers,
+  IconPackage,
+  IconWallet,
+  IconClock,
+  IconArrowDownRight,
   IconCategory,
-  IconTrendingUp,
+  IconCircleCheck,
 } from "@tabler/icons-react"
 
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
-  CardAction,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -65,78 +67,103 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
     )
   }
 
-  const cards = [
-    {
-      icon: IconCurrencyDollar,
-      label: "Tổng doanh thu",
-      value: currency(stats.totalRevenue),
-      badge: wallet ? `Khả dụng: ${currency(wallet.availableBalance)}` : "",
-      badgePositive: true,
-      footer: wallet
-        ? `Đang chờ: ${currency(wallet.pendingBalance)}`
-        : "",
-      sub: wallet
-        ? `Đã rút: ${currency(wallet.totalWithdrawn)}`
-        : "",
-    },
-    {
-      icon: IconShoppingCart,
-      label: "Tổng đơn hàng",
-      value: fmt(stats.totalOrders),
-      badge: `${fmt(stats.totalOrders)} đơn`,
-      badgePositive: true,
-      footer: `Tổng đơn hàng của bạn`,
-      sub: "",
-    },
-    {
-      icon: IconUsers,
-      label: "Tổng khách hàng",
-      value: fmt(stats.totalCustomers),
-      badge: `${fmt(stats.totalCustomers)} khách`,
-      badgePositive: true,
-      footer: "Khách hàng đã mua hàng",
-      sub: "",
-    },
-    {
-      icon: IconCategory,
-      label: "Danh mục & Sản phẩm",
-      value: `${fmt(stats.categoriesCount)} / ${fmt(stats.totalProducts)}`,
-      badge: `${fmt(stats.activeProducts)} đang hoạt động`,
-      badgePositive: true,
-      footer: `${fmt(stats.categoriesCount)} danh mục · ${fmt(stats.totalProducts)} sản phẩm`,
-      sub: "",
-    },
-  ]
-
   return (
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      {cards.map((card) => (
-        <Card key={card.label} className="@container/card">
-          <CardHeader>
-            <CardDescription className="flex items-center gap-1.5">
-              <card.icon className="size-4" />
-              {card.label}
-            </CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-              {card.value}
-            </CardTitle>
-            <CardAction>
-              <Badge variant="outline">
-                <IconTrendingUp className="text-green-500" />
-                {card.badge}
-              </Badge>
-            </CardAction>
-          </CardHeader>
-          <CardFooter className="flex-col items-start gap-1.5 text-sm">
-            <div className="line-clamp-1 flex gap-2 font-medium">
-              {card.footer}
-            </div>
-            {card.sub && (
-              <div className="text-muted-foreground">{card.sub}</div>
-            )}
-          </CardFooter>
-        </Card>
-      ))}
+      {/* ── Revenue Card ── */}
+      <Card className="@container/card">
+        <CardHeader>
+          <CardDescription className="flex items-center gap-1.5">
+            <IconCurrencyDollar className="size-4" />
+            Tổng doanh thu
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {currency(stats.totalRevenue)}
+          </CardTitle>
+        </CardHeader>
+        <CardFooter className="flex-col items-start gap-2 text-sm">
+          <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+            <IconWallet className="size-3.5" />
+            <span className="font-medium">
+              Khả dụng: {wallet ? currency(wallet.availableBalance) : "—"}
+            </span>
+          </div>
+          <div className="text-muted-foreground flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <IconClock className="size-3.5" />
+              Chờ: {wallet ? currency(wallet.pendingBalance) : "—"}
+            </span>
+            <span className="text-muted-foreground/40">|</span>
+            <span className="flex items-center gap-1">
+              <IconArrowDownRight className="size-3.5" />
+              Rút: {wallet ? currency(wallet.totalWithdrawn) : "—"}
+            </span>
+          </div>
+        </CardFooter>
+      </Card>
+
+      {/* ── Orders Card ── */}
+      <Card className="@container/card">
+        <CardHeader>
+          <CardDescription className="flex items-center gap-1.5">
+            <IconShoppingCart className="size-4" />
+            Tổng đơn hàng
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {fmt(stats.totalOrders)}
+            <span className="text-muted-foreground ml-1.5 text-sm font-normal">
+              đơn
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardFooter className="text-muted-foreground text-sm">
+          Tất cả đơn hàng bạn đã nhận được
+        </CardFooter>
+      </Card>
+
+      {/* ── Customers Card ── */}
+      <Card className="@container/card">
+        <CardHeader>
+          <CardDescription className="flex items-center gap-1.5">
+            <IconUsers className="size-4" />
+            Khách hàng
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {fmt(stats.totalCustomers)}
+            <span className="text-muted-foreground ml-1.5 text-sm font-normal">
+              khách
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardFooter className="text-muted-foreground text-sm">
+          Khách hàng đã mua hàng tại cửa hàng
+        </CardFooter>
+      </Card>
+
+      {/* ── Products & Categories Card ── */}
+      <Card className="@container/card">
+        <CardHeader>
+          <CardDescription className="flex items-center gap-1.5">
+            <IconPackage className="size-4" />
+            Sản phẩm
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {fmt(stats.totalProducts)}
+            <span className="text-muted-foreground ml-1.5 text-sm font-normal">
+              sản phẩm
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardFooter className="flex-col items-start gap-1.5 text-sm">
+          <div className="text-muted-foreground flex items-center gap-1.5">
+            <IconCircleCheck className="size-3.5 text-green-600 dark:text-green-400" />
+            <span>{fmt(stats.activeProducts)} đang hoạt động</span>
+          </div>
+          <div className="text-muted-foreground flex items-center gap-1.5">
+            <IconCategory className="size-3.5" />
+            <span>{fmt(stats.categoriesCount)} danh mục</span>
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

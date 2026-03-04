@@ -103,6 +103,10 @@ export function useSellerOrders(initialParams?: Partial<Params>) {
     setParams((p) => ({ ...p, page }))
   }, [])
 
+  const setPageSize = useCallback((pageSize: number) => {
+    setParams((p) => ({ ...p, pageSize, page: 1 }))
+  }, [])
+
   const setStatus = useCallback((status: number | undefined) => {
     setParams((p) => ({ ...p, status, page: 1 }))
   }, [])
@@ -121,6 +125,7 @@ export function useSellerOrders(initialParams?: Partial<Params>) {
     params,
     totalPages,
     setPage,
+    setPageSize,
     setStatus,
     setSearch,
     updateStatus,

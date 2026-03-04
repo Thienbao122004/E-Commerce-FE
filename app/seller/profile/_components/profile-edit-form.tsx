@@ -20,12 +20,12 @@ type Props = {
 function FormSkeleton() {
   return (
     <Card>
-      <CardHeader className="py-3 px-4 border-b">
+      <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
         <Skeleton className="h-5 w-36" />
       </CardHeader>
-      <CardContent className="p-4 grid gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="grid gap-1.5">
+      <CardContent className="p-4 lg:p-5 grid gap-5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="grid gap-2">
             <Skeleton className="h-3.5 w-24" />
             <Skeleton className="h-9 w-full" />
           </div>
@@ -38,15 +38,11 @@ function FormSkeleton() {
 export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [logoUrl, setLogoUrl] = useState("")
-  const [logoError, setLogoError] = useState(false)
 
   useEffect(() => {
     if (shop) {
       setName(shop.name ?? "")
       setDescription(shop.description ?? "")
-      setLogoUrl(shop.logoUrl ?? "")
-      setLogoError(false)
     }
   }, [shop])
 
@@ -54,43 +50,45 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
 
   const hasChanges =
     name !== (shop?.name ?? "") ||
-    description !== (shop?.description ?? "") ||
-    logoUrl !== (shop?.logoUrl ?? "")
+    description !== (shop?.description ?? "")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const dto: UpdateShopPayload = {}
     if (name.trim() && name !== shop?.name) dto.name = name.trim()
     if (description !== (shop?.description ?? "")) dto.description = description
-    if (logoUrl.trim() !== (shop?.logoUrl ?? "")) dto.logoUrl = logoUrl.trim() || undefined
     if (Object.keys(dto).length === 0) return
     await onSave(dto)
   }
 
   return (
-    <Card>
-      <CardHeader className="py-3 px-4 border-b">
+    <Card className="shadow-sm">
+      <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
         <CardTitle className="text-sm flex items-center gap-2">
-          <IconInfoCircle className="size-4 text-muted-foreground" />
+          <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+            <IconInfoCircle className="size-3.5 text-muted-foreground" />
+          </div>
           Thông tin cơ bản
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4">
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="shop-name" className="text-xs">Tên thương hiệu</Label>
+      <CardContent className="p-4 lg:p-5">
+        <form onSubmit={handleSubmit} className="grid gap-5">
+          <div className="grid gap-2">
+            <Label htmlFor="shop-name" className="text-xs font-medium">
+              Tên thương hiệu
+            </Label>
             <Input
               id="shop-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nhập tên thương hiệu"
               maxLength={255}
-              className="h-9 text-sm"
+              className="text-sm"
             />
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="shop-description" className="text-xs">
+          <div className="grid gap-2">
+            <Label htmlFor="shop-description" className="text-xs font-medium">
               Câu chuyện thương hiệu (Storytelling)
             </Label>
             <Textarea
@@ -102,49 +100,21 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
               maxLength={2000}
               className="resize-none text-sm"
             />
-            <p className="text-xs text-muted-foreground text-right">{description.length} / 2000</p>
+            <p className="text-xs text-muted-foreground text-right tabular-nums">
+              {description.length} / 2000
+            </p>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="logo-url" className="text-xs">Logo URL</Label>
-            <Input
-              id="logo-url"
-              value={logoUrl}
-              onChange={(e) => { setLogoUrl(e.target.value); setLogoError(false) }}
-              placeholder="https://example.com/logo.png"
-              className="h-9 text-sm"
-            />
-            {logoUrl && (
-              <div className="flex items-center gap-3 mt-1">
-                <div className="size-12 rounded-lg border bg-muted overflow-hidden shrink-0">
-                  {!logoError ? (
-                    <img
-                      src={logoUrl}
-                      alt="Logo"
-                      className="size-full object-cover"
-                      onError={() => setLogoError(true)}
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-                      Lỗi
-                    </div>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {logoError ? "URL không hợp lệ" : "Xem trước logo"}
-                </span>
-              </div>
-            )}
+          <div className="grid gap-2">
+            <Label className="text-xs font-medium">Slug (đường dẫn)</Label>
+            <Input value={shop?.slug ?? ""} disabled className="text-sm bg-muted/50" />
+            <p className="text-xs text-muted-foreground">
+              Slug được tạo tự động và không thể thay đổi
+            </p>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label className="text-xs">Slug (đường dẫn)</Label>
-            <Input value={shop?.slug ?? ""} disabled className="h-9 text-sm bg-muted" />
-            <p className="text-xs text-muted-foreground">Slug không thể thay đổi</p>
-          </div>
-
-          <div className="flex justify-end pt-2 border-t">
-            <Button type="submit" disabled={saving || !hasChanges} className="min-w-[130px] h-9">
+          <div className="flex justify-end pt-3 border-t">
+            <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
               {saving ? (
                 <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>
               ) : (
