@@ -82,7 +82,7 @@ export default function UserDetailPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex flex-col gap-4 p-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.back()}><IconArrowLeft className="size-5" /></Button>
             <div>

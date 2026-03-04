@@ -93,19 +93,8 @@ export default function DisputesPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <IconScale className="size-7" />Quản lý tranh chấp
-              </h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${totalCount} tranh chấp`}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />Làm mới
-            </Button>
-          </div>
-
+        <div className="flex flex-col gap-4 p-4">
+          {/* Filter */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="flex items-center gap-2">
               <IconFilter className="size-4 text-muted-foreground" />

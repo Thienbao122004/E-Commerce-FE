@@ -60,7 +60,7 @@ export default function InventoryPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex flex-col gap-4 p-4">
           {!loading && (
             <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 dark:border-orange-800">
               <CardHeader className="flex-row items-center gap-4">

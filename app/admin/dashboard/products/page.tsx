@@ -125,19 +125,8 @@ export default function ProductsPage() {
   return (
     <>
       <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <IconPackage className="size-7" />Quản lý sản phẩm
-              </h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${totalCount} sản phẩm`}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />Làm mới
-            </Button>
-          </div>
-
+        <div className="flex flex-col gap-4 p-4">
+          {/* Filter toolbar */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
