@@ -3,7 +3,6 @@
 import * as React from "react"
 import {
   IconPlus,
-  IconRefresh,
   IconTrash,
   IconEdit,
   IconToggleLeft,

@@ -2,20 +2,46 @@
 
 import * as React from "react"
 import {
-  IconPlus, IconRefresh, IconChevronLeft, IconChevronRight,
+  IconPlus, IconChevronLeft, IconChevronRight,
   IconTrash, IconEdit, IconSearch, IconTag,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow } from "@/components/ui/table"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
 import { fetchTags, createTag, updateTag, deleteTag } from "@/services/tags"
 import type { Tag } from "@/types/tag"
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import { useDebounce } from "@/hooks/use-debounce"
+import type { SortConfig } from "@/components/common/table-sorting"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 
@@ -82,25 +108,14 @@ export default function TagsPage() {
 
   return (
     <>
+      <SetHeaderActions>
+        <Button size="sm" onClick={openCreate}>
+          <IconPlus className="mr-1.5 size-4" />
+          Thêm mới
+        </Button>
+      </SetHeaderActions>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Tags</h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${total} tags`}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={load} disabled={loading}><IconRefresh className="mr-1.5 size-4" />Làm mới</Button>
-              <Button size="sm" onClick={openCreate}><IconPlus className="mr-1.5 size-4" />Thêm tag</Button>
-            </div>
-          </div>
-
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="relative max-w-sm">
-              <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input placeholder="Tìm tag..." value={si} onChange={(e) => doSearch(e.target.value)} className="pl-9 bg-background" />
-            </div>
-          </div>
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -146,16 +161,6 @@ export default function TagsPage() {
           )}
         </div>
       </div>
-      <Dialog open={dlg} onOpenChange={setDlg}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{edit ? "Sửa tag" : "Thêm tag"}</DialogTitle><DialogDescription>{edit ? `Đang sửa: ${edit.name}` : "Nhập tên tag"}</DialogDescription></DialogHeader>
-          <div><label className="text-sm font-medium mb-1.5 block">Tên tag *</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: thời trang" /></div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDlg(false)} disabled={busy}>Hủy</Button>
-            <Button onClick={save} disabled={busy || !name}>{busy ? "Đang xử lý..." : edit ? "Cập nhật" : "Tạo"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <Dialog open={del !== null} onOpenChange={(v) => { if (!v) setDel(null) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Xóa tag</DialogTitle><DialogDescription>Bạn có chắc muốn xóa tag &quot;{del?.name}&quot;?</DialogDescription></DialogHeader>

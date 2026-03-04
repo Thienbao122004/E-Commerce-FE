@@ -90,13 +90,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (!mounted) return
                 if (event === 'INITIAL_SESSION') return
 
-                console.log(`[Auth] Auth event triggered: ${event}`, session ? session.user.email : 'null')
                 setSession(session)
                 setUser(session?.user ?? null)
 
+                // xóa khi lên production
+                if (session?.access_token) {
+                    sessionStorage.setItem('debug_token', session.access_token)
+                }
+
                 if (event === 'SIGNED_OUT') {
-                    console.log('[Auth] User signed out, clearing profile')
                     setProfile(null)
+                    sessionStorage.removeItem('debug_token')
                 }
 
                 if (mounted) setIsLoading(false)
