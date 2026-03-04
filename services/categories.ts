@@ -7,7 +7,6 @@ import type {
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
-// ---------- List ----------
 export async function fetchCategories(
   token: string,
   page = 1,
@@ -29,7 +28,6 @@ export async function fetchCategories(
   return res.json()
 }
 
-// ---------- Tree ----------
 export async function fetchCategoryTree(
   token: string
 ): Promise<CategoryTreeResponse> {
@@ -40,7 +38,6 @@ export async function fetchCategoryTree(
   return res.json()
 }
 
-// ---------- Detail ----------
 export async function fetchCategoryById(
   token: string,
   id: number
@@ -52,7 +49,6 @@ export async function fetchCategoryById(
   return res.json()
 }
 
-// ---------- Create ----------
 export async function createCategory(
   token: string,
   data: { parentId?: number | null; code: string; name: string }
@@ -69,7 +65,6 @@ export async function createCategory(
   return res.json()
 }
 
-// ---------- Update ----------
 export async function updateCategory(
   token: string,
   id: number,
@@ -87,7 +82,6 @@ export async function updateCategory(
   return res.json()
 }
 
-// ---------- Activate ----------
 export async function activateCategory(
   token: string,
   id: number
@@ -100,7 +94,6 @@ export async function activateCategory(
   return res.json()
 }
 
-// ---------- Deactivate ----------
 export async function deactivateCategory(
   token: string,
   id: number,
@@ -118,7 +111,6 @@ export async function deactivateCategory(
   return res.json()
 }
 
-// ---------- Delete ----------
 export async function deleteCategory(
   token: string,
   id: number
@@ -131,7 +123,6 @@ export async function deleteCategory(
   return res.json()
 }
 
-// ---------- Migrate Products ----------
 export async function migrateProducts(
   token: string,
   fromId: number,

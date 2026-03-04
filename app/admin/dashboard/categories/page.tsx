@@ -153,6 +153,19 @@ export default function CategoriesPage() {
         { value: "inactive", label: "Vô hiệu" },
       ],
     },
+    {
+      key: "level",
+      label: "Cấp",
+      value: "",
+      onChange: (v: string) => { setActiveFilter(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả cấp" },
+        { value: "1", label: "Cấp 1" },
+        { value: "2", label: "Cấp 2" },
+        { value: "3", label: "Cấp 3" },
+      ],
+    }
   ], [activeFilter])
 
   const openCreate = () => {
