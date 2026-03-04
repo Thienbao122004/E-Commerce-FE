@@ -94,7 +94,7 @@ export default function TagsPage() {
               <Button size="sm" onClick={openCreate}><IconPlus className="mr-1.5 size-4" />Thêm tag</Button>
             </div>
           </div>
-          {/* Filter toolbar */}
+
           <div className="rounded-lg border bg-muted/30 p-3">
             <div className="relative max-w-sm">
               <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />

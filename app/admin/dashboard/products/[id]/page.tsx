@@ -86,7 +86,7 @@ export default function ProductDetailPage() {
         setProduct(res.product)
       } else {
         toast.error(res.message ?? "Không tìm thấy sản phẩm")
-        router.push("/dashboard/products")
+        router.push("/admin/dashboard/products")
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi tải sản phẩm")
@@ -135,10 +135,10 @@ export default function ProductDetailPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-6 p-4 lg:p-6">
-          {/* Back nav */}
+
           <div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/products">
+              <Link href="/admin/dashboard/products">
                 <IconArrowLeft className="mr-1.5 size-4" />
                 Quay lại danh sách
               </Link>
@@ -151,7 +151,7 @@ export default function ProductDetailPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
               {/* Left: Images */}
               <div className="flex flex-col gap-4">
-                {/* Main image */}
+  
                 <div className="aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
                   {product.imageUrls.length > 0 ? (
                     <img
@@ -165,7 +165,7 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
-                {/* Thumbnail strip */}
+
                 {product.imageUrls.length > 1 && (
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {product.imageUrls.map((url, i) => (
@@ -184,7 +184,7 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {/* Right: Details */}
+
               <div className="flex flex-col gap-4">
                 <Card>
                   <CardHeader className="gap-3">
@@ -228,7 +228,7 @@ export default function ProductDetailPage() {
                   </CardHeader>
                 </Card>
 
-                {/* Actions card */}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Thao tác kiểm duyệt</CardTitle>
@@ -277,7 +277,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Confirmation dialog */}
+
       <Dialog
         open={dialogState.type !== null}
         onOpenChange={(v) => { if (!v) setDialogState({ type: null }) }}

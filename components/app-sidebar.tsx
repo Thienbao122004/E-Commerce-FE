@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import {
-  IconCamera,
+  IconBrain,
+  IconBuildingStore,
   IconDashboard,
   IconDatabase,
   IconFolderOpen,
@@ -11,13 +12,19 @@ import {
   IconInnerShadowTop,
   IconList,
   IconListDetails,
+  IconMessage2,
   IconPackage,
+  IconPlus,
   IconReport,
   IconSearch,
+  IconShoppingBag,
+  IconShoppingCart,
   IconStar,
+  IconStarFilled,
   IconTag,
   IconUsers,
   IconUserSearch,
+  IconWallet,
 } from "@tabler/icons-react"
 
 import { NavSellers } from "@/components/nav-sellers"
@@ -35,7 +42,22 @@ import {
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/contexts/auth-context"
 
-const ALL_NAV_ITEMS = [
+type NavSubItem = {
+  title: string
+  url: string
+  icon: typeof IconDashboard
+  roles?: string[]
+}
+
+type NavItem = {
+  title: string
+  url: string
+  icon: typeof IconDashboard
+  roles?: string[]
+  items?: NavSubItem[]
+}
+
+const ALL_NAV_ITEMS: NavItem[] = [
   {
     title: "Tổng quan",
     url: "/dashboard",
@@ -45,15 +67,60 @@ const ALL_NAV_ITEMS = [
   {
     title: "Quản lý sản phẩm",
     url: "/dashboard/products",
-    icon: IconCamera,
+    icon: IconShoppingBag,
     roles: ['admin', 'seller'],
     items: [
-      { title: "Tất cả sản phẩm", url: "/dashboard/products", icon: IconList },
-      { title: "Sản phẩm nổi bật", url: "/dashboard/products/featured", icon: IconStar },
-      { title: "Kho hàng", url: "/dashboard/products/inventory", icon: IconPackage },
+      { title: "Tất cả sản phẩm", url: "/dashboard/products", icon: IconList, roles: ['admin', 'seller'] },
+      { title: "Thêm mới", url: "/dashboard/products/new", icon: IconPlus, roles: ['seller'] },
+      { title: "Sản phẩm nổi bật", url: "/dashboard/products/featured", icon: IconStar, roles: ['admin'] },
+      { title: "Kho hàng", url: "/dashboard/products/inventory", icon: IconPackage, roles: ['admin', 'seller'] },
     ],
   },
-
+  {
+    title: "Đơn hàng",
+    url: "/dashboard/orders",
+    icon: IconShoppingCart,
+    roles: ['seller'],
+    items: [
+      { title: "Tất cả đơn hàng", url: "/dashboard/orders", icon: IconListDetails, roles: ['seller'] },
+    ],
+  },
+  {
+    title: "AI Gợi ý",
+    url: "/dashboard/ai-suggestions",
+    icon: IconBrain,
+    roles: ['seller'],
+  },
+  {
+    title: "Đánh giá & Nhận xét",
+    url: "/dashboard/reviews",
+    icon: IconStarFilled,
+    roles: ['seller'],
+  },
+  {
+    title: "Chat với khách",
+    url: "/dashboard/chat",
+    icon: IconMessage2,
+    roles: ['seller'],
+  },
+  {
+    title: "Ví & Rút tiền",
+    url: "/dashboard/wallet",
+    icon: IconWallet,
+    roles: ['seller'],
+  },
+  {
+    title: "Khiếu nại",
+    url: "/dashboard/disputes",
+    icon: IconGavel,
+    roles: ['seller'],
+  },
+  {
+    title: "Hồ sơ cửa hàng",
+    url: "/profile",
+    icon: IconBuildingStore,
+    roles: ['seller'],
+  },
   {
     title: "Quản lý tranh chấp",
     url: "/dashboard/disputes",
@@ -85,8 +152,8 @@ const ALL_NAV_ITEMS = [
 ]
 
 const SELLERS_ITEMS = [
-  { name: "Quản lý người bán", url: "#", icon: IconDatabase },
-  { name: "Yêu cầu rút tiền", url: "#", icon: IconReport },
+  { name: "Quản lý người bán", url: "/admin/dashboard/sellers", icon: IconDatabase },
+  { name: "Yêu cầu rút tiền", url: "/admin/dashboard/withdrawals", icon: IconReport },
 ]
 
 const NAV_SECONDARY = [
@@ -97,17 +164,31 @@ const NAV_SECONDARY = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role } = useAuth()
 
+  const prefixUrl = (url: string, basePath: string) => {
+    if (url.startsWith('/dashboard') || url.startsWith('/profile')) {
+      if (role === 'seller') {
+        if (url === '/dashboard') return `${basePath}/dashboard`
+        if (url.startsWith('/dashboard/')) return `${basePath}${url.replace('/dashboard', '')}`
+        return `${basePath}${url}`
+      }
+      return `${basePath}${url}`
+    }
+    return url
+  }
+
   const visibleNavItems = ALL_NAV_ITEMS.filter(item =>
     !item.roles || (role && item.roles.includes(role))
   ).map(item => {
     const basePath = role === 'admin' ? '/admin' : (role === 'seller' ? '/seller' : '')
     return {
       ...item,
-      url: item.url.startsWith('/dashboard') ? `${basePath}${item.url}` : item.url,
-      items: item.items?.map(subItem => ({
-        ...subItem,
-        url: subItem.url.startsWith('/dashboard') ? `${basePath}${subItem.url}` : subItem.url,
-      }))
+      url: prefixUrl(item.url, basePath),
+      items: item.items
+        ?.filter(subItem => !subItem.roles || (role && subItem.roles.includes(role)))
+        .map(subItem => ({
+          ...subItem,
+          url: prefixUrl(subItem.url, basePath),
+        }))
     }
   })
 
