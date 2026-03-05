@@ -3,23 +3,32 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import {
-  IconChevronLeft, IconChevronRight, IconRefresh,
-  IconCheck, IconX, IconFilter, IconScale, IconEye,
+  IconRefresh, IconCheck, IconX, IconScale, IconEye,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
+import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
 import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes"
 import {
-  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels,
+  DisputeStatus, DisputeStatusLabels, DisputeStatusColors,
+  DisputeType, DisputeTypeLabels,
 } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
-import { DisputeActionDialog } from "./_components/dispute-action-dialog"
+const DisputeActionDialog = dynamic(() => import("./_components/dispute-action-dialog").then(m => m.DisputeActionDialog))
+
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
@@ -27,29 +36,25 @@ const currency = (v: number) =>
 const formatDate = (ts: string) =>
   new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
-const statusTabs = [
-  { label: "Tất cả", value: null },
-  { label: "Chờ xử lý", value: DisputeStatus.Pending },
-  { label: "Đang xem xét", value: DisputeStatus.UnderReview },
-  { label: "Chờ seller", value: DisputeStatus.WaitingSeller },
-  { label: "Đã giải quyết", value: DisputeStatus.Resolved },
-  { label: "Từ chối", value: DisputeStatus.Rejected },
-  { label: "Đã hoàn tiền", value: DisputeStatus.Refunded },
-]
-
 export default function DisputesPage() {
   const router = useRouter()
   const [disputes, setDisputes] = React.useState<AdminDispute[]>([])
   const [totalCount, setTotalCount] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [actionLoading, setActionLoading] = React.useState(false)
-  const [page, setPage] = React.useState(1)
-  const [status, setStatus] = React.useState<number | null>(null)
-  const pageSize = 20
-  const totalPages = Math.ceil(totalCount / pageSize)
+  const [pg, setPg] = React.useState(1)
+  const [statusFilter, setStatusFilter] = React.useState("all")
+  const [typeFilter, setTypeFilter] = React.useState("all")
+  const [searchInput, setSearchInput] = React.useState("")
+  const debouncedSearch = useDebounce(searchInput)
+  const [sort, setSort] = React.useState<SortConfig | null>(null)
+  const ps = 10
+  const tp = Math.ceil(totalCount / ps)
 
   const [dialogDispute, setDialogDispute] = React.useState<AdminDispute | null>(null)
   const [dialogType, setDialogType] = React.useState<"approve" | "reject" | null>(null)
+
+  React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -57,11 +62,11 @@ export default function DisputesPage() {
     const token = data.session?.access_token
     if (!token) { setLoading(false); return }
     try {
-      const res = await fetchDisputes(token, page, pageSize, status)
+      const res = await fetchDisputes(token, pg, ps, null, null)
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
     finally { setLoading(false) }
-  }, [page, status])
+  }, [pg])
 
   React.useEffect(() => { load() }, [load])
 
@@ -90,27 +95,89 @@ export default function DisputesPage() {
     finally { setActionLoading(false) }
   }
 
+  const sortAccessor = React.useCallback((row: AdminDispute, key: string): string | number => {
+    switch (key) {
+      case "customerName": return row.customerName ?? ""
+      case "shopName": return row.shopName ?? ""
+      case "type": return row.type
+      case "requestedAmount": return row.requestedAmount
+      case "status": return row.status
+      case "createdAt": return row.createdAt ?? ""
+      default: return ""
+    }
+  }, [])
+
+  const tableFilters = React.useMemo(() => [
+    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
+    { key: "type", value: typeFilter, match: (r: Record<string, unknown>) => r.type },
+  ], [statusFilter, typeFilter])
+
+  const { filtered: sorted } = useTableData<AdminDispute>({
+    data: disputes,
+    search: debouncedSearch,
+    searchKeys: ["customerName", "shopName", "title", "id"],
+    filters: tableFilters,
+    sort,
+    sortAccessor,
+  })
+
+  const handleSort = (key: string) => setSort(getNextSort(sort, key))
+
+  const filters: FilterConfig[] = React.useMemo(() => [
+    {
+      key: "status",
+      label: "Trạng thái",
+      value: statusFilter,
+      onChange: (v: string) => { setStatusFilter(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả trạng thái" },
+        { value: String(DisputeStatus.Pending), label: "Chờ xử lý" },
+        { value: String(DisputeStatus.UnderReview), label: "Đang xem xét" },
+        { value: String(DisputeStatus.WaitingSeller), label: "Chờ seller" },
+        { value: String(DisputeStatus.WaitingCustomer), label: "Chờ customer" },
+        { value: String(DisputeStatus.Resolved), label: "Đã giải quyết" },
+        { value: String(DisputeStatus.Rejected), label: "Từ chối" },
+        { value: String(DisputeStatus.Refunded), label: "Đã hoàn tiền" },
+        { value: String(DisputeStatus.Cancelled), label: "Đã hủy" },
+      ],
+    },
+    {
+      key: "type",
+      label: "Loại",
+      value: typeFilter,
+      onChange: (v: string) => { setTypeFilter(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả loại" },
+        { value: String(DisputeType.Refund), label: "Hoàn tiền" },
+        { value: String(DisputeType.Return), label: "Trả hàng" },
+        { value: String(DisputeType.Damaged), label: "Hư hỏng" },
+        { value: String(DisputeType.NotReceived), label: "Không nhận được" },
+        { value: String(DisputeType.WrongItem), label: "Sai hàng" },
+        { value: String(DisputeType.QualityIssue), label: "Chất lượng" },
+        { value: String(DisputeType.Other), label: "Khác" },
+      ],
+    },
+  ], [statusFilter, typeFilter])
+
   return (
     <>
+      <SetHeaderActions>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <IconRefresh className="mr-1.5 size-4" />Làm mới
+        </Button>
+      </SetHeaderActions>
+
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
-          {/* Filter */}
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-2">
-              <IconFilter className="size-4 text-muted-foreground" />
-              <Select
-                value={status === null ? "all" : String(status)}
-                onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPage(1) }}
-              >
-                <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
-                <SelectContent>
-                  {statusTabs.map((tab) => (
-                    <SelectItem key={tab.value ?? "all"} value={tab.value === null ? "all" : String(tab.value)}>{tab.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <FilterBar
+            searchPlaceholder="Tìm khách hàng, cửa hàng, mã tranh chấp..."
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
+            onSearch={load}
+            filters={filters}
+          />
 
           <div className="overflow-hidden rounded-lg border">
             <Table>
@@ -118,28 +185,26 @@ export default function DisputesPage() {
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <TableHead>Mã</TableHead>
-                  <TableHead>Khách hàng</TableHead>
-                  <TableHead>Cửa hàng</TableHead>
-                  <TableHead>Loại</TableHead>
-                  <TableHead className="text-right">Số tiền YC</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
+                  <SortableTableHead sortKey="customerName" currentSort={sort} onSort={handleSort}>Khách hàng</SortableTableHead>
+                  <SortableTableHead sortKey="shopName" currentSort={sort} onSort={handleSort}>Cửa hàng</SortableTableHead>
+                  <SortableTableHead sortKey="type" currentSort={sort} onSort={handleSort}>Loại</SortableTableHead>
+                  <SortableTableHead sortKey="requestedAmount" currentSort={sort} onSort={handleSort} className="text-right">Số tiền YC</SortableTableHead>
+                  <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
+                  <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort}>Ngày tạo</SortableTableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 9 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}
-                    </TableRow>
+                    <TableRow key={i}>{Array.from({ length: 9 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
                   ))
-                ) : disputes.length === 0 ? (
+                ) : sorted.length === 0 ? (
                   <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Không tìm thấy tranh chấp nào.</TableCell></TableRow>
                 ) : (
-                  disputes.map((d, idx) => (
+                  sorted.map((d, idx) => (
                     <TableRow key={d.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/dashboard/disputes/${d.id}`)}>
-                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
+                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                       <TableCell><span className="font-mono text-sm font-medium">{d.id.slice(0, 8)}...</span></TableCell>
                       <TableCell className="text-sm">{d.customerName}</TableCell>
                       <TableCell className="text-sm">{d.shopName}</TableCell>
@@ -181,14 +246,14 @@ export default function DisputesPage() {
             </Table>
           </div>
 
-          {!loading && totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">Trang {page} / {totalPages} · {totalCount} tranh chấp</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page - 1)} disabled={page <= 1}><IconChevronLeft className="size-4" /></Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPage(page + 1)} disabled={page >= totalPages}><IconChevronRight className="size-4" /></Button>
-              </div>
-            </div>
+          {!loading && (
+            <TablePagination
+              currentPage={pg}
+              totalPages={tp}
+              totalItems={totalCount}
+              onPageChange={setPg}
+              itemLabel="tranh chấp"
+            />
           )}
         </div>
       </div>
