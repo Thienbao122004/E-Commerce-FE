@@ -3,16 +3,14 @@
 import * as React from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  IconSearch, IconChevronLeft, IconChevronRight, IconRefresh,
+  IconRefresh,
   IconCheck, IconX, IconPlayerPlay, IconPlayerPause, IconDoorExit,
-  IconFilter, IconBuildingStore, IconEye, IconFileText,
+  IconBuildingStore, IconEye, IconFileText,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,6 +23,13 @@ import {
 } from "@/types/seller"
 import type { ShopVerification } from "@/types/seller"
 import { SellerDetailView } from "./_components/seller-detail-view"
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import { useDebounce } from "@/hooks/use-debounce"
+import type { SortConfig } from "@/components/common/table-sorting"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 const fmtDate = (t: string | null) =>
   t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
@@ -41,21 +46,15 @@ export default function SellersPage() {
   const [loading, setLoading] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
   const [pg, setPg] = React.useState(1)
-  const [vStatus, setVStatus] = React.useState<number | null>(null)
+  const [vStatus, setVStatus] = React.useState("all")
+  const [searchInput, setSearchInput] = React.useState("")
+  const debouncedSearch = useDebounce(searchInput)
+  const [sort, setSort] = React.useState<SortConfig | null>(null)
   const ps = 10
   const tp = Math.ceil(total / ps)
 
   const [selectedShop, setSelectedShop] = React.useState<ShopVerification | null>(null)
   const [detailLoading, setDetailLoading] = React.useState(false)
-
-  const [searchInput, setSearchInput] = React.useState("")
-  const [search, setSearch] = React.useState("")
-  const searchTimeout = React.useRef<NodeJS.Timeout | null>(null)
-  const handleSearchChange = (val: string) => {
-    setSearchInput(val)
-    if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => { setSearch(val); setPg(1) }, 400)
-  }
 
   const [dialogType, setDialogType] = React.useState<DialogType>(null)
   const [target, setTarget] = React.useState<ShopVerification | null>(null)
@@ -70,16 +69,18 @@ export default function SellersPage() {
     return data.session?.access_token
   }
 
+  React.useEffect(() => { setPg(1) }, [debouncedSearch])
+
   const load = React.useCallback(async () => {
     setLoading(true)
     const tk = await getToken()
     if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchSellers(tk, pg, ps, vStatus)
+      const r = await fetchSellers(tk, pg, ps, null)
       if (r.success) { setSellers(r.shops); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
-  }, [pg, vStatus])
+  }, [pg])
 
   React.useEffect(() => { load() }, [load])
 
@@ -173,7 +174,6 @@ export default function SellersPage() {
     finally { setBusy(false) }
   }
 
-
   const handleListDialogAction = async () => {
     if (!target) return
     if (dialogType === "approve") await handleApproveAction(target.id, note || undefined)
@@ -183,15 +183,62 @@ export default function SellersPage() {
     closeDialog()
   }
 
+  // Client-side search filtering
   const filtered = React.useMemo(() => {
-    if (!search) return sellers
-    const q = search.toLowerCase()
-    return sellers.filter((s) =>
-      s.name?.toLowerCase().includes(q) ||
-      s.ownerName?.toLowerCase().includes(q) ||
-      s.ownerEmail?.toLowerCase().includes(q)
-    )
-  }, [sellers, search])
+    let result = sellers
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase()
+      result = result.filter((s) =>
+        s.name?.toLowerCase().includes(q) ||
+        s.ownerName?.toLowerCase().includes(q) ||
+        s.ownerEmail?.toLowerCase().includes(q)
+      )
+    }
+    if (vStatus !== "all") {
+      const st = Number(vStatus)
+      result = result.filter((s) => s.verificationStatus === st)
+    }
+    return result
+  }, [sellers, debouncedSearch, vStatus])
+
+  // Client-side sorting
+  const sorted = React.useMemo(() => {
+    if (!sort) return filtered
+    const { key, direction } = sort
+    const dir = direction === "asc" ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      let av: string | number = ""
+      let bv: string | number = ""
+      switch (key) {
+        case "name": av = a.name ?? ""; bv = b.name ?? ""; break
+        case "ownerName": av = a.ownerName ?? ""; bv = b.ownerName ?? ""; break
+        case "verificationStatus": av = a.verificationStatus; bv = b.verificationStatus; break
+        case "status": av = a.status; bv = b.status; break
+        case "createdAt": av = a.createdAt ?? ""; bv = b.createdAt ?? ""; break
+      }
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }, [filtered, sort])
+
+  const handleSort = (key: string) => setSort(getNextSort(sort, key))
+
+  const filters: FilterConfig[] = React.useMemo(() => [
+    {
+      key: "vStatus",
+      label: "Xác minh",
+      value: vStatus,
+      onChange: (v: string) => { setVStatus(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả" },
+        { value: String(VerificationStatus.Pending), label: "Chờ duyệt" },
+        { value: String(VerificationStatus.Verified), label: "Đã duyệt" },
+        { value: String(VerificationStatus.Rejected), label: "Từ chối" },
+      ],
+    },
+  ], [vStatus])
 
   const renderListActions = (shop: ShopVerification) => {
     const isPending = shop.verificationStatus === VerificationStatus.Pending
@@ -259,62 +306,44 @@ export default function SellersPage() {
     )
   }
 
-
   return (
     <>
-      <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <IconBuildingStore className="size-7" />Quản lý người bán
-              </h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${total} cửa hàng`}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />Làm mới
-            </Button>
-          </div>
+      <SetHeaderActions>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <IconRefresh className="mr-1.5 size-4" />Làm mới
+        </Button>
+      </SetHeaderActions>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input placeholder="Tìm tên shop, chủ shop, email..." value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} className="pl-9 bg-background" />
-            </div>
-            <div className="flex items-center gap-2">
-              <IconFilter className="size-4 text-muted-foreground" />
-              <Select value={vStatus === null ? "all" : String(vStatus)} onValueChange={(v) => { setVStatus(v === "all" ? null : Number(v)); setPg(1) }}>
-                <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Trạng thái xác minh" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value={String(VerificationStatus.Pending)}>Chờ duyệt</SelectItem>
-                  <SelectItem value={String(VerificationStatus.Verified)}>Đã duyệt</SelectItem>
-                  <SelectItem value={String(VerificationStatus.Rejected)}>Từ chối</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4 p-4">
+          <FilterBar
+            searchPlaceholder="Tìm tên shop, chủ shop, email..."
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
+            onSearch={load}
+            filters={filters}
+          />
 
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
-                  <TableHead>Cửa hàng</TableHead>
-                  <TableHead>Chủ shop</TableHead>
+                  <SortableTableHead sortKey="name" currentSort={sort} onSort={handleSort}>Cửa hàng</SortableTableHead>
+                  <SortableTableHead sortKey="ownerName" currentSort={sort} onSort={handleSort}>Chủ shop</SortableTableHead>
                   <TableHead>Hồ sơ</TableHead>
-                  <TableHead>Xác minh</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
+                  <SortableTableHead sortKey="verificationStatus" currentSort={sort} onSort={handleSort}>Xác minh</SortableTableHead>
+                  <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
+                  <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort}>Ngày tạo</SortableTableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
-                )) : filtered.length === 0 ? (
+                )) : sorted.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Không có cửa hàng nào.</TableCell></TableRow>
-                ) : filtered.map((s, idx) => (
+                ) : sorted.map((s, idx) => (
                   <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewDetail(s)}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                     <TableCell>
@@ -369,14 +398,14 @@ export default function SellersPage() {
             </Table>
           </div>
 
-          {!loading && tp > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">Trang {pg} / {tp} · {total} cửa hàng</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg - 1)} disabled={pg <= 1}><IconChevronLeft className="size-4" /></Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg + 1)} disabled={pg >= tp}><IconChevronRight className="size-4" /></Button>
-              </div>
-            </div>
+          {!loading && (
+            <TablePagination
+              currentPage={pg}
+              totalPages={tp}
+              totalItems={total}
+              onPageChange={setPg}
+              itemLabel="cửa hàng"
+            />
           )}
         </div>
       </div>

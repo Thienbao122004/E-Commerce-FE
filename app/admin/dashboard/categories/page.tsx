@@ -67,6 +67,7 @@ export default function CategoriesPage() {
   const debouncedSearch = useDebounce(searchInput)
   const [sort, setSort] = React.useState<SortConfig | null>(null)
   const [activeFilter, setActiveFilter] = React.useState("all")
+  const [levelFilter, setLevelFilter] = React.useState("all")
   const ps = 10
   const tp = Math.ceil(totalCount / ps)
 
@@ -114,8 +115,12 @@ export default function CategoriesPage() {
       const isActive = activeFilter === "active"
       result = result.filter((c) => c.isActive === isActive)
     }
+    if (levelFilter !== "all") {
+      const lvl = Number(levelFilter)
+      result = result.filter((c) => c.level === lvl)
+    }
     return result
-  }, [categories, debouncedSearch, activeFilter])
+  }, [categories, debouncedSearch, activeFilter, levelFilter])
 
   const sorted = React.useMemo(() => {
     if (!sort) return filtered
@@ -130,6 +135,7 @@ export default function CategoriesPage() {
         case "level": av = a.level; bv = b.level; break
         case "productCount": av = a.productCount; bv = b.productCount; break
         case "isActive": av = a.isActive ? 1 : 0; bv = b.isActive ? 1 : 0; break
+        case "id": av = a.id; bv = b.id; break
       }
       if (av < bv) return -1 * dir
       if (av > bv) return 1 * dir
@@ -155,17 +161,17 @@ export default function CategoriesPage() {
     {
       key: "level",
       label: "Cấp",
-      value: "",
-      onChange: (v: string) => { setActiveFilter(v); setPg(1) },
-      width: "w-[160px]",
+      value: levelFilter,
+      onChange: (v: string) => { setLevelFilter(v); setPg(1) },
+      width: "w-[140px]",
       options: [
         { value: "all", label: "Tất cả cấp" },
         { value: "1", label: "Cấp 1" },
         { value: "2", label: "Cấp 2" },
         { value: "3", label: "Cấp 3" },
       ],
-    }
-  ], [activeFilter])
+    },
+  ], [activeFilter, levelFilter])
 
   const openCreate = () => {
     setEditCat(null)
@@ -276,9 +282,10 @@ export default function CategoriesPage() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
+                  <SortableTableHead sortKey="id" currentSort={sort} onSort={handleSort} className="w-12 text-center">ID</SortableTableHead>
                   <SortableTableHead sortKey="code" currentSort={sort} onSort={handleSort} className="w-24">Mã</SortableTableHead>
                   <SortableTableHead sortKey="name" currentSort={sort} onSort={handleSort} className="w-48">Tên danh mục</SortableTableHead>
-                  <SortableTableHead sortKey="level" currentSort={sort} onSort={handleSort} className="w-24">Cấp</SortableTableHead>
+                  <TableHead className="w-24">Cấp</TableHead>
                   <TableHead className="w-48">Danh mục cha</TableHead>
                   <SortableTableHead sortKey="productCount" currentSort={sort} onSort={handleSort} className="text-center w-12">Sản phẩm</SortableTableHead>
                   <SortableTableHead sortKey="isActive" currentSort={sort} onSort={handleSort} className="w-24">Trạng thái</SortableTableHead>
@@ -305,10 +312,11 @@ export default function CategoriesPage() {
                   sorted.map((c, idx) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
+                      <TableCell className="tabular-nums">{c.id}</TableCell>
                       <TableCell className="font-mono text-sm">{c.code}</TableCell>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">{c.levelName}</Badge>
+                        <Badge variant="outline" className="text-xs">Cấp {c.level}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {c.parentName ?? "—"}

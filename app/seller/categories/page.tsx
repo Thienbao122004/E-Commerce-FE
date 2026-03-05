@@ -199,6 +199,7 @@ export default function CategoriesPage() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
+                  <TableHead className="w-12 text-center">ID</TableHead>
                   <TableHead>Mã</TableHead>
                   <TableHead>Tên danh mục</TableHead>
                   <TableHead>Cấp</TableHead>
@@ -228,10 +229,11 @@ export default function CategoriesPage() {
                   categories.map((c, idx) => (
                     <TableRow key={c.id}>
                       <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(page - 1) * pageSize + idx + 1}</TableCell>
+                      <TableCell className="text-center tabular-nums">{c.id}</TableCell>
                       <TableCell className="font-mono text-sm">{c.code}</TableCell>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">{c.levelName}</Badge>
+                        <Badge variant="outline" className="text-xs">Cấp {c.level}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {c.parentName ?? "—"}

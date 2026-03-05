@@ -1,4 +1,3 @@
-// ---------- Types ----------
 export type Category = {
   id: number
   parentId: number | null
@@ -7,7 +6,6 @@ export type Category = {
   name: string
   slug: string
   level: number
-  levelName: string
   isActive: boolean
   productCount: number
   subcategoryCount: number
