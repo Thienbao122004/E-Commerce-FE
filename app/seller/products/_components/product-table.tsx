@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -111,7 +112,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                     </TableCell>
                     <TableCell>
                       {imgUrl ? (
-                        <img src={imgUrl} alt={product.name} className="size-10 rounded-lg border object-cover" />
+                        <Image src={imgUrl} alt={product.name} width={40} height={40} className="size-10 rounded-lg border object-cover" />
                       ) : (
                         <div className="bg-muted flex size-10 items-center justify-center rounded-lg border text-muted-foreground">
                           <IconPackage className="size-4 opacity-40" />

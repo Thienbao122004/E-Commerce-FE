@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -154,10 +155,11 @@ export default function ProductDetailPage() {
                 {/* Main image */}
                 <div className="aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
                   {product.imageUrls.length > 0 ? (
-                    <img
+                    <Image
                       src={product.imageUrls[selectedImage] ?? product.imageUrls[0]}
                       alt={product.name}
-                      className="size-full object-contain"
+                      fill
+                      className="object-contain"
                     />
                   ) : (
                     <div className="flex size-full items-center justify-center text-muted-foreground">
@@ -173,11 +175,11 @@ export default function ProductDetailPage() {
                         key={i}
                         onClick={() => setSelectedImage(i)}
                         className={`shrink-0 size-16 rounded-lg border-2 overflow-hidden transition-all ${selectedImage === i
-                            ? "border-primary ring-2 ring-primary/20"
-                            : "border-transparent hover:border-muted-foreground/30"
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "border-transparent hover:border-muted-foreground/30"
                           }`}
                       >
-                        <img src={url} alt="" className="size-full object-cover" />
+                        <Image src={url} alt="" fill className="object-cover" />
                       </button>
                     ))}
                   </div>

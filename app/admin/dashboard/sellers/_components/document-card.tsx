@@ -2,6 +2,7 @@ import {
   IconEye, IconFileText, IconPhoto, IconCreditCard,
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
+import Image from "next/image"
 import type { ShopDocument } from "@/types/seller"
 
 const fmtDate = (t: string | null) =>
@@ -49,7 +50,7 @@ export function DocumentCard({ doc, onPreview }: { doc: ShopDocument; onPreview:
           className="relative h-40 bg-muted cursor-pointer overflow-hidden"
           onClick={() => onPreview(doc.fileUrl)}
         >
-          <img src={doc.fileUrl} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+          <Image src={doc.fileUrl} alt={label} fill className="object-cover group-hover:scale-105 transition-transform duration-200" />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
             <IconEye className="size-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
           </div>

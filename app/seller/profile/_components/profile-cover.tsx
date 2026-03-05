@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -170,7 +171,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                 onClick={handleOpenLogoDialog}
               >
                 {shop.logoUrl ? (
-                  <img src={shop.logoUrl} alt={shop.name} className="size-full object-cover" />
+                  <Image src={shop.logoUrl} alt={shop.name} fill className="object-cover" />
                 ) : (
                   <div className="flex size-full items-center justify-center bg-gradient-to-br from-stone-600 to-stone-800 text-3xl font-bold text-white">
                     {shop.name.charAt(0).toUpperCase()}
@@ -261,7 +262,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                   <IconCamera className="size-8 text-muted-foreground/40" />
                 )}
               </div>
-              
+
               <input
                 type="file"
                 ref={fileInputRef}
@@ -269,9 +270,9 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                 accept="image/*"
                 onChange={handleFileChange}
               />
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full sm:w-auto"
               >

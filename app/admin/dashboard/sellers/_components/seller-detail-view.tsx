@@ -1,4 +1,5 @@
 import * as React from "react"
+import Image from "next/image"
 import {
   IconCheck, IconX, IconPlayerPlay, IconPlayerPause, IconDoorExit,
   IconBuildingStore, IconFileText, IconExternalLink, IconArrowLeft,
@@ -157,7 +158,7 @@ export function SellerDetailView({
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thông tin cửa hàng</h3>
                   <div className="flex items-center gap-3">
                     {shop.logoUrl ? (
-                      <img src={shop.logoUrl} alt={shop.name} className="size-12 rounded-lg object-cover border" />
+                      <Image src={shop.logoUrl} alt={shop.name} width={48} height={48} className="size-12 rounded-lg object-cover border" />
                     ) : (
                       <div className="size-12 rounded-lg bg-muted flex items-center justify-center">
                         <IconBuildingStore className="size-6 text-muted-foreground" />
@@ -252,7 +253,7 @@ export function SellerDetailView({
           <DialogHeader><DialogTitle>Xem tài liệu</DialogTitle></DialogHeader>
           {previewImg && (
             <div className="flex items-center justify-center max-h-[70vh] overflow-auto">
-              <img src={previewImg} alt="Document preview" className="max-w-full max-h-[65vh] object-contain rounded-lg" />
+              <Image src={previewImg} alt="Document preview" width={800} height={600} className="max-w-full max-h-[65vh] object-contain rounded-lg" />
             </div>
           )}
           <DialogFooter>

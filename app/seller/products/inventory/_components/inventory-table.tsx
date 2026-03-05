@@ -1,5 +1,7 @@
 "use client"
 
+import Image from "next/image"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -99,7 +101,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                     </TableCell>
                     <TableCell>
                       {imgUrl ? (
-                        <img src={imgUrl} alt={product.name} className="size-10 rounded border object-cover" />
+                        <Image src={imgUrl} alt={product.name} width={40} height={40} className="size-10 rounded border object-cover" />
                       ) : (
                         <div className="bg-muted flex size-10 items-center justify-center rounded border text-xs text-muted-foreground">N/A</div>
                       )}

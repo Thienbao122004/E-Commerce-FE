@@ -7,6 +7,8 @@ import {
   IconChevronLeft, IconChevronRight, IconRefresh,
   IconFilter, IconPackage,
 } from "@tabler/icons-react"
+import Image from "next/image"
+import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,8 +21,10 @@ import { fetchProductById } from "@/services/products"
 import { supabase } from "@/lib/supabase"
 import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
-import { ProductDetailView } from "./_components/product-detail-view"
-import { ActionDialog } from "./_components/action-dialog"
+const ProductDetailView = dynamic(() => import("./_components/product-detail-view").then(m => m.ProductDetailView), {
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full" /></div>,
+})
+const ActionDialog = dynamic(() => import("./_components/action-dialog").then(m => m.ActionDialog))
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
@@ -182,7 +186,7 @@ export default function ProductsPage() {
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 20 + idx + 1}</TableCell>
                     <TableCell>
                       {product.imageUrls[0] ? (
-                        <img src={product.imageUrls[0]} alt={product.name} className="size-10 rounded border object-cover" />
+                        <Image src={product.imageUrls[0]} alt={product.name} width={40} height={40} className="size-10 rounded border object-cover" />
                       ) : (
                         <div className="bg-muted flex size-10 items-center justify-center rounded border text-xs text-muted-foreground">N/A</div>
                       )}

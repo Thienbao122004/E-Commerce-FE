@@ -8,6 +8,8 @@ import {
   IconBuildingStore, IconEye, IconFileText,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
+import Image from "next/image"
+import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,7 +24,9 @@ import {
   ShopStatus, ShopStatusLabels, ShopStatusColors,
 } from "@/types/seller"
 import type { ShopVerification } from "@/types/seller"
-import { SellerDetailView } from "./_components/seller-detail-view"
+const SellerDetailView = dynamic(() => import("./_components/seller-detail-view").then(m => m.SellerDetailView), {
+  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full" /></div>,
+})
 import FilterBar from "@/components/common/filter-bar"
 import type { FilterConfig } from "@/components/common/filter-bar"
 import TablePagination from "@/components/common/table-pagination"
@@ -349,7 +353,7 @@ export default function SellersPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {s.logoUrl ? (
-                          <img src={s.logoUrl} alt={s.name} className="size-8 rounded-md object-cover border" />
+                          <Image src={s.logoUrl} alt={s.name} width={32} height={32} className="size-8 rounded-md object-cover border" />
                         ) : (
                           <div className="size-8 rounded-md bg-muted flex items-center justify-center">
                             <IconBuildingStore className="size-4 text-muted-foreground" />
