@@ -158,6 +158,15 @@
     scrollbar-color: #e7dbcf transparent;
   }
 
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .material-symbols-outlined {
     font-family: 'Material Symbols Outlined';
     font-weight: normal;

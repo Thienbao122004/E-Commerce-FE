@@ -13,7 +13,7 @@ export default function ResetPasswordPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
                 </div>
                 <div className="absolute bottom-10 left-10 z-10 text-white max-w-md">
-                    <h2 className="text-3xl font-bold mb-2 tracking-tight">Shopio</h2>
+                    <h2 className="text-3xl font-bold mb-2 tracking-tight">EcomViet</h2>
                     <p className="text-white/90 text-lg font-light">Nền tảng thương mại điện tử nội địa Việt Nam</p>
                 </div>
             </div>

@@ -209,7 +209,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <div className="flex  gap-2 p-1.5">
               <IconInnerShadowTop className="!size-5 mt-0.5" />
-              <span className="text-base font-semibold">Shopio</span>
+              <span className="text-base font-semibold">EcomViet</span>
             </div>
           </SidebarMenuItem>
         </SidebarMenu>

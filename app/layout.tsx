@@ -22,7 +22,7 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "Shopio - E-Commerce",
+  title: "EcomViet",
   description: "Discover the soul of Vietnamese artistry",
 };
 

@@ -2,22 +2,29 @@
 
 import * as React from "react"
 import {
-  IconSearch, IconChevronLeft, IconChevronRight, IconRefresh,
-  IconCheck, IconX, IconFilter, IconCash,
+  IconRefresh, IconCheck, IconX,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
+import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
 import { fetchWithdrawals, approveWithdrawal, rejectWithdrawal } from "@/services/withdrawals"
 import { WithdrawStatus, WithdrawStatusLabels, WithdrawStatusColors } from "@/types/withdraw"
 import type { WithdrawRequest } from "@/types/withdraw"
-import { WithdrawalDialogs } from "./_components/withdrawal-dialogs"
+const WithdrawalDialogs = dynamic(() => import("./_components/withdrawal-dialogs").then(m => m.WithdrawalDialogs))
+
+import FilterBar from "@/components/common/filter-bar"
+import type { FilterConfig } from "@/components/common/filter-bar"
+import TablePagination from "@/components/common/table-pagination"
+import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 const fmtDate = (t: string | null) =>
   t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
@@ -33,24 +40,20 @@ export default function WithdrawalsPage() {
   const [loading, setLoading] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
   const [pg, setPg] = React.useState(1)
-  const [status, setStatus] = React.useState<number | null>(null)
+  const [statusFilter, setStatusFilter] = React.useState("all")
+  const [searchInput, setSearchInput] = React.useState("")
+  const debouncedSearch = useDebounce(searchInput)
+  const [sort, setSort] = React.useState<SortConfig | null>(null)
   const ps = 10
   const tp = Math.ceil(total / ps)
-
-  const [searchInput, setSearchInput] = React.useState("")
-  const [search, setSearch] = React.useState("")
-  const searchTimeout = React.useRef<NodeJS.Timeout | null>(null)
-  const handleSearchChange = (val: string) => {
-    setSearchInput(val)
-    if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    searchTimeout.current = setTimeout(() => { setSearch(val); setPg(1) }, 400)
-  }
 
   const [dialogType, setDialogType] = React.useState<DialogType>(null)
   const [target, setTarget] = React.useState<WithdrawRequest | null>(null)
 
   const openDialog = (type: DialogType, req: WithdrawRequest) => { setDialogType(type); setTarget(req) }
   const closeDialog = () => { setDialogType(null); setTarget(null) }
+
+  React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
   const getToken = async () => {
     const { data } = await supabase.auth.getSession()
@@ -62,11 +65,11 @@ export default function WithdrawalsPage() {
     const tk = await getToken()
     if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchWithdrawals(tk, pg, ps, status)
+      const r = await fetchWithdrawals(tk, pg, ps, null)
       if (r.success) { setRequests(r.requests); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
-  }, [pg, status])
+  }, [pg])
 
   React.useEffect(() => { load() }, [load])
 
@@ -96,77 +99,93 @@ export default function WithdrawalsPage() {
     finally { setBusy(false) }
   }
 
-  const filtered = React.useMemo(() => {
-    if (!search) return requests
-    const q = search.toLowerCase()
-    return requests.filter((r) =>
-      r.sellerName?.toLowerCase().includes(q) ||
-      r.bankAccountName?.toLowerCase().includes(q) ||
-      r.bankAccountNumber?.includes(q)
-    )
-  }, [requests, search])
+  const sortAccessor = React.useCallback((row: WithdrawRequest, key: string): string | number => {
+    switch (key) {
+      case "sellerName": return row.sellerName ?? ""
+      case "amount": return row.amount
+      case "bankName": return row.bankName ?? ""
+      case "status": return row.status
+      case "requestedAt": return row.requestedAt ?? ""
+      case "reviewedAt": return row.reviewedAt ?? ""
+      default: return ""
+    }
+  }, [])
+
+  const tableFilters = React.useMemo(() => [
+    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
+  ], [statusFilter])
+
+  const { filtered: sorted } = useTableData<WithdrawRequest>({
+    data: requests,
+    search: debouncedSearch,
+    searchKeys: ["sellerName", "bankAccountName", "bankAccountNumber"],
+    filters: tableFilters,
+    sort,
+    sortAccessor,
+  })
+
+  const handleSort = (key: string) => setSort(getNextSort(sort, key))
+
+  const filters: FilterConfig[] = React.useMemo(() => [
+    {
+      key: "status",
+      label: "Trạng thái",
+      value: statusFilter,
+      onChange: (v: string) => { setStatusFilter(v); setPg(1) },
+      width: "w-[160px]",
+      options: [
+        { value: "all", label: "Tất cả trạng thái" },
+        { value: String(WithdrawStatus.Pending), label: "Chờ xử lý" },
+        { value: String(WithdrawStatus.Approved), label: "Đã duyệt" },
+        { value: String(WithdrawStatus.Rejected), label: "Từ chối" },
+      ],
+    },
+  ], [statusFilter])
 
   return (
     <>
-      <div className="flex flex-1 flex-col">
-        <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <IconCash className="size-7" />Yêu cầu rút tiền
-              </h1>
-              <p className="text-muted-foreground text-sm">{loading ? "Đang tải..." : `${total} yêu cầu`}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <IconRefresh className="mr-1.5 size-4" />Làm mới
-            </Button>
-          </div>
+      <SetHeaderActions>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <IconRefresh className="mr-1.5 size-4" />Làm mới
+        </Button>
+      </SetHeaderActions>
 
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <IconSearch className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
-              <Input placeholder="Tìm người bán, tên TK, số TK..." value={searchInput} onChange={(e) => handleSearchChange(e.target.value)} className="pl-9 bg-background" />
-            </div>
-            <div className="flex items-center gap-2">
-              <IconFilter className="size-4 text-muted-foreground" />
-              <Select value={status === null ? "all" : String(status)} onValueChange={(v) => { setStatus(v === "all" ? null : Number(v)); setPg(1) }}>
-                <SelectTrigger className="w-[160px] bg-background"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value={String(WithdrawStatus.Pending)}>Chờ xử lý</SelectItem>
-                  <SelectItem value={String(WithdrawStatus.Approved)}>Đã duyệt</SelectItem>
-                  <SelectItem value={String(WithdrawStatus.Rejected)}>Từ chối</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-col gap-4 p-4">
+          <FilterBar
+            searchPlaceholder="Tìm người bán, tên TK, số TK..."
+            searchValue={searchInput}
+            onSearchChange={setSearchInput}
+            onSearch={load}
+            filters={filters}
+          />
 
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
-                  <TableHead>Người bán</TableHead>
-                  <TableHead className="text-right">Số tiền</TableHead>
-                  <TableHead>Ngân hàng</TableHead>
+                  <SortableTableHead sortKey="sellerName" currentSort={sort} onSort={handleSort}>Người bán</SortableTableHead>
+                  <SortableTableHead sortKey="amount" currentSort={sort} onSort={handleSort}>Số tiền</SortableTableHead>
+                  <SortableTableHead sortKey="bankName" currentSort={sort} onSort={handleSort}>Ngân hàng</SortableTableHead>
                   <TableHead>Số TK</TableHead>
                   <TableHead>Chủ TK</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Ngày yêu cầu</TableHead>
-                  <TableHead>Ngày duyệt</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
+                  <SortableTableHead sortKey="requestedAt" currentSort={sort} onSort={handleSort}>Ngày yêu cầu</SortableTableHead>
+                  <SortableTableHead sortKey="reviewedAt" currentSort={sort} onSort={handleSort}>Ngày duyệt</SortableTableHead>
+                  <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>{Array.from({ length: 10 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
-                )) : filtered.length === 0 ? (
+                )) : sorted.length === 0 ? (
                   <TableRow><TableCell colSpan={10} className="h-32 text-center text-muted-foreground">Không có yêu cầu rút tiền nào.</TableCell></TableRow>
-                ) : filtered.map((r, idx) => (
+                ) : sorted.map((r, idx) => (
                   <TableRow key={r.id}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
                     <TableCell className="text-sm font-medium">{r.sellerName ?? "—"}</TableCell>
-                    <TableCell className="text-right text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                    <TableCell className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
                       {fmtMoney(r.amount, r.currency)}
                     </TableCell>
                     <TableCell className="text-sm">{r.bankName}</TableCell>
@@ -200,14 +219,14 @@ export default function WithdrawalsPage() {
             </Table>
           </div>
 
-          {!loading && tp > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground text-sm">Trang {pg} / {tp} · {total} yêu cầu</p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg - 1)} disabled={pg <= 1}><IconChevronLeft className="size-4" /></Button>
-                <Button variant="outline" size="icon" className="size-8" onClick={() => setPg(pg + 1)} disabled={pg >= tp}><IconChevronRight className="size-4" /></Button>
-              </div>
-            </div>
+          {!loading && (
+            <TablePagination
+              currentPage={pg}
+              totalPages={tp}
+              totalItems={total}
+              onPageChange={setPg}
+              itemLabel="yêu cầu"
+            />
           )}
         </div>
       </div>

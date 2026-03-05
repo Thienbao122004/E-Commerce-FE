@@ -27,7 +27,7 @@ export function useProducts(initialParams?: Partial<Params>) {
   const [actionLoading, setActionLoading] = useState(false)
   const [params, setParams] = useState<Params>({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     status: null,
     search: "",
     ...initialParams,

@@ -153,7 +153,7 @@ export default function ProductDetailPage() {
               {/* Left: Images */}
               <div className="flex flex-col gap-4">
 
-                <div className="aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
+                <div className="relative aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
                   {product.imageUrls.length > 0 ? (
                     <Image
                       src={product.imageUrls[selectedImage] ?? product.imageUrls[0]}
@@ -174,7 +174,7 @@ export default function ProductDetailPage() {
                       <button
                         key={i}
                         onClick={() => setSelectedImage(i)}
-                        className={`shrink-0 size-16 rounded-lg border-2 overflow-hidden transition-all ${selectedImage === i
+                        className={`relative shrink-0 size-16 rounded-lg border-2 overflow-hidden transition-all ${selectedImage === i
                           ? "border-primary ring-2 ring-primary/20"
                           : "border-transparent hover:border-muted-foreground/30"
                           }`}

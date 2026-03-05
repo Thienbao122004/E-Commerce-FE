@@ -208,7 +208,7 @@ export default function ProductsPage() {
                   </TableRow>
                 ) : sorted.map((product, idx) => (
                   <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewDetail(product)}>
-                    <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 20 + idx + 1}</TableCell>
+                    <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 10 + idx + 1}</TableCell>
                     <TableCell>
                       {product.imageUrls[0] ? (
                         <Image src={product.imageUrls[0]} alt={product.name} width={40} height={40} className="size-10 rounded border object-cover" />
