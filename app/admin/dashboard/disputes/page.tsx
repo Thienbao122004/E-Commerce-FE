@@ -188,10 +188,10 @@ export default function DisputesPage() {
                   <SortableTableHead sortKey="customerName" currentSort={sort} onSort={handleSort}>Khách hàng</SortableTableHead>
                   <SortableTableHead sortKey="shopName" currentSort={sort} onSort={handleSort}>Cửa hàng</SortableTableHead>
                   <SortableTableHead sortKey="type" currentSort={sort} onSort={handleSort}>Loại</SortableTableHead>
-                  <SortableTableHead sortKey="requestedAmount" currentSort={sort} onSort={handleSort} className="text-right">Số tiền YC</SortableTableHead>
+                  <SortableTableHead sortKey="requestedAmount" currentSort={sort} onSort={handleSort}>Số tiền YC</SortableTableHead>
                   <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
                   <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort}>Ngày tạo</SortableTableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead className="text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -209,7 +209,7 @@ export default function DisputesPage() {
                       <TableCell className="text-sm">{d.customerName}</TableCell>
                       <TableCell className="text-sm">{d.shopName}</TableCell>
                       <TableCell><Badge variant="outline" className="text-xs">{DisputeTypeLabels[d.type] ?? d.typeName}</Badge></TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{currency(d.requestedAmount)}</TableCell>
+                      <TableCell className="font-medium tabular-nums">{currency(d.requestedAmount)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={`text-xs ${DisputeStatusColors[d.status] ?? ""}`}>
                           {DisputeStatusLabels[d.status] ?? d.statusName}

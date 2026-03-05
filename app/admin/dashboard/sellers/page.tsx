@@ -32,6 +32,7 @@ import type { FilterConfig } from "@/components/common/filter-bar"
 import TablePagination from "@/components/common/table-pagination"
 import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
@@ -187,44 +188,29 @@ export default function SellersPage() {
     closeDialog()
   }
 
-  // Client-side search filtering
-  const filtered = React.useMemo(() => {
-    let result = sellers
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase()
-      result = result.filter((s) =>
-        s.name?.toLowerCase().includes(q) ||
-        s.ownerName?.toLowerCase().includes(q) ||
-        s.ownerEmail?.toLowerCase().includes(q)
-      )
+  const sortAccessor = React.useCallback((row: ShopVerification, key: string): string | number => {
+    switch (key) {
+      case "name": return row.name ?? ""
+      case "ownerName": return row.ownerName ?? ""
+      case "verificationStatus": return row.verificationStatus
+      case "status": return row.status
+      case "createdAt": return row.createdAt ?? ""
+      default: return ""
     }
-    if (vStatus !== "all") {
-      const st = Number(vStatus)
-      result = result.filter((s) => s.verificationStatus === st)
-    }
-    return result
-  }, [sellers, debouncedSearch, vStatus])
+  }, [])
 
-  // Client-side sorting
-  const sorted = React.useMemo(() => {
-    if (!sort) return filtered
-    const { key, direction } = sort
-    const dir = direction === "asc" ? 1 : -1
-    return [...filtered].sort((a, b) => {
-      let av: string | number = ""
-      let bv: string | number = ""
-      switch (key) {
-        case "name": av = a.name ?? ""; bv = b.name ?? ""; break
-        case "ownerName": av = a.ownerName ?? ""; bv = b.ownerName ?? ""; break
-        case "verificationStatus": av = a.verificationStatus; bv = b.verificationStatus; break
-        case "status": av = a.status; bv = b.status; break
-        case "createdAt": av = a.createdAt ?? ""; bv = b.createdAt ?? ""; break
-      }
-      if (av < bv) return -1 * dir
-      if (av > bv) return 1 * dir
-      return 0
-    })
-  }, [filtered, sort])
+  const tableFilters = React.useMemo(() => [
+    { key: "vStatus", value: vStatus, match: (r: Record<string, unknown>) => r.verificationStatus },
+  ], [vStatus])
+
+  const { filtered: sorted } = useTableData<ShopVerification>({
+    data: sellers,
+    search: debouncedSearch,
+    searchKeys: ["name", "ownerName", "ownerEmail"],
+    filters: tableFilters,
+    sort,
+    sortAccessor,
+  })
 
   const handleSort = (key: string) => setSort(getNextSort(sort, key))
 

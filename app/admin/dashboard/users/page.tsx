@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
 import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
 import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
@@ -86,34 +87,23 @@ export default function UsersPage() {
     finally { setBusy(false) }
   }
 
-  const filtered = React.useMemo(() => {
-    if (!debouncedSearch) return users
-    const q = debouncedSearch.toLowerCase()
-    return users.filter((u) =>
-      (u.fullName?.toLowerCase().includes(q)) ||
-      (u.email?.toLowerCase().includes(q)) ||
-      (u.phone?.includes(q))
-    )
-  }, [users, debouncedSearch])
+  const sortAccessor = React.useCallback((row: AdminUser, key: string): string | number => {
+    switch (key) {
+      case "fullName": return row.fullName ?? ""
+      case "role": return row.role
+      case "status": return row.status
+      case "createdAt": return row.createdAt
+      default: return ""
+    }
+  }, [])
 
-  const sorted = React.useMemo(() => {
-    if (!sort) return filtered
-    const { key, direction } = sort
-    const dir = direction === "asc" ? 1 : -1
-    return [...filtered].sort((a, b) => {
-      let av: string | number = ""
-      let bv: string | number = ""
-      switch (key) {
-        case "fullName": av = a.fullName ?? ""; bv = b.fullName ?? ""; break
-        case "role": av = a.role; bv = b.role; break
-        case "status": av = a.status; bv = b.status; break
-        case "createdAt": av = a.createdAt; bv = b.createdAt; break
-      }
-      if (av < bv) return -1 * dir
-      if (av > bv) return 1 * dir
-      return 0
-    })
-  }, [filtered, sort])
+  const { filtered: sorted } = useTableData<AdminUser>({
+    data: users,
+    search: debouncedSearch,
+    searchKeys: ["fullName", "email", "phone"],
+    sort,
+    sortAccessor,
+  })
 
   const handleSort = (key: string) => setSort(getNextSort(sort, key))
 
@@ -174,7 +164,7 @@ export default function UsersPage() {
               <TableBody>
                 {loading ? Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>{Array.from({ length: 8 }).map((_, j) => (<TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>))}</TableRow>
-                )) : filtered.length === 0 ? (
+                )) : sorted.length === 0 ? (
                   <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Không có người dùng nào.</TableCell></TableRow>
                 ) : sorted.map((u, idx) => (
                   <TableRow key={u.id}>

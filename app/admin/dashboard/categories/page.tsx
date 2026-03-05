@@ -54,6 +54,7 @@ import type { FilterConfig } from "@/components/common/filter-bar"
 import TablePagination from "@/components/common/table-pagination"
 import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
@@ -101,47 +102,31 @@ export default function CategoriesPage() {
 
   React.useEffect(() => { load() }, [load])
 
-  const filtered = React.useMemo(() => {
-    let result = categories
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase()
-      result = result.filter((c) =>
-        c.code.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        (c.parentName?.toLowerCase().includes(q))
-      )
+  const sortAccessor = React.useCallback((row: Category, key: string): string | number => {
+    switch (key) {
+      case "code": return row.code
+      case "name": return row.name
+      case "level": return row.level
+      case "productCount": return row.productCount
+      case "isActive": return row.isActive ? 1 : 0
+      case "id": return row.id
+      default: return ""
     }
-    if (activeFilter !== "all") {
-      const isActive = activeFilter === "active"
-      result = result.filter((c) => c.isActive === isActive)
-    }
-    if (levelFilter !== "all") {
-      const lvl = Number(levelFilter)
-      result = result.filter((c) => c.level === lvl)
-    }
-    return result
-  }, [categories, debouncedSearch, activeFilter, levelFilter])
+  }, [])
 
-  const sorted = React.useMemo(() => {
-    if (!sort) return filtered
-    const { key, direction } = sort
-    const dir = direction === "asc" ? 1 : -1
-    return [...filtered].sort((a, b) => {
-      let av: string | number = ""
-      let bv: string | number = ""
-      switch (key) {
-        case "code": av = a.code; bv = b.code; break
-        case "name": av = a.name; bv = b.name; break
-        case "level": av = a.level; bv = b.level; break
-        case "productCount": av = a.productCount; bv = b.productCount; break
-        case "isActive": av = a.isActive ? 1 : 0; bv = b.isActive ? 1 : 0; break
-        case "id": av = a.id; bv = b.id; break
-      }
-      if (av < bv) return -1 * dir
-      if (av > bv) return 1 * dir
-      return 0
-    })
-  }, [filtered, sort])
+  const tableFilters = React.useMemo(() => [
+    { key: "isActive", value: activeFilter, match: (r: Record<string, unknown>) => r.isActive ? "active" : "inactive" },
+    { key: "level", value: levelFilter, match: (r: Record<string, unknown>) => r.level },
+  ], [activeFilter, levelFilter])
+
+  const { filtered: sorted } = useTableData<Category>({
+    data: categories,
+    search: debouncedSearch,
+    searchKeys: ["code", "name", "parentName"],
+    filters: tableFilters,
+    sort,
+    sortAccessor,
+  })
 
   const handleSort = (key: string) => setSort(getNextSort(sort, key))
 

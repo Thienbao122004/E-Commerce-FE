@@ -27,6 +27,7 @@ import FilterBar from "@/components/common/filter-bar"
 import TablePagination from "@/components/common/table-pagination"
 import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
+import { useTableData } from "@/hooks/use-table-data"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
@@ -65,24 +66,21 @@ export default function TagsPage() {
 
   React.useEffect(() => { load() }, [load])
 
-  const sorted = React.useMemo(() => {
-    if (!sort) return tags
-    const { key, direction } = sort
-    const dir = direction === "asc" ? 1 : -1
-    return [...tags].sort((a, b) => {
-      let av: string | number = ""
-      let bv: string | number = ""
-      switch (key) {
-        case "name": av = a.name; bv = b.name; break
-        case "slug": av = a.slug; bv = b.slug; break
-        case "productCount": av = a.productCount; bv = b.productCount; break
-        case "createdAt": av = a.createdAt; bv = b.createdAt; break
-      }
-      if (av < bv) return -1 * dir
-      if (av > bv) return 1 * dir
-      return 0
-    })
-  }, [tags, sort])
+  const sortAccessor = React.useCallback((row: Tag, key: string): string | number => {
+    switch (key) {
+      case "name": return row.name
+      case "slug": return row.slug
+      case "productCount": return row.productCount
+      case "createdAt": return row.createdAt
+      default: return ""
+    }
+  }, [])
+
+  const { filtered: sorted } = useTableData<Tag>({
+    data: tags,
+    sort,
+    sortAccessor,
+  })
 
   const handleSort = (key: string) => setSort(getNextSort(sort, key))
 
