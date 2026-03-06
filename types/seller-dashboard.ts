@@ -64,6 +64,7 @@ export type SellerProduct = {
 export type SellerProductsResponse = {
   success: boolean
   data?: SellerProduct[]
+  totalCount?: number
   message?: string
 }
 
@@ -220,6 +221,7 @@ export type UpdateSellerProductPayload = {
   description?: string
   basePrice?: number
   status?: number
+  imageUrls?: string[]
 }
 
 export type UpdateInventoryPayload = {

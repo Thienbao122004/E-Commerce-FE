@@ -1,39 +1,24 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconExternalLink,
-  IconShoppingCart,
-} from "@tabler/icons-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { IconExternalLink, IconShoppingCart } from "@tabler/icons-react"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
-import { validTransitions } from "./order-status-dialog"
 import type { SellerOrder } from "@/types/seller-dashboard"
+import { validTransitions } from "./order-status-dialog"
+import { SortableTableHead } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
+import TablePagination from "@/components/common/table-pagination"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
 const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "short", year: "numeric" })
+  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 
 const statusColors: Record<number, string> = {
   [OrderStatus.Pending]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
@@ -47,7 +32,7 @@ const statusColors: Record<number, string> = {
 function TableSkeleton() {
   return (
     <>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <TableRow key={i}>
           {Array.from({ length: 8 }).map((__, j) => (
             <TableCell key={j}><Skeleton className="h-4 w-full max-w-[80px]" /></TableCell>
@@ -58,12 +43,6 @@ function TableSkeleton() {
   )
 }
 
-const PAGE_SIZE_OPTIONS = [
-  { label: "10 / trang", value: "10" },
-  { label: "20 / trang", value: "20" },
-  { label: "50 / trang", value: "50" },
-]
-
 type Props = {
   orders: SellerOrder[]
   loading: boolean
@@ -71,6 +50,8 @@ type Props = {
   totalPages: number
   page: number
   pageSize: number
+  sort: SortConfig | null
+  onSort: (key: string) => void
   onOpenStatusDialog: (orderId: string, currentStatus: number) => void
   onPageChange: (p: number) => void
   onPageSizeChange?: (size: number) => void
@@ -83,25 +64,26 @@ export function OrderTable({
   totalPages,
   page,
   pageSize,
+  sort,
+  onSort,
   onOpenStatusDialog,
   onPageChange,
   onPageSizeChange,
 }: Props) {
-  const startItem = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
-  const endItem = Math.min(page * pageSize, totalCount)
+  const router = useRouter()
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <div className="overflow-hidden rounded-lg border">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-muted">
             <TableRow>
-              <TableHead className="w-12 text-center">#</TableHead>
+              <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead>Mã đơn hàng</TableHead>
-              <TableHead>Khách hàng</TableHead>
-              <TableHead>Ngày đặt</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Tổng tiền</TableHead>
+              <SortableTableHead sortKey="customerName" currentSort={sort} onSort={onSort}>Khách hàng</SortableTableHead>
+              <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={onSort}>Ngày đặt</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSort={sort} onSort={onSort}>Trạng thái</SortableTableHead>
+              <SortableTableHead sortKey="totalAmount" currentSort={sort} onSort={onSort}>Tổng tiền</SortableTableHead>
               <TableHead className="hidden lg:table-cell">Địa chỉ</TableHead>
               <TableHead className="w-[100px] text-center">Thao tác</TableHead>
             </TableRow>
@@ -127,7 +109,11 @@ export function OrderTable({
               orders.map((order, idx) => {
                 const canUpdate = (validTransitions[order.status] ?? []).length > 0
                 return (
-                  <TableRow key={order.id} className="group hover:bg-muted/40 transition-colors">
+                  <TableRow
+                    key={order.id}
+                    className="group cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => router.push(`/seller/orders/${order.id}`)}
+                  >
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                       {(page - 1) * pageSize + idx + 1}
                     </TableCell>
@@ -155,7 +141,7 @@ export function OrderTable({
                         {OrderStatusLabels[order.status] ?? "—"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold text-sm tabular-nums">
+                    <TableCell className="font-semibold text-sm tabular-nums">
                       {currency(order.totalAmount)}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
@@ -163,7 +149,7 @@ export function OrderTable({
                         {order.shippingAddress ?? "—"}
                       </p>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         {canUpdate && (
                           <Button
@@ -188,51 +174,17 @@ export function OrderTable({
         </Table>
       </div>
 
-      {/* Pagination Bar */}
-      {!loading && totalCount > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-muted-foreground text-sm">
-            Hiển thị <span className="font-medium text-foreground">{startItem}–{endItem}</span> trong số{" "}
-            <span className="font-medium text-foreground">{totalCount}</span> đơn hàng
-          </p>
-          <div className="flex items-center gap-2">
-            {onPageSizeChange && (
-              <Select value={String(pageSize)} onValueChange={(val) => onPageSizeChange(Number(val))}>
-                <SelectTrigger className="h-8 w-[120px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => onPageChange(page - 1)}
-                disabled={page <= 1}
-              >
-                <IconChevronLeft className="size-4" />
-              </Button>
-              <span className="min-w-[70px] text-center text-sm tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => onPageChange(page + 1)}
-                disabled={page >= totalPages}
-              >
-                <IconChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
+      {!loading && (
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          onPageChange={onPageChange}
+          itemLabel="đơn hàng"
+          pageSize={pageSize}
+          onPageSizeChange={onPageSizeChange}
+          pageSizeOptions={onPageSizeChange ? [10, 20, 50] : undefined}
+        />
       )}
     </div>
   )
