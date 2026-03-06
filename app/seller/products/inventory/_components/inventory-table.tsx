@@ -1,13 +1,15 @@
 "use client"
 
 import Image from "next/image"
-
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { IconChevronLeft, IconChevronRight, IconPackage } from "@tabler/icons-react"
+import { IconPackage } from "@tabler/icons-react"
 import type { SellerProduct } from "@/types/seller-dashboard"
+import { SortableTableHead } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
+import TablePagination from "@/components/common/table-pagination"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
@@ -36,7 +38,7 @@ function getStockWarning(stock: number | null): { label: string; cls: string } |
 function TableSkeleton() {
   return (
     <>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <TableRow key={i}>
           <TableCell><Skeleton className="h-4 w-8" /></TableCell>
           <TableCell><Skeleton className="h-10 w-10 rounded" /></TableCell>
@@ -58,22 +60,26 @@ type Props = {
   totalPages: number
   page: number
   pageSize: number
+  sort: SortConfig | null
+  onSort: (key: string) => void
   onPageChange: (p: number) => void
 }
 
-export function InventoryTable({ products, loading, totalCount, totalPages, page, pageSize, onPageChange }: Props) {
+export function InventoryTable({ products, loading, totalCount, totalPages, page, pageSize, sort, onSort, onPageChange }: Props) {
+  const router = useRouter()
+
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead className="w-[60px]">Ảnh</TableHead>
-              <TableHead>Sản phẩm</TableHead>
-              <TableHead className="text-right">Giá</TableHead>
+              <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Sản phẩm</SortableTableHead>
+              <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
               <TableHead>Số lượng tồn kho</TableHead>
-              <TableHead className="text-center">Tồn</TableHead>
+              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn</SortableTableHead>
               <TableHead>Cảnh báo</TableHead>
             </TableRow>
           </TableHeader>
@@ -95,7 +101,11 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                 const stock = product.totalStock ?? 0
                 const warning = getStockWarning(stock)
                 return (
-                  <TableRow key={product.id} className="hover:bg-muted/50">
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/seller/products/${product.id}`)}
+                  >
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                       {(page - 1) * pageSize + idx + 1}
                     </TableCell>
@@ -114,7 +124,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell className="font-medium tabular-nums">
                       {currency(product.basePrice)}
                     </TableCell>
                     <TableCell>
@@ -140,22 +150,15 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
         </Table>
       </div>
 
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-muted-foreground text-sm">
-            Hiển thị {products.length} trong số {totalCount} sản phẩm
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
-              <IconChevronLeft className="size-4" />
-            </Button>
-            <span className="text-sm tabular-nums">{page} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>
-              <IconChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
+      {!loading && (
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          onPageChange={onPageChange}
+          itemLabel="sản phẩm"
+        />
       )}
-    </>
+    </div>
   )
 }
