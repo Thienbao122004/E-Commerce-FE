@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
@@ -86,6 +86,57 @@ function ProductCardSkeleton() {
 
 const FLASH_DISCOUNTS = [30, 15, 25, 20, 40, 35, 10, 45, 18, 28]
 
+const HERO_SLIDES = [
+  {
+    image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
+    badge: "Ưu đãi hôm nay",
+    badgeColor: "#E07A5F",
+    title: "Sale lớn\ncuối tuần",
+    titleHighlight: "Giảm đến 50%",
+    desc: "Hàng ngàn sản phẩm chính hãng — giao nhanh toàn quốc",
+    cta: "Mua ngay",
+    btnColor: "#E07A5F",
+    bg: "from-orange-900/70 via-orange-800/40",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
+    badge: "Hàng mới về",
+    badgeColor: "#3B82F6",
+    title: "Thời trang\nthu đông 2025",
+    titleHighlight: "Xu hướng mới",
+    desc: "Phong cách hiện đại kết hợp nét truyền thống Việt Nam",
+    cta: "Khám phá",
+    btnColor: "#3B82F6",
+    bg: "from-blue-900/70 via-blue-800/40",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80",
+    badge: "Đặc sản vùng miền",
+    badgeColor: "#16A34A",
+    title: "Tinh hoa\nẩm thực Việt",
+    titleHighlight: "Giao tận nhà",
+    desc: "Cà phê Đà Lạt, đặc sản Hội An, mắm Phú Quốc — chính gốc 100%",
+    cta: "Đặt hàng",
+    btnColor: "#16A34A",
+    bg: "from-green-900/70 via-green-800/40",
+  },
+]
+
+const SIDE_BANNERS = [
+  {
+    image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80",
+    sub: "Trang trí nhà cửa",
+    title: "Đồ thủ\ncông mỹ nghệ",
+    overlay: "linear-gradient(135deg, rgba(120,60,20,0.6) 0%, rgba(0,0,0,0.2) 100%)",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
+    sub: "Voucher giảm 30%",
+    title: "Làm đẹp\nchính hãng",
+    overlay: "linear-gradient(135deg, rgba(200,80,120,0.6) 0%, rgba(0,0,0,0.2) 100%)",
+  },
+]
+
 export default function LandingPage() {
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [flashProducts, setFlashProducts] = useState<StorefrontProduct[]>([])
@@ -97,6 +148,9 @@ export default function LandingPage() {
 
   const [search, setSearch] = useState("")
   const [countdown, setCountdown] = useState({ h: 2, m: 14, s: 55 })
+  const [heroSlide, setHeroSlide] = useState(0)
+  const [flashScroll, setFlashScroll] = useState({ canPrev: false, canNext: true })
+  const flashScrollRef = useRef<HTMLDivElement>(null)
 
   /* ── fetch ── */
   const loadCategories = useCallback(async () => {
@@ -131,6 +185,36 @@ export default function LandingPage() {
     loadFlash()
     loadFeatured()
   }, [loadCategories, loadFlash, loadFeatured])
+
+  const updateFlashScroll = useCallback(() => {
+    const el = flashScrollRef.current
+    if (!el) return
+    setFlashScroll({
+      canPrev: el.scrollLeft > 4,
+      canNext: el.scrollLeft < el.scrollWidth - el.clientWidth - 4,
+    })
+  }, [])
+
+  const scrollFlash = (dir: "prev" | "next") => {
+    const el = flashScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === "next" ? 540 : -540, behavior: "smooth" })
+  }
+
+  /* ── flash scroll state ── */
+  useEffect(() => {
+    const el = flashScrollRef.current
+    if (!el) return
+    el.addEventListener("scroll", updateFlashScroll, { passive: true })
+    updateFlashScroll()
+    return () => el.removeEventListener("scroll", updateFlashScroll)
+  }, [flashProducts, updateFlashScroll])
+
+  /* ── hero auto-rotate ── */
+  useEffect(() => {
+    const t = setInterval(() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length), 4000)
+    return () => clearInterval(t)
+  }, [])
 
   /* ── countdown ── */
   useEffect(() => {
@@ -234,46 +318,117 @@ export default function LandingPage() {
       </header>
 
       {/* ══ MAIN ══ */}
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6 space-y-12">
-        <section className="rounded-2xl overflow-hidden relative min-h-[400px] md:min-h-[500px] flex items-center group">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700"
-            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1400&q=80')" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-          <div className="relative z-10 p-6 md:p-16 max-w-2xl flex flex-col gap-6 items-start">
-            <span
-              className="inline-block px-3 py-1 rounded-full text-white text-xs font-bold tracking-wider uppercase"
-              style={{ backgroundColor: "rgba(236,127,19,0.9)" }}
-            >
-              Hàng thủ công tuyển chọn
-            </span>
-            <h1 className="text-4xl md:text-6xl font-black text-white leading-[1.1]">
-              Khám phá<br />
-              <span style={{ color: "var(--color-primary)" }}>Tinh hoa Việt Nam</span>
-            </h1>
-            <p className="text-gray-200 text-lg md:text-xl font-medium max-w-lg">
-              Hàng thủ công chất lượng giao tận nhà. Từ lụa Hội An đến gốm Bát Tràng — hỗ trợ trực tiếp nghệ nhân địa phương.
-            </p>
-            <div className="flex flex-wrap gap-4 mt-2">
-              <button
-                className="h-12 px-8 rounded-lg text-white font-bold text-base transition-all flex items-center gap-2 shadow-lg"
-                style={{ backgroundColor: "var(--color-text-secondary)" }}
+      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-4 space-y-6">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
+          <div className="relative rounded-xl overflow-hidden" style={{ height: "300px" }}>
+            {HERO_SLIDES.map((slide, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 transition-opacity duration-700 ${heroSlide === i ? "opacity-100" : "opacity-0 pointer-events-none"}`}
               >
-                Xem bộ sưu tập
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </button>
-              <button className="h-12 px-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-base transition-all border border-white/30 backdrop-blur-sm">
-                Xem người bán
-              </button>
+                <div
+                  className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[6000ms]"
+                  style={{
+                    backgroundImage: `url(${slide.image})`,
+                    transform: heroSlide === i ? "scale(1.05)" : "scale(1)",
+                  }}
+                />
+                <div className={`absolute inset-0 bg-gradient-to-r ${slide.bg} to-transparent`} />
+                <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6 max-w-md">
+                  <span
+                    className="self-start px-2.5 py-0.5 rounded text-white text-[11px] font-bold uppercase tracking-wide mb-3"
+                    style={{ backgroundColor: slide.badgeColor }}
+                  >
+                    {slide.badge}
+                  </span>
+                  <h2 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1 whitespace-pre-line">
+                    {slide.title}
+                  </h2>
+                  <span className="text-lg font-bold mb-2" style={{ color: "#ffd580" }}>
+                    {slide.titleHighlight}
+                  </span>
+                  <p className="text-white/75 text-sm mb-5 leading-relaxed">{slide.desc}</p>
+                  <button
+                    className="self-start px-5 py-2 rounded-lg text-white font-bold text-sm flex items-center gap-1.5 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: slide.btnColor }}
+                  >
+                    {slide.cta}
+                    <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>arrow_forward</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Prev / Next */}
+            <button
+              onClick={() => setHeroSlide((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_left</span>
+            </button>
+            <button
+              onClick={() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_right</span>
+            </button>
+
+            {/* Dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+              {HERO_SLIDES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setHeroSlide(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${heroSlide === i ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
+                />
+              ))}
             </div>
           </div>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-            <div className="w-8 h-1 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
-            <div className="w-2 h-1 bg-white/50 rounded-full" />
-            <div className="w-2 h-1 bg-white/50 rounded-full" />
+
+          {/* Side banners */}
+          <div className="hidden lg:flex flex-col gap-2">
+            {SIDE_BANNERS.map((b, i) => (
+              <a
+                key={i}
+                href="#"
+                className="relative flex-1 rounded-xl overflow-hidden cursor-pointer group block"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${b.image})` }}
+                />
+                <div className="absolute inset-0" style={{ background: b.overlay }} />
+                <div className="relative z-10 h-full flex flex-col justify-end p-4">
+                  <span className="text-[11px] font-semibold text-white/75 mb-0.5">{b.sub}</span>
+                  <h3 className="font-black text-white text-base leading-tight whitespace-pre-line">{b.title}</h3>
+                </div>
+              </a>
+            ))}
           </div>
         </section>
+
+        {/* ── Trust bar ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[
+            { icon: "local_shipping", label: "Miễn phí vận chuyển", sub: "Đơn từ 150.000đ" },
+            { icon: "verified_user", label: "Hàng chính hãng 100%", sub: "Cam kết hoàn tiền" },
+            { icon: "replay", label: "Đổi trả dễ dàng", sub: "Trong vòng 7 ngày" },
+            { icon: "support_agent", label: "Hỗ trợ 24/7", sub: "Chat ngay với CSKH" },
+          ].map((item) => (
+            <div
+              key={item.icon}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-100"
+            >
+              <span className="material-symbols-outlined text-2xl shrink-0" style={{ color: "var(--color-primary)" }}>
+                {item.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate" style={{ color: "var(--color-text-main)" }}>{item.label}</p>
+                <p className="text-[11px] text-gray-400 truncate">{item.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* ── Categories ── */}
         <section>
@@ -322,7 +477,7 @@ export default function LandingPage() {
         </section>
 
         {/* ── Flash Sale ── */}
-        <section className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
+        <section className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
           <div
             className="border-b px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
             style={{ backgroundColor: "rgba(224,122,95,0.08)", borderColor: "rgba(224,122,95,0.1)" }}
@@ -363,7 +518,24 @@ export default function LandingPage() {
                 <p>Chưa có sản phẩm Flash Sale</p>
               </div>
             ) : (
-              <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
+              <div className="relative mx-4">
+                <button
+                  onClick={() => scrollFlash("prev")}
+                  className={`carousel-arrow carousel-arrow--prev carousel-arrow--hint${!flashScroll.canPrev ? " carousel-arrow--hidden" : ""}`}
+                  aria-label="Cuộn về trước"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chevron_left</span>
+                </button>
+
+                <button
+                  onClick={() => scrollFlash("next")}
+                  className={`carousel-arrow carousel-arrow--next carousel-arrow--hint${!flashScroll.canNext ? " carousel-arrow--hidden" : ""}`}
+                  aria-label="Cuộn tiếp theo"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chevron_right</span>
+                </button>
+
+              <div ref={flashScrollRef} className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
                 {flashProducts.map((product, i) => {
                   const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
                   const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
@@ -374,7 +546,7 @@ export default function LandingPage() {
                   return (
                     <div
                       key={product.id}
-                      className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300"
+                      className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 cursor-pointer"
                       style={{ backgroundColor: "var(--color-background-light)" }}
                     >
                       <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
@@ -382,11 +554,10 @@ export default function LandingPage() {
                       </div>
                       <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                         {img ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={img}
                             alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -429,11 +600,11 @@ export default function LandingPage() {
                   )
                 })}
               </div>
+              </div>
             )}
           </div>
         </section>
 
-          {/* ── Featured Products ── */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
@@ -512,27 +683,6 @@ export default function LandingPage() {
           )}
         </section>
 
-        {/* ── Trust indicators ── */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8 border-t border-gray-100">
-          {[
-            { icon: "verified", title: "Thương hiệu địa phương xác thực", desc: "Trực tiếp từ nghệ nhân Việt Nam" },
-            { icon: "local_shipping", title: "Giao hàng toàn quốc", desc: "Vận chuyển nhanh đến 63 tỉnh thành" },
-            { icon: "lock", title: "Thanh toán bảo mật", desc: "Momo, ZaloPay & thẻ ngân hàng" },
-          ].map((item) => (
-            <div key={item.icon} className="flex items-center gap-4 p-4 rounded-xl bg-white border border-dashed border-gray-200">
-              <div
-                className="size-12 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(236,127,19,0.1)", color: "var(--color-primary)" }}
-              >
-                <span className="material-symbols-outlined text-2xl">{item.icon}</span>
-              </div>
-              <div>
-                <h4 className="font-bold" style={{ color: "var(--color-text-main)" }}>{item.title}</h4>
-                <p className="text-sm text-gray-500">{item.desc}</p>
-              </div>
-            </div>
-          ))}
-        </section>
       </main>
 
       {/* ══ FOOTER ══ */}
