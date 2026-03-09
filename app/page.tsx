@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
+import { useAuth } from "@/contexts/auth-context"
+import { Separator } from "@/components/ui/separator"
 
 /* ─────────────────── helpers ─────────────────── */
 
@@ -90,35 +93,35 @@ const HERO_SLIDES = [
   {
     image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
     badge: "Ưu đãi hôm nay",
-    badgeColor: "#E07A5F",
+    badgeColor: "#ec7f13",
     title: "Sale lớn\ncuối tuần",
     titleHighlight: "Giảm đến 50%",
     desc: "Hàng ngàn sản phẩm chính hãng — giao nhanh toàn quốc",
     cta: "Mua ngay",
-    btnColor: "#E07A5F",
-    bg: "from-orange-900/70 via-orange-800/40",
+    btnColor: "#ec7f13",
+    overlay: "rgba(28, 14, 4, 0.58)",
   },
   {
     image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
     badge: "Hàng mới về",
-    badgeColor: "#3B82F6",
+    badgeColor: "#9a734c",
     title: "Thời trang\nthu đông 2025",
     titleHighlight: "Xu hướng mới",
     desc: "Phong cách hiện đại kết hợp nét truyền thống Việt Nam",
     cta: "Khám phá",
-    btnColor: "#3B82F6",
-    bg: "from-blue-900/70 via-blue-800/40",
+    btnColor: "#9a734c",
+    overlay: "rgba(20, 12, 6, 0.60)",
   },
   {
     image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80",
     badge: "Đặc sản vùng miền",
-    badgeColor: "#16A34A",
+    badgeColor: "#c47a2b",
     title: "Tinh hoa\nẩm thực Việt",
     titleHighlight: "Giao tận nhà",
     desc: "Cà phê Đà Lạt, đặc sản Hội An, mắm Phú Quốc — chính gốc 100%",
     cta: "Đặt hàng",
-    btnColor: "#16A34A",
-    bg: "from-green-900/70 via-green-800/40",
+    btnColor: "#c47a2b",
+    overlay: "rgba(24, 12, 2, 0.55)",
   },
 ]
 
@@ -127,17 +130,20 @@ const SIDE_BANNERS = [
     image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80",
     sub: "Trang trí nhà cửa",
     title: "Đồ thủ\ncông mỹ nghệ",
-    overlay: "linear-gradient(135deg, rgba(120,60,20,0.6) 0%, rgba(0,0,0,0.2) 100%)",
+    overlay: "rgba(28, 14, 4, 0.52)",
   },
   {
     image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
     sub: "Voucher giảm 30%",
     title: "Làm đẹp\nchính hãng",
-    overlay: "linear-gradient(135deg, rgba(200,80,120,0.6) 0%, rgba(0,0,0,0.2) 100%)",
+    overlay: "rgba(28, 14, 4, 0.52)",
   },
 ]
 
 export default function LandingPage() {
+  const { session } = useAuth()
+  const router = useRouter()
+
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [flashProducts, setFlashProducts] = useState<StorefrontProduct[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<StorefrontProduct[]>([])
@@ -145,6 +151,11 @@ export default function LandingPage() {
   const [loadingCats, setLoadingCats] = useState(true)
   const [loadingFlash, setLoadingFlash] = useState(true)
   const [loadingFeatured, setLoadingFeatured] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [featuredPage, setFeaturedPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+
+  const PAGE_SIZE = 12
 
   const [search, setSearch] = useState("")
   const [countdown, setCountdown] = useState({ h: 2, m: 14, s: 55 })
@@ -153,38 +164,66 @@ export default function LandingPage() {
   const flashScrollRef = useRef<HTMLDivElement>(null)
 
   /* ── fetch ── */
-  const loadCategories = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoadingCats(true)
-    try {
-      const res = await getCategories({ pageSize: 6, level: 1 })
-      if (res.success) setCategories(res.categories)
-    } catch { /* silent */ }
-    finally { setLoadingCats(false) }
-  }, [])
-
-  const loadFlash = useCallback(async () => {
     setLoadingFlash(true)
-    try {
-      const res = await getProducts({ pageSize: 12, sortBy: "newest" })
-      if (res.success) setFlashProducts(res.products)
-    } catch { /* silent */ }
-    finally { setLoadingFlash(false) }
-  }, [])
-
-  const loadFeatured = useCallback(async () => {
     setLoadingFeatured(true)
-    try {
-      const res = await getProducts({ pageSize: 12, sortBy: "rating" })
-      if (res.success) setFeaturedProducts(res.products)
-    } catch { /* silent */ }
-    finally { setLoadingFeatured(false) }
+
+    const [catsRes, flashRes, featuredRes] = await Promise.allSettled([
+      getCategories({ pageSize: 6, level: 1 }),
+      getProducts({ pageSize: 12, sortBy: "newest" }),
+      getProducts({ pageSize: 12, sortBy: "rating" }),
+    ])
+
+    if (catsRes.status === "fulfilled" && catsRes.value.success)
+      setCategories(catsRes.value.categories)
+    setLoadingCats(false)
+
+    if (flashRes.status === "fulfilled" && flashRes.value.success)
+      setFlashProducts(flashRes.value.products)
+    setLoadingFlash(false)
+
+    if (featuredRes.status === "fulfilled" && featuredRes.value.success) {
+      const { products, totalCount } = featuredRes.value
+      setFeaturedProducts(products)
+      setHasMore(products.length < totalCount)
+    }
+    setLoadingFeatured(false)
   }, [])
 
   useEffect(() => {
-    loadCategories()
-    loadFlash()
-    loadFeatured()
-  }, [loadCategories, loadFlash, loadFeatured])
+    loadAll()
+  }, [loadAll])
+
+  const handleLoadMore = useCallback(async () => {
+    if (!session) {
+      router.push("/login")
+      return
+    }
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = featuredPage + 1
+      const res = await getProducts({ page: nextPage, pageSize: PAGE_SIZE, sortBy: "rating" })
+      if (res.success) {
+        setFeaturedProducts((prev) => {
+          const merged = [...prev, ...res.products]
+          setHasMore(merged.length < res.totalCount)
+          return merged
+        })
+        setFeaturedPage(nextPage)
+      }
+    } catch { }
+    finally { setLoadingMore(false) }
+  }, [session, router, loadingMore, hasMore, featuredPage])
+  const uniqueFeaturedProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return featuredProducts.filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [featuredProducts])
 
   const updateFlashScroll = useCallback(() => {
     const el = flashScrollRef.current
@@ -201,7 +240,6 @@ export default function LandingPage() {
     el.scrollBy({ left: dir === "next" ? 540 : -540, behavior: "smooth" })
   }
 
-  /* ── flash scroll state ── */
   useEffect(() => {
     const el = flashScrollRef.current
     if (!el) return
@@ -210,13 +248,11 @@ export default function LandingPage() {
     return () => el.removeEventListener("scroll", updateFlashScroll)
   }, [flashProducts, updateFlashScroll])
 
-  /* ── hero auto-rotate ── */
   useEffect(() => {
     const t = setInterval(() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length), 4000)
     return () => clearInterval(t)
   }, [])
 
-  /* ── countdown ── */
   useEffect(() => {
     const t = setInterval(() => {
       setCountdown((p) => {
@@ -278,13 +314,6 @@ export default function LandingPage() {
               <span className="material-symbols-outlined">person</span>
             </Link>
             <button
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4] relative"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 size-2 rounded-full" style={{ backgroundColor: "#E07A5F" }} />
-            </button>
-            <button
               className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
               style={{ color: "var(--color-text-main)" }}
             >
@@ -317,7 +346,6 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* ══ MAIN ══ */}
       <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-4 space-y-6">
         <section className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
           <div className="relative rounded-xl overflow-hidden" style={{ height: "300px" }}>
@@ -333,7 +361,7 @@ export default function LandingPage() {
                     transform: heroSlide === i ? "scale(1.05)" : "scale(1)",
                   }}
                 />
-                <div className={`absolute inset-0 bg-gradient-to-r ${slide.bg} to-transparent`} />
+                <div className="absolute inset-0" style={{ backgroundColor: slide.overlay }} />
                 <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6 max-w-md">
                   <span
                     className="self-start px-2.5 py-0.5 rounded text-white text-[11px] font-bold uppercase tracking-wide mb-3"
@@ -359,7 +387,6 @@ export default function LandingPage() {
               </div>
             ))}
 
-            {/* Prev / Next */}
             <button
               onClick={() => setHeroSlide((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
               className="absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
@@ -373,7 +400,6 @@ export default function LandingPage() {
               <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_right</span>
             </button>
 
-            {/* Dots */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
               {HERO_SLIDES.map((_, i) => (
                 <button
@@ -385,7 +411,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Side banners */}
           <div className="hidden lg:flex flex-col gap-2">
             {SIDE_BANNERS.map((b, i) => (
               <a
@@ -407,13 +432,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── Trust bar ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
-            { icon: "local_shipping", label: "Miễn phí vận chuyển", sub: "Đơn từ 150.000đ" },
+            { icon: "category", label: "Đa dạng sản phẩm", sub: "Có hơn 20 loại sản phẩm" },
             { icon: "verified_user", label: "Hàng chính hãng 100%", sub: "Cam kết hoàn tiền" },
             { icon: "replay", label: "Đổi trả dễ dàng", sub: "Trong vòng 7 ngày" },
-            { icon: "support_agent", label: "Hỗ trợ 24/7", sub: "Chat ngay với CSKH" },
+            { icon: "support_agent", label: "Hỗ trợ 24/7", sub: "Khiếu nại nhanh chóng" },
           ].map((item) => (
             <div
               key={item.icon}
@@ -430,7 +454,6 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* ── Categories ── */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
@@ -476,7 +499,6 @@ export default function LandingPage() {
           )}
         </section>
 
-        {/* ── Flash Sale ── */}
         <section className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
           <div
             className="border-b px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
@@ -535,71 +557,71 @@ export default function LandingPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chevron_right</span>
                 </button>
 
-              <div ref={flashScrollRef} className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
-                {flashProducts.map((product, i) => {
-                  const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
-                  const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
-                  const soldPercents = [75, 40, 90, 20, 60, 55, 35, 80]
-                  const soldPercent = soldPercents[i % soldPercents.length]
-                  const img = product.imageUrls?.[0]
+                <div ref={flashScrollRef} className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
+                  {flashProducts.map((product, i) => {
+                    const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
+                    const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
+                    const soldPercents = [75, 40, 90, 20, 60, 55, 35, 80]
+                    const soldPercent = soldPercents[i % soldPercents.length]
+                    const img = product.imageUrls?.[0]
 
-                  return (
-                    <div
-                      key={product.id}
-                      className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 cursor-pointer"
-                      style={{ backgroundColor: "var(--color-background-light)" }}
-                    >
-                      <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
-                        -{discount}%
-                      </div>
-                      <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                        {img ? (
-                          <img
-                            src={img}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="material-symbols-outlined text-4xl text-gray-300">image</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-4 flex flex-col gap-2">
-                        <span
-                          className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
-                          style={{ backgroundColor: "rgba(236,127,19,0.15)", color: "var(--color-text-secondary)" }}
-                        >
-                          {product.shopName}
-                        </span>
-                        <h3 className="font-bold line-clamp-2 min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
-                          {product.name}
-                        </h3>
-                        <div className="flex items-center justify-between mt-1">
-                          <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 line-through">{formatPrice(originalPrice)}</span>
-                            <span className="text-lg font-bold" style={{ color: "#E07A5F" }}>
-                              {formatPrice(product.basePrice)}
-                            </span>
-                          </div>
-                          <button
-                            className="size-10 rounded-full text-white flex items-center justify-center shadow-md transition-colors"
-                            style={{ backgroundColor: "var(--color-text-secondary)" }}
+                    return (
+                      <div
+                        key={product.id}
+                        className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 cursor-pointer"
+                        style={{ backgroundColor: "var(--color-background-light)" }}
+                      >
+                        <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
+                          -{discount}%
+                        </div>
+                        <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                          {img ? (
+                            <img
+                              src={img}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="material-symbols-outlined text-4xl text-gray-300">image</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4 flex flex-col gap-2">
+                          <span
+                            className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                            style={{ backgroundColor: "rgba(236,127,19,0.15)", color: "var(--color-text-secondary)" }}
                           >
-                            <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
-                          </button>
+                            {product.shopName}
+                          </span>
+                          <h3 className="font-bold line-clamp-2 min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
+                            {product.name}
+                          </h3>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-400 line-through">{formatPrice(originalPrice)}</span>
+                              <span className="text-lg font-bold" style={{ color: "#E07A5F" }}>
+                                {formatPrice(product.basePrice)}
+                              </span>
+                            </div>
+                            <button
+                              className="size-10 rounded-full text-white flex items-center justify-center shadow-md transition-colors"
+                              style={{ backgroundColor: "var(--color-text-secondary)" }}
+                            >
+                              <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
+                            </button>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1 overflow-hidden">
+                            <div className="h-1.5 rounded-full" style={{ width: `${soldPercent}%`, backgroundColor: "#E07A5F" }} />
+                          </div>
+                          <span className="text-[10px] font-bold" style={{ color: "#E07A5F" }}>
+                            {soldPercent >= 90 ? "Sắp hết hàng" : "Đang bán chạy"}
+                          </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1 overflow-hidden">
-                          <div className="h-1.5 rounded-full" style={{ width: `${soldPercent}%`, backgroundColor: "#E07A5F" }} />
-                        </div>
-                        <span className="text-[10px] font-bold" style={{ color: "#E07A5F" }}>
-                          {soldPercent >= 90 ? "Sắp hết hàng" : "Đang bán chạy"}
-                        </span>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -617,7 +639,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
-          ) : featuredProducts.length === 0 ? (
+          ) : uniqueFeaturedProducts.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <span className="material-symbols-outlined text-5xl block mb-3">inventory_2</span>
               <p className="font-medium">Chưa có sản phẩm nào</p>
@@ -626,14 +648,8 @@ export default function LandingPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                {featuredProducts.map((product, i) => {
+                {uniqueFeaturedProducts.map((product, i) => {
                   const img = product.imageUrls?.[0]
-                  const tagColors = [
-                    "bg-green-100 text-green-800", "bg-purple-100 text-purple-800",
-                    "bg-amber-100 text-amber-800", "bg-orange-100 text-orange-800",
-                    "bg-blue-100 text-blue-800", "bg-pink-100 text-pink-800",
-                    "bg-teal-100 text-teal-800", "bg-rose-100 text-rose-800",
-                  ][i % 8]
                   return (
                     <div
                       key={product.id}
@@ -653,11 +669,6 @@ export default function LandingPage() {
                         )}
                       </div>
                       <div className="p-4 flex flex-col flex-1">
-                        <div className="mb-2">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${tagColors}`}>
-                            {product.categoryName || product.shopName}
-                          </span>
-                        </div>
                         <h3 className="text-sm mb-1 line-clamp-2" style={{ color: "var(--color-text-main)" }}>
                           {product.name}
                         </h3>
@@ -671,22 +682,40 @@ export default function LandingPage() {
                   )
                 })}
               </div>
-              <div className="flex justify-center mt-10">
-                <button
-                  className="px-8 py-3 bg-white border border-gray-200 font-bold rounded-lg transition-all shadow-sm hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                  style={{ color: "var(--color-text-main)" }}
-                >
-                  Xem thêm sản phẩm
-                </button>
-              </div>
+              {hasMore && (
+                <div className="flex flex-col items-center gap-2 mt-8">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 px-8 py-3 bg-white border border-gray-200 font-bold rounded-lg transition-all shadow-sm hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ color: "var(--color-text-main)" }}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <span className="size-4 border-2 border-gray-300 border-t-[var(--color-primary)] rounded-full animate-spin" />
+                        Đang tải...
+                      </>
+                    ) : !session ? (
+                      <>
+                        Đăng nhập để xem thêm
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">expand_more</span>
+                        Xem thêm sản phẩm
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </section>
 
       </main>
 
-      {/* ══ FOOTER ══ */}
-      <footer className="pt-16 pb-8 mt-auto text-white" style={{ backgroundColor: "var(--color-surface-dark)" }}>
+      <Separator className="bg-gray-200 mt-12" />
+      <footer className="pt-8 pb-8 mt-auto">
         <div className="max-w-[1440px] mx-auto px-4 md:px-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             <div className="flex flex-col gap-4">
@@ -718,7 +747,7 @@ export default function LandingPage() {
                 <input
                   type="email"
                   placeholder="Địa chỉ email của bạn"
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
+                  className="border-gray-400 border rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
                 />
                 <button className="text-white font-bold py-3 px-4 rounded-lg transition-colors" style={{ backgroundColor: "var(--color-primary)" }}>
                   Đăng ký
@@ -729,8 +758,8 @@ export default function LandingPage() {
           <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
             <p>© 2025 EcomViet Marketplace. Tất cả quyền được bảo lưu.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-white transition-colors">Chính sách bảo mật</a>
-              <a href="#" className="hover:text-white transition-colors">Điều khoản dịch vụ</a>
+              <a href="#" className="hover:text-black transition-colors">Chính sách bảo mật</a>
+              <a href="#" className="hover:text-black transition-colors">Điều khoản dịch vụ</a>
             </div>
           </div>
         </div>
