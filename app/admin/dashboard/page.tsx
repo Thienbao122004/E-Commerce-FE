@@ -1,6 +1,7 @@
 "use client"
 
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { DashboardCharts } from "@/components/dashboard-charts"
 import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"
 import { useDashboard } from "@/hooks/use-dashboard"
@@ -24,6 +25,7 @@ export default function Page() {
         <div className="px-4 lg:px-6">
           <ChartAreaInteractive stats={stats ?? undefined} />
         </div>
+        <DashboardCharts stats={stats ?? undefined} />
         <DataTable
           products={products}
           shops={shops}
