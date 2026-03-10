@@ -7,6 +7,12 @@ import { getProducts, type StorefrontProduct } from "@/services/storefront-produ
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
 import { useAuth } from "@/contexts/auth-context"
 import { Separator } from "@/components/ui/separator"
+import dynamic from "next/dynamic"
+
+const HeaderUser = dynamic(
+  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
 
 /* ─────────────────── helpers ─────────────────── */
 
@@ -141,7 +147,7 @@ const SIDE_BANNERS = [
 ]
 
 export default function LandingPage() {
-  const { session } = useAuth()
+  const { session, isLoading: authLoading } = useAuth()
   const router = useRouter()
 
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
@@ -306,13 +312,8 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <Link
-              href="/login"
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">person</span>
-            </Link>
+            <HeaderUser />
+            
             <button
               className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
               style={{ color: "var(--color-text-main)" }}
@@ -532,7 +533,7 @@ export default function LandingPage() {
           <div className="p-6">
             {loadingFlash ? (
               <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
-                {Array.from({ length: 4 }).map((_, i) => <FlashCardSkeleton key={i} />)}
+                {Array.from({ length: 5 }).map((_, i) => <FlashCardSkeleton key={i} />)}
               </div>
             ) : flashProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-400">
