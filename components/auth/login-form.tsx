@@ -31,7 +31,15 @@ export function LoginForm() {
       if (event.origin !== window.location.origin) return
       if (event.data?.type === 'supabase:auth:error') {
         setGoogleLoading(false)
-        setError(event.data.error || 'Đăng nhập Google thất bại')
+        const errCode: string = event.data.error ?? ''
+        const errDesc: string = event.data.errorDescription ?? ''
+        if (errCode === 'server_error') {
+          setError('Đăng nhập thất bại do lỗi máy chủ. Vui lòng thử lại sau.')
+        } else if (errCode === 'access_denied') {
+          setError('Đăng nhập bị từ chối. Vui lòng thử lại.')
+        } else {
+          setError(errDesc || 'Đăng nhập Google thất bại. Vui lòng thử lại.')
+        }
       }
     }
 

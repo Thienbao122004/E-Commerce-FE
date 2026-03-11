@@ -161,8 +161,6 @@ export default function LandingPage() {
     }
   }, [authLoading, role])
 
-  if (authLoading || role === 'admin' || role === 'seller') return null
-
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [flashProducts, setFlashProducts] = useState<StorefrontProduct[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<StorefrontProduct[]>([])
@@ -285,6 +283,8 @@ export default function LandingPage() {
   }, [])
 
   const pad = (n: number) => String(n).padStart(2, "0")
+
+  if (authLoading || role === 'admin' || role === 'seller') return null
 
   return (
     <div
