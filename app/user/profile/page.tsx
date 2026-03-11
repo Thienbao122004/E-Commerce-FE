@@ -213,7 +213,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6" style={{ borderColor: '#e5ded6' }}>
+      <div className="bg-white rounded-[5px] shadow-sm border p-6" style={{ borderColor: '#e5ded6' }}>
         <div className="animate-pulse space-y-6">
           <div className="h-6 w-48 bg-gray-200 rounded" />
           <div className="h-4 w-72 bg-gray-200 rounded" />
@@ -233,7 +233,7 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border" style={{ borderColor: '#e5ded6' }}>
+      <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-main)' }}>

@@ -20,6 +20,7 @@ export interface StorefrontProduct {
   categorySlug: string | null
   imageUrls: string[]
   createdAt: string
+  soldCount: number
 }
 
 /** Dùng cho trang chi tiết sản phẩm */

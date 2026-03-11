@@ -9,6 +9,7 @@ export type UserRole = 'customer' | 'seller' | 'admin'
 export interface UserProfile {
     id: string
     role: UserRole
+    role_id: number | null
     full_name: string | null
     phone: string | null
     status: number
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fetchProfile = async (userId: string, userMeta?: Record<string, any>) => {
         const { data, error } = await supabase
             .from('users')
-            .select('*')
+            .select('*, roles(code)')
             .eq('id', userId)
             .single()
 
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return {
                 id: userId,
                 role: fallbackRole,
+                role_id: null,
                 full_name: userMeta?.full_name ?? null,
                 phone: null,
                 status: 1,
@@ -64,7 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } as UserProfile
         }
 
-        return data as UserProfile
+        const rawData = data as any
+        const roleCode = (rawData.roles?.code ?? 'customer') as UserRole
+        return {
+            ...rawData,
+            role: roleCode,
+        } as UserProfile
     }
 
     useEffect(() => {

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
 import { useAuth } from "@/contexts/auth-context"
+import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import dynamic from "next/dynamic"
 
@@ -148,6 +149,7 @@ const SIDE_BANNERS = [
 
 export default function LandingPage() {
   const { session, isLoading: authLoading } = useAuth()
+  const { isFavorited, toggle: toggleFavorite } = useFavorites()
   const router = useRouter()
 
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
@@ -159,7 +161,7 @@ export default function LandingPage() {
   const [loadingFeatured, setLoadingFeatured] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [featuredPage, setFeaturedPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+  const [totalFeaturedCount, setTotalFeaturedCount] = useState(0)
 
   const PAGE_SIZE = 12
 
@@ -192,7 +194,7 @@ export default function LandingPage() {
     if (featuredRes.status === "fulfilled" && featuredRes.value.success) {
       const { products, totalCount } = featuredRes.value
       setFeaturedProducts(products)
-      setHasMore(products.length < totalCount)
+      setTotalFeaturedCount(totalCount)
     }
     setLoadingFeatured(false)
   }, [])
@@ -200,6 +202,17 @@ export default function LandingPage() {
   useEffect(() => {
     loadAll()
   }, [loadAll])
+
+  const uniqueFeaturedProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return featuredProducts.filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [featuredProducts])
+
+  const hasMore = uniqueFeaturedProducts.length < totalFeaturedCount
 
   const handleLoadMore = useCallback(async () => {
     if (!session) {
@@ -210,26 +223,15 @@ export default function LandingPage() {
     setLoadingMore(true)
     try {
       const nextPage = featuredPage + 1
-      const res = await getProducts({ page: nextPage, pageSize: PAGE_SIZE, sortBy: "rating" })
+      const res = await getProducts({ page: nextPage, pageSize: PAGE_SIZE, sortBy: "newest" })
       if (res.success) {
-        setFeaturedProducts((prev) => {
-          const merged = [...prev, ...res.products]
-          setHasMore(merged.length < res.totalCount)
-          return merged
-        })
+        setFeaturedProducts((prev) => [...prev, ...res.products])
+        setTotalFeaturedCount(res.totalCount)
         setFeaturedPage(nextPage)
       }
     } catch { }
     finally { setLoadingMore(false) }
   }, [session, router, loadingMore, hasMore, featuredPage])
-  const uniqueFeaturedProducts = useMemo(() => {
-    const seen = new Set<string>()
-    return featuredProducts.filter((p) => {
-      if (seen.has(p.id)) return false
-      seen.add(p.id)
-      return true
-    })
-  }, [featuredProducts])
 
   const updateFlashScroll = useCallback(() => {
     const el = flashScrollRef.current
@@ -562,14 +564,13 @@ export default function LandingPage() {
                   {flashProducts.map((product, i) => {
                     const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
                     const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
-                    const soldPercents = [75, 40, 90, 20, 60, 55, 35, 80]
-                    const soldPercent = soldPercents[i % soldPercents.length]
                     const img = product.imageUrls?.[0]
 
                     return (
-                      <div
+                      <Link
                         key={product.id}
-                        className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 cursor-pointer"
+                        href={`/products/${product.id}`}
+                        className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-[rgba(236,127,19,0.4)]"
                         style={{ backgroundColor: "var(--color-background-light)" }}
                       >
                         <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
@@ -606,20 +607,34 @@ export default function LandingPage() {
                               </span>
                             </div>
                             <button
-                              className="size-10 rounded-full text-white flex items-center justify-center shadow-md transition-colors"
-                              style={{ backgroundColor: "var(--color-text-secondary)" }}
+                              onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
+                              className="size-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                              style={{
+                                backgroundColor: isFavorited(product.id) ? "rgba(239,68,68,0.1)" : "rgba(0,0,0,0.04)",
+                                color: isFavorited(product.id) ? "#ef4444" : "#9ca3af",
+                              }}
+                              aria-label={isFavorited(product.id) ? "Bỏ yêu thích" : "Yêu thích"}
                             >
-                              <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
+                              <span
+                                className="material-symbols-outlined text-xl"
+                                style={{ fontVariationSettings: isFavorited(product.id) ? "'FILL' 1" : "'FILL' 0" }}
+                              >
+                                favorite
+                              </span>
                             </button>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1 overflow-hidden">
-                            <div className="h-1.5 rounded-full" style={{ width: `${soldPercent}%`, backgroundColor: "#E07A5F" }} />
-                          </div>
-                          <span className="text-[10px] font-bold" style={{ color: "#E07A5F" }}>
-                            {soldPercent >= 90 ? "Sắp hết hàng" : "Đang bán chạy"}
-                          </span>
+                          {product.soldCount > 0 && (
+                            <span className="text-[10px] font-semibold text-gray-400">
+                              Đã bán{" "}
+                              <span className="font-bold" style={{ color: "#E07A5F" }}>
+                                {product.soldCount >= 1000
+                                  ? `${(product.soldCount / 1000).toFixed(1)}k`
+                                  : product.soldCount}
+                              </span>
+                            </span>
+                          )}
                         </div>
-                      </div>
+                      </Link>
                     )
                   })}
                 </div>
@@ -652,9 +667,10 @@ export default function LandingPage() {
                 {uniqueFeaturedProducts.map((product, i) => {
                   const img = product.imageUrls?.[0]
                   return (
-                    <div
+                    <Link
                       key={product.id}
-                      className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] transition-all duration-300"
+                      href={`/products/${product.id}`}
+                      className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
                     >
                       <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">
                         {img ? (
@@ -668,18 +684,41 @@ export default function LandingPage() {
                             <span className="material-symbols-outlined text-5xl text-gray-300">image</span>
                           </div>
                         )}
+                        <button
+                          onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
+                          className="absolute top-2 right-2 size-8 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+                          style={{
+                            backgroundColor: isFavorited(product.id) ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.85)",
+                            color: isFavorited(product.id) ? "#ef4444" : "#9ca3af",
+                          }}
+                          aria-label={isFavorited(product.id) ? "Bỏ yêu thích" : "Yêu thích"}
+                        >
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ fontSize: "18px", fontVariationSettings: isFavorited(product.id) ? "'FILL' 1" : "'FILL' 0" }}
+                          >
+                            favorite
+                          </span>
+                        </button>
                       </div>
                       <div className="p-4 flex flex-col flex-1">
                         <h3 className="text-sm mb-1 line-clamp-2" style={{ color: "var(--color-text-main)" }}>
                           {product.name}
                         </h3>
-                        <div className="mt-auto pt-3">
+                        <div className="mt-auto pt-3 flex items-end justify-between gap-1">
                           <span className="font-bold text-sm" style={{ color: "var(--color-text-secondary)" }}>
                             {formatPrice(product.basePrice)}
                           </span>
+                          {product.soldCount > 0 && (
+                            <span className="text-[12px] text-gray-400 shrink-0">
+                              Đã bán {product.soldCount >= 1000
+                                ? `${(product.soldCount / 1000).toFixed(1)}k`
+                                : product.soldCount}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>

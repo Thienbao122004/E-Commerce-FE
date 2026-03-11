@@ -54,7 +54,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border" style={{ borderColor: '#e5ded6' }}>
+    <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-main)' }}>
