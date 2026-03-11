@@ -16,13 +16,20 @@ export function LoginForm() {
     searchParams.get('error')
   )
   const popupRef = useRef<Window | null>(null)
+  const authSucceededRef = useRef(false)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        authSucceededRef.current = true
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
-
-      if (event.data?.type === 'supabase:auth:success') {
-      } else if (event.data?.type === 'supabase:auth:error') {
+      if (event.data?.type === 'supabase:auth:error') {
         setGoogleLoading(false)
         setError(event.data.error || 'Đăng nhập Google thất bại')
       }
@@ -37,8 +44,17 @@ export function LoginForm() {
 
     const interval = setInterval(() => {
       if (popupRef.current && popupRef.current.closed) {
-        setGoogleLoading(false)
+        clearInterval(interval)
         popupRef.current = null
+
+        // Popup closed mid-redirect before auth event fires — wait briefly
+        // so Supabase has time to propagate the session. If auth succeeded
+        // the login page will redirect and unmount this component anyway.
+        setTimeout(() => {
+          if (!authSucceededRef.current) {
+            setGoogleLoading(false)
+          }
+        }, 2000)
       }
     }, 500)
 

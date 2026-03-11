@@ -47,9 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .single()
 
         if (error || !data) {
-            if (error && error.code !== 'PGRST116') {
-                console.warn('Could not fetch user profile (check RLS policy):', error.code)
-            }
             const fallbackRole = (userMeta?.role ?? userMeta?.user_role ?? 'customer') as UserRole
             return {
                 id: userId,
@@ -66,10 +63,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } as UserProfile
         }
 
-        const rawData = data as any
-        const roleCode = (rawData.roles?.code ?? 'customer') as UserRole
+        type UserRow = Omit<UserProfile, 'role'> & {
+            roles: { code: string } | null
+        }
+        const { roles, ...rest } = data as unknown as UserRow
+        const roleCode = (roles?.code ?? 'customer') as UserRole
         return {
-            ...rawData,
+            ...rest,
             role: roleCode,
         } as UserProfile
     }

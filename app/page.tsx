@@ -148,9 +148,20 @@ const SIDE_BANNERS = [
 ]
 
 export default function LandingPage() {
-  const { session, isLoading: authLoading } = useAuth()
+  const { session, isLoading: authLoading, role } = useAuth()
   const { isFavorited, toggle: toggleFavorite } = useFavorites()
   const router = useRouter()
+
+  useEffect(() => {
+    if (authLoading) return
+    if (role === 'admin') {
+      window.location.href = '/admin/dashboard'
+    } else if (role === 'seller') {
+      window.location.href = '/seller/dashboard'
+    }
+  }, [authLoading, role])
+
+  if (authLoading || role === 'admin' || role === 'seller') return null
 
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [flashProducts, setFlashProducts] = useState<StorefrontProduct[]>([])
