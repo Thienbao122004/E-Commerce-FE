@@ -118,7 +118,7 @@ export default function InventoryPage() {
                 ) : (
                   products.map((product, idx) => (
                     <TableRow key={product.id}>
-                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 20 + idx + 1}</TableCell>
+                      <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * params.pageSize + idx + 1}</TableCell>
                       <TableCell>
                         {product.imageUrls[0] ? (
                           <img
