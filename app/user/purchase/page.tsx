@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { ordersService, type OrderSummary } from '@/services/orders'
+import { usePurchaseOrders } from '@/hooks/use-purchase-orders'
 
 const STATUS_TABS = [
   { label: 'Tất cả', value: undefined },
@@ -39,26 +40,8 @@ const STATUS_COLORS: Record<number, string> = {
 }
 
 export default function PurchasePage() {
-  const [activeTab, setActiveTab] = useState<number | undefined>(undefined)
-  const [orders, setOrders] = useState<OrderSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders()
   const [searchTerm, setSearchTerm] = useState('')
-
-  const fetchOrders = useCallback(async (status?: number) => {
-    setLoading(true)
-    try {
-      const res = await ordersService.getMyOrders(1, 50, status)
-      setOrders(Array.isArray(res.orders) ? res.orders : [])
-    } catch {
-      setOrders([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchOrders(activeTab)
-  }, [activeTab, fetchOrders])
 
   const filtered = searchTerm
     ? orders.filter(
@@ -84,12 +67,12 @@ export default function PurchasePage() {
 
       <div className="flex overflow-x-auto">
         {STATUS_TABS.map((tab) => {
-          const isActive = activeTab === tab.value
+          const isActive = activeStatus === tab.value
           return (
             <button
               key={String(tab.value)}
               onClick={() => {
-                setActiveTab(tab.value)
+                setActiveStatus(tab.value)
                 setSearchTerm('')
               }}
               className="flex-shrink-0 px-4 py-3 text-sm transition-colors border-b-2"
@@ -122,7 +105,7 @@ export default function PurchasePage() {
       ) : (
         <div className="space-y-4 p-4">
           {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} onRefresh={() => fetchOrders(activeTab)} />
+            <OrderCard key={order.id} order={order} onRefresh={invalidateAndRefresh} />
           ))}
         </div>
       )}

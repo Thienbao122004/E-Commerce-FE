@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation"
 
 export function HeaderUser() {
-  const { session, user, profile, isLoading, signOut } = useAuth()
+  const { session, user, profile, avatarUrl, isLoading, signOut } = useAuth()
   const router = useRouter()
 
   if (isLoading) {
@@ -25,7 +25,6 @@ export function HeaderUser() {
 
   if (session) {
     const displayName = profile?.full_name ?? user?.email?.split("@")[0] ?? ""
-    const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
     const initials = displayName
       ? displayName.split(" ").map((w) => w[0]).slice(-2).join("").toUpperCase()
       : "U"

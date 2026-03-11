@@ -18,10 +18,9 @@ const orderLinks = [
 
 export function ProfileSidebar() {
   const pathname = usePathname()
-  const { user, profile } = useAuth()
+  const { user, profile, avatarUrl } = useAuth()
 
   const displayName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Người dùng'
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
   const initials = displayName
     ? displayName
         .split(' ')
