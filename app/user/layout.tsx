@@ -17,7 +17,7 @@ const CartDropdown = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
-const FULL_WIDTH_PATHS = ['/user/cart']
+const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat']
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth()
@@ -77,6 +77,14 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            <Link
+              href="/user/ai-chat"
+              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
+              style={{ color: 'var(--color-text-main)' }}
+              title="Chat với AI mua sắm"
+            >
+              <span className="material-symbols-outlined">smart_toy</span>
+            </Link>
             <HeaderUser />
             <CartDropdown />
           </div>
