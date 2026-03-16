@@ -510,17 +510,16 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex gap-3 flex-wrap grid grid-cols-3">
                   <button
-                    className="flex-1 min-w-[70px] flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm border-2 transition-all hover:bg-[rgba(236,127,19,0.06)]"
+                    className="flex-1 min-w-[70px] flex items-center justify-center gap-2 rounded-xl font-semibold text-sm border-2 transition-all hover:bg-[rgba(236,127,19,0.06)]"
                     style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
                   >
                     <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
                     Thêm vào giỏ
                   </button>
                   <button
-                    className="flex-1 min-w-[70px] py-3.5 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 active:scale-95"
+                    className="flex-1 min-w-[70px] rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 active:scale-95"
                     style={{ backgroundColor: "var(--color-primary)" }}
                   >
                     Mua ngay
