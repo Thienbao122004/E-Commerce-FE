@@ -1,11 +1,12 @@
 import type {
   DisputeListResponse,
   DisputeResponse,
+  SellerDisputeListResponse,
+  SellerDisputeResponse,
 } from "@/types/dispute"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
-// ---------- List ----------
 export async function fetchDisputes(
   token: string,
   page = 1,
@@ -27,7 +28,6 @@ export async function fetchDisputes(
   return res.json()
 }
 
-// ---------- Detail ----------
 export async function fetchDisputeById(
   token: string,
   id: string
@@ -39,7 +39,6 @@ export async function fetchDisputeById(
   return res.json()
 }
 
-// ---------- Approve Refund ----------
 export async function approveRefund(
   token: string,
   disputeId: string,
@@ -62,7 +61,6 @@ export async function approveRefund(
   return res.json()
 }
 
-// ---------- Reject ----------
 export async function rejectDispute(
   token: string,
   disputeId: string,
@@ -81,5 +79,55 @@ export async function rejectDispute(
     }
   )
   if (!res.ok) throw new Error("Lỗi từ chối tranh chấp")
+  return res.json()
+}
+
+export async function fetchSellerDisputes(
+  token: string,
+  page = 1,
+  pageSize = 20,
+  status?: number | null,
+  type?: number | null
+): Promise<SellerDisputeListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  })
+  if (status !== null && status !== undefined) params.set("status", String(status))
+  if (type !== null && type !== undefined) params.set("type", String(type))
+
+  const res = await fetch(`${API}/api/seller/disputes?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Lỗi tải danh sách tranh chấp")
+  return res.json()
+}
+
+export async function fetchSellerDisputeById(
+  token: string,
+  disputeId: string
+): Promise<SellerDisputeResponse> {
+  const res = await fetch(`${API}/api/seller/disputes/${disputeId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Lỗi tải chi tiết tranh chấp")
+  return res.json()
+}
+
+export async function respondToSellerDispute(
+  token: string,
+  disputeId: string,
+  response: string,
+  evidenceUrls?: string[]
+): Promise<SellerDisputeResponse> {
+  const res = await fetch(`${API}/api/seller/disputes/${disputeId}/respond`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ response, evidenceUrls }),
+  })
+  if (!res.ok) throw new Error("Lỗi gửi phản hồi")
   return res.json()
 }

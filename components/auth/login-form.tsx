@@ -30,6 +30,7 @@ export function LoginForm() {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
       if (event.data?.type === 'supabase:auth:error') {
+        popupRef.current = null
         setGoogleLoading(false)
         const errCode: string = event.data.error ?? ''
         const errDesc: string = event.data.errorDescription ?? ''
@@ -53,16 +54,16 @@ export function LoginForm() {
     const interval = setInterval(() => {
       if (popupRef.current && popupRef.current.closed) {
         clearInterval(interval)
-        popupRef.current = null
-
-        // Popup closed mid-redirect before auth event fires — wait briefly
-        // so Supabase has time to propagate the session. If auth succeeded
-        // the login page will redirect and unmount this component anyway.
+        // Do NOT null popupRef here yet — browser temporarily reports closed
+        // during cross-origin redirects (Google → Supabase → callback).
+        // Keeping the ref set prevents handleGoogleSignIn from opening a new
+        // popup (via the same named window) while the callback is still running.
         setTimeout(() => {
           if (!authSucceededRef.current) {
+            popupRef.current = null
             setGoogleLoading(false)
           }
-        }, 2000)
+        }, 5000)
       }
     }, 500)
 
@@ -87,6 +88,14 @@ export function LoginForm() {
   }
 
   const handleGoogleSignIn = async () => {
+    if (popupRef.current) {
+      if (!popupRef.current.closed) {
+        popupRef.current.focus()
+      }
+      return
+    }
+
+    authSucceededRef.current = false
     setGoogleLoading(true)
     setError(null)
 
@@ -104,10 +113,6 @@ export function LoginForm() {
 
       if (error || !data.url) {
         throw new Error(error?.message || 'Không thể lấy URL đăng nhập Google')
-      }
-
-      if (popupRef.current && !popupRef.current.closed) {
-        popupRef.current.close()
       }
 
       const popupWidth = 500

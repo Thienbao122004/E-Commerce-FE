@@ -86,13 +86,11 @@ export function SellerRecentOrders({ orders, loading }: Props) {
             {recentOrders.map((order) => (
               <div
                 key={order.id}
-                className="flex items-center gap-4 py-3 transition-colors hover:bg-muted/30 rounded-lg px-1"
+                className="flex items-center gap-4 py-3 transition-colors hover:bg-muted/30 px-1"
               >
-                {/* Avatar */}
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
                   {(order.customerName ?? "K").charAt(0).toUpperCase()}
                 </div>
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium">
                     {order.customerName ?? "Khách hàng"}
