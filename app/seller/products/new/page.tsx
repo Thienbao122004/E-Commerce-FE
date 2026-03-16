@@ -11,15 +11,16 @@ import {
   IconPlus,
   IconLoader2,
   IconChevronRight,
-  IconEdit,
-  IconBulb,
-  IconSend,
   IconPhoto,
   IconTag,
   IconCategory,
   IconBoxSeam,
   IconPalette,
+  IconAlertCircle,
+  IconPencil,
+  IconInfoCircle,
 } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,27 +29,19 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { useSellerProducts } from "@/hooks/use-seller-products"
+import {
+  aiSuggestCategory,
+  aiSuggestTags,
+  aiSuggestMaterials,
+  aiSendFeedback,
+} from "@/services/ai-seller"
+import type {
+  CategorySuggestion,
+  TagSuggestion,
+  MaterialSuggestion,
+} from "@/services/ai-seller"
 
-type AiSuggestions = {
-  categoryName: string | null
-  categoryId: number | null
-  subcategoryName: string | null
-  tags: { name: string; type: "style" | "occasion" | "other"; score: number }[]
-  materials: { name: string; score: number }[]
-  insight: string | null
-  loading: boolean
-}
-
-// Tag color by type
-const tagColor: Record<string, string> = {
-  style:
-    "border-orange-300 bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
-  occasion:
-    "border-green-300 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300",
-  other:
-    "border-sky-300 bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
-}
-
+// ── Helpers ─────────────────────────────────────────────
 function SectionLabel({
   icon: Icon,
   children,
@@ -71,11 +64,35 @@ function SectionLabel({
   )
 }
 
+function ConfidenceDot({ score }: { score: number }) {
+  const pct = Math.round(score * 100)
+  const color =
+    pct >= 70
+      ? "bg-emerald-500"
+      : pct >= 40
+        ? "bg-amber-400"
+        : "bg-muted-foreground/40"
+  return (
+    <span className="flex items-center gap-1">
+      <span className={`inline-block size-1.5 rounded-full ${color}`} />
+      <span className="text-[10px] tabular-nums text-muted-foreground">
+        {pct}%
+      </span>
+    </span>
+  )
+}
 
+function confidenceText(score?: number) {
+  if (score == null) return "--"
+  return `${Math.round(score * 100)}%`
+}
+
+// ── Main ────────────────────────────────────────────────
 export default function CreateProductPage() {
   const router = useRouter()
   const { create, actionLoading } = useSellerProducts()
 
+  // Form state
   const [name, setName] = React.useState("")
   const [price, setPrice] = React.useState("")
   const [sku, setSku] = React.useState("")
@@ -83,36 +100,159 @@ export default function CreateProductPage() {
   const [imageUrls, setImageUrls] = React.useState<string[]>([])
   const [imageInput, setImageInput] = React.useState("")
   const [isDragging, setIsDragging] = React.useState(false)
-  const [aiFeedback, setAiFeedback] = React.useState("")
-
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [brokenUrls, setBrokenUrls] = React.useState<Set<string>>(new Set())
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
+  // AI state
+  const [catLoading, setCatLoading] = React.useState(false)
+  const [tagLoading, setTagLoading] = React.useState(false)
+  const [catError, setCatError] = React.useState(false)
+
+  const [catSuggestions, setCatSuggestions] = React.useState<CategorySuggestion[]>([])
+  const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
+  const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
+
+  const [catLogId, setCatLogId] = React.useState<string | null>(null)
+  const [tagLogId, setTagLogId] = React.useState<string | null>(null)
+
+  // Selections
+  const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
+  const [selTagIds, setSelTagIds] = React.useState<number[]>([])
+  const [selMatIds, setSelMatIds] = React.useState<string[]>([])
+  const [customTags, setCustomTags] = React.useState<string[]>([])
+  const [customTagInput, setCustomTagInput] = React.useState("")
+  const [showCustomTag, setShowCustomTag] = React.useState(false)
+
+  const hasInput = name.trim().length > 0 || description.trim().length > 0
+
+  // ── 1. suggest-category (debounced on name/description change) ──
+  const aiCatTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  React.useEffect(() => {
+    if (!name.trim() && !description.trim()) {
+      setCatSuggestions([])
+      setCatLogId(null)
+      setCatError(false)
+      return
+    }
+    clearTimeout(aiCatTimer.current)
+    aiCatTimer.current = setTimeout(async () => {
+      setCatLoading(true)
+      setCatError(false)
+      try {
+        const res = await aiSuggestCategory({
+          title: name.trim(),
+          description: description.trim(),
+          imageUrls: imageUrls.filter((u) => u.startsWith("http")),
+        })
+        setCatSuggestions(res.suggestions ?? [])
+        setCatLogId(res.logId ?? null)
+        // Auto-select top suggestion if nothing chosen yet
+        if (!selCategory && res.suggestions.length > 0) {
+          setSelCategory(res.suggestions[0])
+          fetchTagsAndMaterials(res.suggestions[0].categoryId)
+        }
+      } catch {
+        setCatError(true)
+      } finally {
+        setCatLoading(false)
+      }
+    }, 900)
+
+    return () => clearTimeout(aiCatTimer.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, description])
+
+  // ── 2. suggest-tags + suggest-materials when category changes ──
+  const fetchTagsAndMaterials = React.useCallback(
+    async (categoryId: number) => {
+      if (!name.trim() && !description.trim()) return
+      setTagLoading(true)
+      try {
+        const [tagsRes, matsRes] = await Promise.all([
+          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId }),
+          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId }),
+        ])
+        setTagSuggestions(tagsRes.suggestions ?? [])
+        setMatSuggestions(matsRes.suggestions ?? [])
+        if (tagsRes.logId) setTagLogId(tagsRes.logId)
+      } catch {
+        // silent fail for tags/materials
+      } finally {
+        setTagLoading(false)
+      }
+    },
+    [name, description]
+  )
+
+  const handleSelectCategory = (cat: CategorySuggestion) => {
+    setSelCategory(cat)
+    setSelTagIds([])
+    setSelMatIds([])
+    fetchTagsAndMaterials(cat.categoryId)
+  }
+
+  // ── 3. tag-feedback on submit ────────────────────────
+  const sendFeedback = async () => {
+    const logId = catLogId ?? tagLogId
+    if (!logId) return
+    try {
+      await aiSendFeedback({
+        logId,
+        chosenCategoryId: selCategory?.categoryId,
+        chosenTagIds: selTagIds,
+        chosenMaterialIds: selMatIds,
+        action: selCategory ? "accepted" : "skipped",
+      })
+    } catch {
+      // feedback is best-effort
+    }
+  }
+
+  // ── Submit ───────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!name.trim() || !price) return
+    await sendFeedback()
+    const ok = await create({
+      name: name.trim(),
+      basePrice: Number(price),
+      description: description.trim() || undefined,
+      currency: "VND",
+      imageUrls: imageUrls.filter((u) => u.startsWith("http")).length > 0
+        ? imageUrls.filter((u) => u.startsWith("http"))
+        : undefined,
+      categoryId: selCategory?.categoryId ?? undefined,
+    })
+    if (ok) {
+      toast.success("Tạo sản phẩm thành công!")
+      router.push("/seller/products")
+    }
+  }
+
+  // ── Image helpers ────────────────────────────────────
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return
     Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
       .slice(0, 6 - imageUrls.length)
-      .forEach((f) => setImageUrls((p) => [...p, URL.createObjectURL(f)].slice(0, 6)))
+      .forEach((f) =>
+        setImageUrls((p) => [...p, URL.createObjectURL(f)].slice(0, 6))
+      )
   }
   const addImageUrl = () => {
     let v = imageInput.trim()
     if (!v) return
-
     try {
       if (v.includes("google.com/imgres")) {
         const u = new URL(v)
         const raw = u.searchParams.get("imgurl")
         if (raw) v = decodeURIComponent(raw)
       }
-    } catch {
-    }
-
+    } catch { /* ignore */ }
     if (!v.startsWith("http://") && !v.startsWith("https://")) {
       setImageInput("")
       return
     }
-
     if (imageUrls.length < 6) {
       setImageUrls((p) => [...p, v])
       setBrokenUrls((prev) => { const s = new Set(prev); s.delete(v); return s })
@@ -124,94 +264,27 @@ export default function CreateProductPage() {
     setImageUrls((p) => p.filter((_, j) => j !== i))
     setBrokenUrls((prev) => { const s = new Set(prev); s.delete(url); return s })
   }
-  const handleImgError = (url: string) =>
-    setBrokenUrls((prev) => new Set(prev).add(url))
 
-  // ── AI ──────────────────────────────────────────────────
-  const [ai, setAi] = React.useState<AiSuggestions>({
-    categoryName: null, categoryId: null, subcategoryName: null,
-    tags: [], materials: [], insight: null, loading: false,
-  })
-
-  // Selected state
-  const [selCategory, setSelCategory] = React.useState<{ id: number | null; name: string } | null>(null)
-  const [selSubcat, setSelSubcat] = React.useState<string | null>(null)
-  const [selTags, setSelTags] = React.useState<string[]>([])
-  const [selMaterials, setSelMaterials] = React.useState<string[]>([])
-  const [editCatMode, setEditCatMode] = React.useState(false)
-  const [editCatVal, setEditCatVal] = React.useState("")
-  const [editSubMode, setEditSubMode] = React.useState(false)
-  const [editSubVal, setEditSubVal] = React.useState("")
-  const [customTag, setCustomTag] = React.useState("")
-  const [showCustomTag, setShowCustomTag] = React.useState(false)
-
-  const hasInput = name.trim().length > 0 || description.trim().length > 0
-  const aiRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  // Mock AI analysis – replace with real API call later
-  const runAi = React.useCallback(() => {
-    if (!name.trim() && !description.trim()) {
-      setAi({ categoryName: null, categoryId: null, subcategoryName: null, tags: [], materials: [], insight: null, loading: false })
-      return
-    }
-    setAi((p) => ({ ...p, loading: true }))
-    clearTimeout(aiRef.current)
-    aiRef.current = setTimeout(() => {
-      const result: AiSuggestions = {
-        categoryName: "Trang trí nhà cửa",
-        categoryId: 1,
-        subcategoryName: "Bình hoa & Lọ cắm",
-        tags: [
-          { name: "handmade", type: "style", score: 0.95 },
-          { name: "vintage", type: "style", score: 0.88 },
-          { name: "minimalist", type: "style", score: 0.82 },
-          { name: "quà tặng", type: "occasion", score: 0.76 },
-        ],
-        materials: [
-          { name: "Gốm Bát Tràng", score: 0.91 },
-          { name: "Đất sét nung", score: 0.78 },
-        ],
-        insight: "Sản phẩm thủ công có nguồn gốc rõ ràng thường bán chạy hơn 25%.",
-        loading: false,
-      }
-      setAi(result)
-      if (!selCategory) {
-        setSelCategory({ id: result.categoryId, name: result.categoryName! })
-        setSelSubcat(result.subcategoryName)
-      }
-    }, 1400)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, description])
-
-  React.useEffect(() => {
-    const t = setTimeout(runAi, 700)
-    return () => clearTimeout(t)
-  }, [name, description, runAi])
-
-  const toggleTag = (t: string) =>
-    setSelTags((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
-  const toggleMat = (m: string) =>
-    setSelMaterials((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m])
-
-  const handleSubmit = async () => {
-    if (!name.trim() || !price) return
-    const ok = await create({
-      name: name.trim(),
-      basePrice: Number(price),
-      description: description.trim() || undefined,
-      currency: "VND",
-      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      categoryId: selCategory?.id ?? undefined,
-    })
-    if (ok) router.push("/seller/products")
-  }
-
-  const canSubmit = name.trim().length > 0 && Number(price) > 0
-
-  // Main image slot
   const mainImage = imageUrls[0]
-  // Extra thumbnail slots (always 4 visible below main)
-  const extraSlots = Array.from({ length: 4 })
+  const hasMainPreview = Boolean(mainImage && !brokenUrls.has(mainImage))
+  const extraSlots = Array.from({ length: 5 })
+  const canSubmit = name.trim().length > 0 && Number(price) > 0
+  const confidenceBadge = selCategory?.confidenceScore ?? catSuggestions[0]?.confidenceScore
+
+  // ── Tag & material toggles ───────────────────────────
+  const toggleTag = (id: number) =>
+    setSelTagIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
+  const toggleMat = (id: string) =>
+    setSelMatIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
+  const addCustomTag = () => {
+    const t = customTagInput.trim()
+    if (t && !customTags.includes(t)) {
+      setCustomTags((p) => [...p, t])
+    }
+    setCustomTagInput("")
+    setShowCustomTag(false)
+  }
+  const removeCustomTag = (t: string) => setCustomTags((p) => p.filter((x) => x !== t))
 
   return (
     <div className="flex flex-1 flex-col">
@@ -226,15 +299,14 @@ export default function CreateProductPage() {
           <span className="text-foreground font-medium">Thêm mới</span>
         </div>
 
-        {/* 3-col grid: 2 left + 1 right */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:items-stretch">
 
-          {/* ── LEFT: Form ────────────────────────────────── */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* ── LEFT: Form ──────────────────────────── */}
+          <div className="lg:col-span-2 flex flex-col gap-4 lg:h-full">
 
             {/* Basic info */}
             <Card>
-              <CardHeader className="py-3 px-4">
+              <CardHeader className="py-1 px-4">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <span className="flex items-center justify-center size-6 rounded-md bg-primary/10">
                     <IconBoxSeam className="size-3.5 text-primary" />
@@ -249,13 +321,12 @@ export default function CreateProductPage() {
                   </Label>
                   <Input
                     id="name"
-                    placeholder="Ví dụ: Bình gốm Bát Tràng thủ công – màu xanh cobalt"
+                    placeholder="Ví dụ: Áo sơ mi nam vải kate cao cấp – màu trắng"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="h-9 text-sm"
                   />
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1">
                     <Label htmlFor="price" className="text-xs">
@@ -267,7 +338,7 @@ export default function CreateProductPage() {
                         id="price"
                         type="number"
                         min="0"
-                        placeholder="1,250,000"
+                        placeholder="299,000"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         className="h-9 pl-7 text-sm"
@@ -285,12 +356,11 @@ export default function CreateProductPage() {
                     />
                   </div>
                 </div>
-
                 <div className="grid gap-1">
-                  <Label htmlFor="desc" className="text-xs">Mô tả sản phẩm</Label>
+                  <Label htmlFor="description" className="text-xs">Mô tả sản phẩm</Label>
                   <Textarea
                     id="description"
-                    placeholder="Mô tả chi tiết về chất liệu, kích thước, câu chuyện sản phẩm..."
+                    placeholder="Mô tả chi tiết về chất liệu, kích thước, màu sắc..."
                     rows={4}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -302,7 +372,7 @@ export default function CreateProductPage() {
 
             {/* Images */}
             <Card>
-              <CardHeader className="py-3 px-4">
+              <CardHeader className="py-1 px-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <span className="flex items-center justify-center size-6 rounded-md bg-primary/10">
@@ -314,17 +384,15 @@ export default function CreateProductPage() {
                 </div>
               </CardHeader>
               <CardContent className="px-4 pb-4 grid gap-3">
-
-                {/* Main drop zone */}
                 <div
                   className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer select-none ${
                     imageUrls.length >= 6
-                      ? "opacity-40 cursor-not-allowed p-6"
+                      ? "cursor-not-allowed border-muted-foreground/25"
                       : isDragging
-                        ? "border-primary bg-primary/5 p-6"
-                        : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/20 p-6"
-                  }`}
-                  style={{ minHeight: 140 }}
+                        ? "border-primary"
+                        : "border-muted-foreground/25 hover:border-primary/50"
+                  } ${hasMainPreview ? "overflow-hidden p-0" : "p-6"}`}
+                  style={{ minHeight: 180 }}
                   onClick={() => { if (imageUrls.length < 6) fileInputRef.current?.click() }}
                   onDragOver={(e) => { e.preventDefault(); if (imageUrls.length < 6) setIsDragging(true) }}
                   onDragLeave={() => setIsDragging(false)}
@@ -332,30 +400,29 @@ export default function CreateProductPage() {
                 >
                   <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden"
                     onChange={(e) => handleFilesSelected(e.target.files)} />
-
-                  {mainImage && !brokenUrls.has(mainImage) ? (
-                    <div className="relative">
-                      <img
-                        src={mainImage}
-                        alt="Ảnh chính"
-                        className="h-28 w-28 object-cover rounded-lg border"
-                        onError={() => handleImgError(mainImage)}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); removeImage(0) }}
-                        className="absolute -top-1.5 -right-1.5 flex items-center justify-center size-5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                      >
+                  {hasMainPreview ? (
+                    <div className="relative h-[180px] w-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={mainImage} alt="Ảnh chính" className="absolute inset-0 h-full w-full object-cover"
+                        onError={() => setBrokenUrls((p) => new Set(p).add(mainImage))} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
+                      <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        Ảnh chính
+                      </div>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); removeImage(0) }}
+                        className="absolute right-3 top-3 flex items-center justify-center size-6 rounded-full bg-red-500 text-white shadow hover:bg-red-600 transition-colors">
                         <IconX className="size-3" />
                       </button>
-                    </div>
-                  ) : mainImage && brokenUrls.has(mainImage) ? (
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <div className="flex items-center justify-center h-28 w-28 rounded-lg border bg-muted">
-                        <IconPhoto className="size-8 text-muted-foreground/60" />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground/70">
-                        URL ảnh không tải được. Kiểm tra lại link hoặc thử URL khác.
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                        className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-black/65"
+                      >
+                        <IconUpload className="size-3.5" />
+                        Thêm ảnh
+                      </button>
+                      <p className="absolute bottom-3 left-3 text-[11px] font-medium text-white/95">
+                        Ảnh phụ thêm ở các ô bên dưới
                       </p>
                     </div>
                   ) : (
@@ -366,62 +433,39 @@ export default function CreateProductPage() {
                       <div>
                         <p className="text-xs font-medium text-primary">
                           {isDragging ? "Thả ảnh vào đây" : "Tải ảnh lên"}
-                          {!isDragging && (
-                            <span className="text-foreground font-normal"> hoặc kéo thả vào đây</span>
-                          )}
+                          {!isDragging && <span className="text-foreground font-normal"> hoặc kéo thả</span>}
                         </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          PNG, JPG, GIF tối đa 10MB
-                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">PNG, JPG, GIF tối đa 10MB</p>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Thumbnail strip (4 slots) */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {extraSlots.map((_, i) => {
                     const url = imageUrls[i + 1]
                     if (url && !brokenUrls.has(url)) {
                       return (
                         <div key={i} className="relative aspect-square rounded-lg border overflow-hidden group">
-                          <img
-                            src={url}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            onError={() => handleImgError(url)}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(i + 1)}
-                            className="absolute top-0.5 right-0.5 flex items-center justify-center size-4 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt="" className="w-full h-full object-cover"
+                            onError={() => setBrokenUrls((p) => new Set(p).add(url))} />
+                          <button type="button" onClick={() => removeImage(i + 1)}
+                            className="absolute top-0.5 right-0.5 flex items-center justify-center size-4 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                             <IconX className="size-2.5" />
                           </button>
                         </div>
                       )
                     }
-                    if (url && brokenUrls.has(url)) {
-                      return (
-                        <div key={i} className="relative aspect-square rounded-lg border border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/40">
-                          <IconPhoto className="size-5 text-muted-foreground/60" />
-                        </div>
-                      )
-                    }
                     return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 flex flex-col items-center justify-center gap-1 text-muted-foreground/40 bg-muted/20 hover:bg-muted/40 transition-all"
-                      >
+                      <button key={i} type="button" onClick={() => fileInputRef.current?.click()}
+                        className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 flex flex-col items-center justify-center gap-1 text-muted-foreground/40 bg-muted/20 hover:bg-muted/40 transition-all">
                         <IconPhoto className="size-4" />
                       </button>
                     )
                   })}
                 </div>
 
-                {/* URL input */}
                 <div className="flex gap-2">
                   <Input
                     placeholder="Hoặc dán URL ảnh vào đây..."
@@ -436,307 +480,276 @@ export default function CreateProductPage() {
                     <IconPlus className="size-3.5" />
                   </Button>
                 </div>
-
               </CardContent>
             </Card>
           </div>
 
-          {/* ── RIGHT: AI panel ─────────────────────────── */}
-          <div className="flex flex-col gap-4">
-
-            {/* AI Smart Panel */}
-            <Card className="border-[1.5px] border-violet-200 dark:border-violet-800">
-              <CardHeader className="py-3 px-4 pb-2">
-                <div className="flex items-start gap-2.5">
-                  <span className="flex items-center justify-center size-7 rounded-full bg-violet-100 dark:bg-violet-900/60 shrink-0 mt-0.5">
-                    <IconSparkles className="size-4 text-violet-600 dark:text-violet-400" />
+          {/* ── RIGHT: AI Panel ─────────────────────── */}
+          <div className="flex flex-col gap-4 lg:h-full">
+            <Card className="border border-[#d7dfcf] shadow-sm">
+              <CardHeader className="py-1 px-4">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <IconSparkles className="size-3.5" />
                   </span>
-                  <div>
-                    <CardTitle className="text-sm">Trợ lý thông minh</CardTitle>
-                    {name.trim() ? (
-                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                        Dựa trên thông tin{" "}
-                        <span className="font-semibold text-foreground">{name}</span>, hệ thống gợi ý các thông tin sau:
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Nhập tên sản phẩm để nhận gợi ý tự động
-                      </p>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-sm flex items-center gap-2 text-foreground">Trợ lý thông minh</CardTitle>
+                    <p className="mt-1 text-xs leading-relaxed text-[#607157]">
+                      {name.trim()
+                        ? <>Dựa trên hình ảnh <span className="font-semibold text-[#2f3f27]">{name}</span> bạn vừa tải lên, hệ thống gợi ý các thông tin sau:</>
+                        : "Nhập tên hoặc mô tả để AI phân tích và gợi ý tự động"}
+                    </p>
                   </div>
+                  {(catLoading || tagLoading) && (
+                    <IconLoader2 className="mt-1 size-3.5 shrink-0 animate-spin text-[#738f5b]" />
+                  )}
                 </div>
               </CardHeader>
 
-              <CardContent className="px-4 pb-4 grid gap-3.5">
-
-                {/* DANH MỤC */}
+              <CardContent className="px-4 pb-4 grid gap-4">
+                {/* ── DANH MỤC ── */}
                 <div>
                   <SectionLabel
                     icon={IconCategory}
                     badge={
-                      ai.categoryName && !ai.loading ? (
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">
-                          Độ chính xác: {Math.round(0.94 * 100)}%
-                        </Badge>
-                      ) : undefined
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-[#60794b]">
+                        Độ chính xác: {confidenceText(confidenceBadge)}
+                      </span>
                     }
                   >
                     Danh mục
                   </SectionLabel>
 
                   {!hasInput ? (
-                    <div className="rounded-lg border border-dashed border-muted-foreground/20 p-2.5 text-[11px] text-muted-foreground/50 italic text-center">
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
                       Chưa phân tích
                     </div>
-                  ) : ai.loading ? (
-                    <div className="rounded-lg border p-2.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <IconLoader2 className="size-3 animate-spin text-violet-400" />
-                      Đang phân tích...
+                  ) : catLoading ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#cfd8c7] bg-white p-3 text-[11px] text-[#6d7f62]">
+                      <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
+                      Đang phân tích danh mục...
                     </div>
-                  ) : selCategory && !editCatMode ? (
-                    <div className="rounded-lg border border-violet-200 dark:border-violet-700 bg-white dark:bg-card p-2.5 flex items-center justify-between gap-2 shadow-sm">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{selCategory.name}</p>
-                        <p className="text-[10px] text-muted-foreground">Home Decor</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setEditCatVal(selCategory.name); setEditCatMode(true) }}
-                        className="shrink-0 flex items-center justify-center size-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <IconEdit className="size-3.5" />
-                      </button>
+                  ) : catError ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
+                      <IconAlertCircle className="size-3.5 shrink-0" />
+                      Không thể kết nối AI. Kiểm tra microservice.
                     </div>
-                  ) : editCatMode ? (
-                    <div className="flex gap-1.5">
-                      <Input autoFocus value={editCatVal} onChange={(e) => setEditCatVal(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { setSelCategory({ id: selCategory?.id ?? null, name: editCatVal.trim() || (selCategory?.name ?? "") }); setEditCatMode(false) }
-                          if (e.key === "Escape") setEditCatMode(false)
-                        }}
-                        className="h-8 text-xs" placeholder="Tên danh mục..." />
-                      <Button type="button" size="sm" className="h-8 px-2 text-xs"
-                        onClick={() => { if (editCatVal.trim()) setSelCategory({ id: selCategory?.id ?? null, name: editCatVal.trim() }); setEditCatMode(false) }}>
-                        OK
-                      </Button>
+                  ) : catSuggestions.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
+                      Không có gợi ý
                     </div>
                   ) : (
-                    ai.categoryName ? (
-                      <button type="button" onClick={() => setSelCategory({ id: ai.categoryId, name: ai.categoryName! })}
-                        className="w-full text-left rounded-lg border p-2.5 hover:border-violet-300 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-all flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">{ai.categoryName}</p>
-                        <span className="text-[10px] text-violet-600 shrink-0">Chọn</span>
-                      </button>
-                    ) : <div className="rounded-lg border border-dashed p-2.5 text-[11px] text-muted-foreground/50 text-center italic">Không có gợi ý</div>
-                  )}
-                </div>
-
-                {/* LOẠI SẢN PHẨM */}
-                <div>
-                  <SectionLabel icon={IconTag}>Loại sản phẩm</SectionLabel>
-                  {!hasInput ? (
-                    <div className="rounded-lg border border-dashed border-muted-foreground/20 p-2.5 text-[11px] text-muted-foreground/50 italic text-center">
-                      Chưa phân tích
-                    </div>
-                  ) : ai.loading ? (
-                    <div className="rounded-lg border p-2.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <IconLoader2 className="size-3 animate-spin text-violet-400" />
-                      Đang phân tích...
-                    </div>
-                  ) : selSubcat && !editSubMode ? (
-                    <div className="rounded-lg border border-violet-200 dark:border-violet-700 bg-white dark:bg-card p-2.5 flex items-center justify-between gap-2 shadow-sm">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{selSubcat}</p>
-                        <p className="text-[10px] text-muted-foreground">Vases</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setEditSubVal(selSubcat); setEditSubMode(true) }}
-                        className="shrink-0 flex items-center justify-center size-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      >
-                        <IconEdit className="size-3.5" />
-                      </button>
-                    </div>
-                  ) : editSubMode ? (
-                    <div className="flex gap-1.5">
-                      <Input autoFocus value={editSubVal} onChange={(e) => setEditSubVal(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") { setSelSubcat(editSubVal.trim() || selSubcat); setEditSubMode(false) }
-                          if (e.key === "Escape") setEditSubMode(false)
-                        }}
-                        className="h-8 text-xs" placeholder="Loại sản phẩm..." />
-                      <Button type="button" size="sm" className="h-8 px-2 text-xs"
-                        onClick={() => { if (editSubVal.trim()) setSelSubcat(editSubVal.trim()); setEditSubMode(false) }}>
-                        OK
-                      </Button>
-                    </div>
-                  ) : (
-                    ai.subcategoryName ? (
-                      <button type="button" onClick={() => setSelSubcat(ai.subcategoryName!)}
-                        className="w-full text-left rounded-lg border p-2.5 hover:border-violet-300 hover:bg-violet-50/50 dark:hover:bg-violet-950/20 transition-all flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium">{ai.subcategoryName}</p>
-                        <span className="text-[10px] text-violet-600 shrink-0">Chọn</span>
-                      </button>
-                    ) : <div className="rounded-lg border border-dashed p-2.5 text-[11px] text-muted-foreground/50 text-center italic">Không có gợi ý</div>
-                  )}
-                </div>
-
-                {/* CHẤT LIỆU */}
-                <div>
-                  <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
-                  {!hasInput ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3].map((i) => <div key={i} className="h-6 w-16 rounded-full bg-muted/50 opacity-40" />)}
-                    </div>
-                  ) : ai.loading ? (
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <IconLoader2 className="size-3 animate-spin text-violet-400" /> Đang phân tích...
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selMaterials.map((m) => (
-                        <button key={m} type="button" onClick={() => toggleMat(m)}
-                          className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 px-2.5 py-0.5 text-xs font-medium hover:opacity-80 transition-opacity">
-                          <IconCheck className="size-3" />
-                          {m}
-                        </button>
-                      ))}
-                      {ai.materials.filter((m) => !selMaterials.includes(m.name)).map((m) => (
-                        <button key={m.name} type="button" onClick={() => toggleMat(m.name)}
-                          className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 text-muted-foreground px-2.5 py-0.5 text-xs font-medium hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 transition-all">
-                          <IconPlus className="size-3" />
-                          {m.name}
-                        </button>
-                      ))}
-                      {ai.materials.length === 0 && selMaterials.length === 0 && (
-                        <span className="text-[11px] text-muted-foreground/50 italic">Không có gợi ý</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* TAGS */}
-                <div>
-                  <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
-                  {!hasInput ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4].map((i) => <div key={i} className="h-6 w-14 rounded-full bg-muted/50 opacity-40" />)}
-                    </div>
-                  ) : ai.loading ? (
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <IconLoader2 className="size-3 animate-spin text-violet-400" /> Đang phân tích...
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {ai.tags.map((tag) => {
-                        const active = selTags.includes(tag.name)
-                        const color = active ? tagColor[tag.type] ?? tagColor.other : "border-muted-foreground/20 bg-muted/50 text-muted-foreground hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                    <div className="flex flex-col gap-2">
+                      {catSuggestions.map((cat) => {
+                        const active = selCategory?.categoryId === cat.categoryId
                         return (
-                          <button key={tag.name} type="button" onClick={() => toggleTag(tag.name)}
-                            className={`inline-flex items-center gap-0.5 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-all ${color}`}>
-                            #{tag.name}
-                            {active && <IconX className="size-3 ml-0.5" />}
+                          <button
+                            key={cat.categoryId}
+                            type="button"
+                            onClick={() => handleSelectCategory(cat)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                              active
+                                ? "border-[#9db183] bg-white"
+                                : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-[25px] font-semibold text-[#2d3a25]">{cat.categoryName}</p>
+                              <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <ConfidenceDot score={cat.confidenceScore} />
+                              <IconPencil className={`size-3.5 ${active ? "text-[#607b4a]" : "text-[#8f9f82]"}`} />
+                              {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
+                            </div>
                           </button>
                         )
                       })}
-                      {/* custom tags */}
-                      {selTags.filter((t) => !ai.tags.find((at) => at.name === t)).map((t) => (
-                        <button key={t} type="button" onClick={() => toggleTag(t)}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 px-2.5 py-0.5 text-xs font-medium hover:opacity-80">
-                          #{t}<IconX className="size-3 ml-0.5" />
+                    </div>
+                  )}
+                </div>
+
+                {/* ── CHẤT LIỆU ── */}
+                <div>
+                  <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
+                  {!selCategory ? (
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-7 w-16 rounded-full bg-[#dfe8d6] opacity-60" />
+                      ))}
+                    </div>
+                  ) : tagLoading ? (
+                    <div className="flex items-center gap-2 text-[11px] text-[#728568]">
+                      <IconLoader2 className="size-3 animate-spin text-[#6f8659]" /> Đang tải...
+                    </div>
+                  ) : matSuggestions.length === 0 ? (
+                    <p className="text-[11px] italic text-[#8a9a80]">Không có gợi ý</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {matSuggestions.map((m) => {
+                        const active = selMatIds.includes(m.materialId)
+                        return (
+                          <button
+                            key={m.materialId}
+                            type="button"
+                            onClick={() => toggleMat(m.materialId)}
+                            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                              active
+                                ? "border-[#8ea27a] bg-white text-[#415337]"
+                                : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a]"
+                            }`}
+                          >
+                            {m.materialName}
+                            {active && <IconCheck className="size-3.5" />}
+                          </button>
+                        )
+                      })}
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-[#bcc9af] bg-white px-3 py-1 text-xs text-[#6f8161] hover:border-[#96aa84]"
+                      >
+                        <IconPlus className="size-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── TAGS ── */}
+                <div className="border-t border-[#dce3d5] pt-3">
+                  <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
+                  {!selCategory ? (
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-7 w-14 rounded-full bg-[#dfe8d6] opacity-60" />
+                      ))}
+                    </div>
+                  ) : tagLoading ? (
+                    <div className="flex items-center gap-2 text-[11px] text-[#728568]">
+                      <IconLoader2 className="size-3 animate-spin text-[#6f8659]" /> Đang tải...
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {tagSuggestions.map((tag) => {
+                        const active = selTagIds.includes(tag.tagId)
+                        return (
+                          <button
+                            key={tag.tagId}
+                            type="button"
+                            onClick={() => toggleTag(tag.tagId)}
+                            className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
+                              active
+                                ? "border-[#e8b37f] bg-white text-[#b06017]"
+                                : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f]"
+                            }`}
+                          >
+                            #{tag.tagName}
+                          </button>
+                        )
+                      })}
+
+                      {customTags.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => removeCustomTag(t)}
+                          className="inline-flex items-center gap-1 rounded-md border border-[#e8b37f] bg-white px-2.5 py-1 text-xs font-medium text-[#b06017] hover:opacity-80"
+                        >
+                          #{t}
+                          <IconX className="size-3" />
                         </button>
                       ))}
+
                       {showCustomTag ? (
                         <div className="flex items-center gap-1">
-                          <Input autoFocus value={customTag} onChange={(e) => setCustomTag(e.target.value)}
+                          <Input
+                            autoFocus
+                            value={customTagInput}
+                            onChange={(e) => setCustomTagInput(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === "Enter" && customTag.trim()) { toggleTag(customTag.trim()); setCustomTag(""); setShowCustomTag(false) }
+                              if (e.key === "Enter" && customTagInput.trim()) addCustomTag()
                               if (e.key === "Escape") setShowCustomTag(false)
                             }}
-                            placeholder="tag..." className="h-6 text-[11px] w-20 px-2" />
+                            placeholder="tag..."
+                            className="h-7 w-24 border-[#c8d4bd] bg-white px-2 text-[11px]"
+                          />
                         </div>
                       ) : (
-                        <button type="button" onClick={() => setShowCustomTag(true)}
-                          className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-muted-foreground/30 px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-violet-400 hover:text-violet-600 transition-all">
-                          <IconPlus className="size-3" /> Thêm
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomTag(true)}
+                          className="rounded-md border border-dashed border-[#bcc9af] bg-white px-2.5 py-1 text-[11px] text-[#6f8161] hover:border-[#96aa84]"
+                        >
+                          + Thêm
                         </button>
+                      )}
+
+                      {tagSuggestions.length === 0 && customTags.length === 0 && !showCustomTag && selCategory && !tagLoading && (
+                        <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý - bạn có thể tự thêm</span>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* AI insight */}
-                {ai.insight && !ai.loading && (
-                  <div className="rounded-lg bg-muted/60 border border-muted p-2.5 flex gap-2">
-                    <span className="text-green-500 text-[11px] shrink-0 mt-0.5">●</span>
-                    <div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed italic">
-                        &ldquo;{ai.insight}&rdquo;
-                      </p>
-                      <button type="button" onClick={() => document.getElementById("description")?.focus()}
-                        className="text-[10px] text-violet-600 hover:underline mt-1">
-                        Thêm câu chuyện thương hiệu
-                      </button>
-                    </div>
+                {selCategory && (
+                  <div className="rounded-xl border border-[#d4deca] bg-white p-3 text-[11px] text-[#627458]">
+                    Đã chọn: <span className="font-semibold text-[#46573b]">{selCategory.categoryName}</span>
+                    {selTagIds.length > 0 && ` · ${selTagIds.length} tag`}
+                    {selMatIds.length > 0 && ` · ${selMatIds.length} chất liệu`}
                   </div>
                 )}
 
                 {!hasInput && (
-                  <div className="rounded-lg border border-dashed border-muted-foreground/15 p-2.5 flex gap-2 items-start">
-                    <IconBulb className="size-3.5 text-muted-foreground/30 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-muted-foreground/50 italic leading-relaxed">
-                      Gợi ý AI sẽ xuất hiện ngay khi bạn nhập tên sản phẩm
-                    </p>
+                  <div className="rounded-xl border border-dashed border-[#c7d2bd] bg-white p-3 text-center text-[11px] italic leading-relaxed text-[#7b8d71]">
+                    Nhập tên hoặc mô tả sản phẩm để AI gợi ý danh mục
                   </div>
                 )}
-
               </CardContent>
             </Card>
 
-            {/* Góp ý AI */}
-            <Card>
-              <CardHeader className="py-3 px-4 pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <span className="flex items-center justify-center size-6 rounded-full bg-muted">
-                    <IconSend className="size-3 text-muted-foreground" />
+            <Card className="border border-[#d7dfcf] shadow-sm">
+              <CardHeader className="py-1 px-4">
+                <CardTitle className="text-sm flex items-center gap-2 text-foreground">
+                  <span className="flex size-6 items-center justify-center rounded-md bg-primary/10">
+                    <IconPencil className="size-3.5 text-primary" />
                   </span>
                   Góp ý AI cải thiện
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4 grid gap-2">
+              <CardContent className="px-4 pb-4">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Chia sẻ góp ý để hệ thống gợi ý danh mục, tag và chất liệu chính xác hơn cho lần đăng tiếp theo.
+                </p>
                 <Textarea
-                  placeholder="Ý kiến của bạn về mức độ chính xác của AI ..."
                   rows={3}
-                  className="text-xs resize-none"
-                  value={aiFeedback}
-                  onChange={(e) => setAiFeedback(e.target.value)}
+                  placeholder="Ý kiến của bạn về mức độ chính xác của AI ..."
+                  className="h-24 resize-none border-[#d3dbcb] bg-white text-sm"
                 />
-                <Button type="button" variant="outline" size="sm" className="w-full h-8 text-xs"
-                  disabled={!aiFeedback.trim()}
-                  onClick={() => setAiFeedback("")}>
-                  <IconSend className="size-3 mr-1.5" /> Gửi góp ý
-                </Button>
               </CardContent>
             </Card>
 
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 bg-white"
+                onClick={() => router.push("/seller/products")}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={actionLoading || !canSubmit}
+                className="h-10"
+              >
+                {actionLoading ? (
+                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tạo...</>
+                ) : (
+                  "Đăng bán →"
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-
-        {/* Bottom actions */}
-        <div className="flex items-center justify-between gap-3 border-t pt-4">
-          <Button type="button" variant="ghost" size="sm"
-            onClick={() => router.push("/seller/products")}>
-            Hủy bỏ
-          </Button>
-          <Button type="button" onClick={handleSubmit}
-            disabled={actionLoading || !canSubmit}
-            className="min-w-[130px] h-9">
-            {actionLoading ? (
-              <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tạo...</>
-            ) : (
-              "Đăng bán →"
-            )}
-          </Button>
         </div>
 
       </div>

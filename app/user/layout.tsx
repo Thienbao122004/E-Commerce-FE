@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { ProfileSidebar } from '@/app/user/profile/_components/profile-sidebar'
 import Link from 'next/link'
@@ -11,8 +12,17 @@ const HeaderUser = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
+const CartDropdown = dynamic(
+  () => import('@/components/layout/cart-dropdown').then((m) => m.CartDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
+const FULL_WIDTH_PATHS = ['/user/cart']
+
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth()
+  const pathname = usePathname()
+  const isFullWidth = FULL_WIDTH_PATHS.some((p) => pathname.startsWith(p))
 
   useEffect(() => {
     if (!isLoading && !session) {
@@ -68,22 +78,20 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <HeaderUser />
-            <Link
-              href="/"
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: 'var(--color-text-main)' }}
-            >
-              <span className="material-symbols-outlined">shopping_cart</span>
-            </Link>
+            <CartDropdown />
           </div>
         </div>
       </header>
 
       <main className="flex-grow w-full max-w-[1200px] mx-auto px-4 md:px-10 py-6">
-        <div className="flex gap-6">
-          <ProfileSidebar />
-          <div className="flex-1 min-w-0">{children}</div>
-        </div>
+        {isFullWidth ? (
+          <div className="w-full">{children}</div>
+        ) : (
+          <div className="flex gap-6">
+            <ProfileSidebar />
+            <div className="flex-1 min-w-0">{children}</div>
+          </div>
+        )}
       </main>
     </div>
   )

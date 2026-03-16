@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import {
@@ -11,11 +11,21 @@ import {
   type ProductVariantStorefront,
 } from "@/services/storefront-products"
 import { useFavorites } from "@/contexts/favorites-context"
+import { cartService } from "@/services/cart"
 import { Separator } from "@/components/ui/separator"
+import { toast } from "sonner"
 import dynamic from "next/dynamic"
+import { useAuth } from "@/contexts/auth-context"
+
+const CART_UPDATED_EVENT = "cart:updated"
 
 const HeaderUser = dynamic(
   () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
+const CartDropdown = dynamic(
+  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
@@ -32,6 +42,35 @@ function formatPrice(price: number) {
 function formatSold(n: number) {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return String(n)
+}
+
+function showAddedToCartToast(productName: string, quantity: number) {
+  toast.custom(
+    (id) => (
+      <div className="mt-14 md:mt-16 w-[320px] rounded-xl border border-emerald-200 bg-emerald-50 shadow-md px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center size-7">
+            <span className="material-symbols-outlined text-base">check</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-700">Đã thêm vào giỏ hàng</p>
+            <p className="mt-1 text-xs text-emerald-800 line-clamp-2">
+              +{quantity} {productName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toast.dismiss(id)}
+            className="text-emerald-600 hover:text-emerald-800 transition-colors"
+            aria-label="Đóng thông báo"
+          >
+            <span className="material-symbols-outlined text-base">close</span>
+          </button>
+        </div>
+      </div>
+    ),
+    { duration: 2200 }
+  )
 }
 
 /* ─────────── star rating ─────────── */
@@ -118,6 +157,7 @@ function RelatedCardSkeleton() {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { session } = useAuth()
 
   const [product, setProduct] = useState<StorefrontProductDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -131,6 +171,7 @@ export default function ProductDetailPage() {
   const [loadingRelated, setLoadingRelated] = useState(false)
 
   const [search, setSearch] = useState("")
+  const [addingToCart, setAddingToCart] = useState(false)
   const { isFavorited, toggle: toggleFavorite } = useFavorites()
 
   const load = useCallback(async () => {
@@ -157,7 +198,6 @@ export default function ProductDetailPage() {
               setRelatedProducts(rel.products.filter((p) => p.id !== id))
             }
           } catch {
-            /* ignore related error */
           } finally {
             setLoadingRelated(false)
           }
@@ -176,14 +216,98 @@ export default function ProductDetailPage() {
     load()
   }, [load])
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    if (search.trim()) router.push(`/?search=${encodeURIComponent(search.trim())}`)
+    const keyword = search.trim()
+    if (keyword) router.push(`/?search=${encodeURIComponent(keyword)}`)
+  }, [router, search])
+
+  const handleQuantityInput = useCallback(
+    (value: string) => {
+      const maxStock = selectedVariant?.stockQuantity ?? product?.totalStock ?? 0
+      const digitsOnly = value.replace(/\D/g, "")
+      if (!digitsOnly) {
+        setQuantity(1)
+        return
+      }
+
+      const parsed = Number(digitsOnly)
+      if (Number.isNaN(parsed)) return
+
+      if (maxStock > 0) {
+        setQuantity(Math.min(Math.max(1, parsed), maxStock))
+      } else {
+        setQuantity(Math.max(1, parsed))
+      }
+    },
+    [selectedVariant?.stockQuantity, product?.totalStock]
+  )
+
+  const handleAddToCart = async (buyNow = false) => {
+    if (!product) return
+
+    if (!session) {
+      toast.error("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng")
+      router.push("/login")
+      return
+    }
+
+    const stock =
+      selectedVariant?.stockQuantity ??
+      product.totalStock ??
+      0
+
+    if (stock <= 0) {
+      toast.error("Sản phẩm đã hết hàng")
+      return
+    }
+
+    if (quantity > stock) {
+      toast.error("Số lượng vượt quá tồn kho", {
+        description: `Tồn kho hiện có: ${stock}`,
+      })
+      return
+    }
+
+    setAddingToCart(true)
+    try {
+      await cartService.addItem({
+        productId: product.id,
+        variantId: selectedVariant?.id ?? undefined,
+        quantity,
+      })
+      window.dispatchEvent(new Event(CART_UPDATED_EVENT))
+      if (buyNow) {
+        router.push("/user/cart")
+      } else {
+        showAddedToCartToast(product.name, quantity)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể thêm vào giỏ hàng"
+      toast.error(msg)
+    } finally {
+      setAddingToCart(false)
+    }
   }
 
   const displayPrice = selectedVariant?.price ?? product?.basePrice ?? 0
-  const activeVariants = product?.variants?.filter((v) => v.isActive) ?? []
-  const images = product?.imageUrls ?? []
+  const activeVariants = useMemo(
+    () => product?.variants?.filter((v) => v.isActive) ?? [],
+    [product?.variants]
+  )
+  const images = useMemo(() => product?.imageUrls ?? [], [product?.imageUrls])
+  const currentStock = useMemo(
+    () => selectedVariant?.stockQuantity ?? product?.totalStock ?? 0,
+    [selectedVariant?.stockQuantity, product?.totalStock]
+  )
+
+  useEffect(() => {
+    if (!product) return
+    setQuantity((prev) => {
+      if (currentStock <= 0) return 1
+      return prev > currentStock ? currentStock : prev
+    })
+  }, [product, selectedVariant?.id, currentStock])
 
   /* ─── header ─── */
   const header = (
@@ -222,12 +346,7 @@ export default function ProductDetailPage() {
 
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <HeaderUser />
-          <button
-            className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-            style={{ color: "var(--color-text-main)" }}
-          >
-            <span className="material-symbols-outlined">shopping_cart</span>
-          </button>
+          <CartDropdown />
         </div>
       </div>
     </header>
@@ -498,28 +617,55 @@ export default function ProductDetailPage() {
                     >
                       −
                     </button>
-                    <span className="w-12 text-center text-sm font-semibold py-2 border-x border-gray-200">
-                      {quantity}
-                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={quantity}
+                      onChange={(e) => handleQuantityInput(e.target.value)}
+                      onBlur={() => {
+                        if (quantity < 1) {
+                          setQuantity(1)
+                          return
+                        }
+                        if (currentStock > 0 && quantity > currentStock) {
+                          setQuantity(currentStock)
+                        }
+                      }}
+                      className="w-16 h-10 text-center text-sm font-semibold border-x border-gray-200 focus:outline-none focus:ring-0"
+                      aria-label="Nhập số lượng"
+                    />
                     <button
                       onClick={() => setQuantity((q) => q + 1)}
                       className="px-3 py-2 text-gray-500 hover:bg-gray-50 transition-colors text-lg font-bold"
+                      disabled={currentStock > 0 ? quantity >= currentStock : false}
                     >
                       +
                     </button>
                   </div>
+                  <span className="text-xs text-gray-400">
+                    {currentStock > 0 ? `Còn lại ${currentStock}` : "Hết hàng"}
+                  </span>
                 </div>
 
-                <div className="flex gap-3 flex-wrap grid grid-cols-3">
+                <div className="flex gap-3 flex-wrap">
                   <button
-                    className="flex-1 min-w-[70px] flex items-center justify-center gap-2 rounded-xl font-semibold text-sm border-2 transition-all hover:bg-[rgba(236,127,19,0.06)]"
+                    onClick={() => handleAddToCart(false)}
+                    disabled={addingToCart || currentStock <= 0}
+                    className="flex-1 min-w-[70px] flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm border-2 transition-all hover:bg-[rgba(236,127,19,0.06)] disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
                   >
-                    <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
+                    {addingToCart ? (
+                      <span className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
+                    )}
                     Thêm vào giỏ
                   </button>
                   <button
-                    className="flex-1 min-w-[70px] rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 active:scale-95"
+                    onClick={() => handleAddToCart(true)}
+                    disabled={addingToCart || currentStock <= 0}
+                    className="flex-1 min-w-[70px] py-3.5 rounded-xl font-semibold text-sm text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{ backgroundColor: "var(--color-primary)" }}
                   >
                     Mua ngay
