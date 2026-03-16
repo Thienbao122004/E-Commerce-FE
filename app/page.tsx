@@ -15,6 +15,11 @@ const HeaderUser = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
+const CartDropdown = dynamic(
+  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
 /* ─────────────────── helpers ─────────────────── */
 
 function formatPrice(price: number) {
@@ -327,12 +332,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <HeaderUser />
             
-            <button
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">shopping_cart</span>
-            </button>
+            <CartDropdown />
           </div>
         </div>
 
