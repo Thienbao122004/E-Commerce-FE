@@ -9,6 +9,7 @@ export type UserRole = 'customer' | 'seller' | 'admin'
 export interface UserProfile {
     id: string
     role: UserRole
+    role_id: number | null
     full_name: string | null
     phone: string | null
     status: number
@@ -23,6 +24,7 @@ interface AuthContextValue {
     session: Session | null
     user: User | null
     profile: UserProfile | null
+    avatarUrl: string | undefined
     role: UserRole | null
     isLoading: boolean
     isAdmin: boolean
@@ -36,24 +38,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<UserProfile | null>(null)
+    const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
     const [isLoading, setIsLoading] = useState(true)
     const [isProfileLoading, setIsProfileLoading] = useState(true)
-
     const fetchProfile = async (userId: string, userMeta?: Record<string, any>) => {
         const { data, error } = await supabase
             .from('users')
-            .select('*')
+            .select('*, roles(code)')
             .eq('id', userId)
             .single()
 
         if (error || !data) {
-            if (error && error.code !== 'PGRST116') {
-                console.warn('Could not fetch user profile (check RLS policy):', error.code)
-            }
             const fallbackRole = (userMeta?.role ?? userMeta?.user_role ?? 'customer') as UserRole
             return {
                 id: userId,
                 role: fallbackRole,
+                role_id: null,
                 full_name: userMeta?.full_name ?? null,
                 phone: null,
                 status: 1,
@@ -65,7 +65,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } as UserProfile
         }
 
-        return data as UserProfile
+        type UserRow = Omit<UserProfile, 'role'> & {
+            roles: { code: string } | null
+        }
+        const { roles, ...rest } = data as unknown as UserRow
+        const roleCode = (roles?.code ?? 'customer') as UserRole
+        return {
+            ...rest,
+            role: roleCode,
+        } as UserProfile
     }
 
     useEffect(() => {
@@ -115,6 +123,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         let mounted = true
+        const loadAvatar = async () => {
+            if (!user) {
+                if (mounted) setAvatarUrl(undefined)
+                return
+            }
+
+            const storagePath = user.user_metadata?.avatar_storage_path as string | undefined
+            if (storagePath) {
+                const { data, error } = await supabase.storage
+                    .from('image')
+                    .createSignedUrl(storagePath, 3600)
+
+                if (!mounted) return
+
+                if (!error && data?.signedUrl) {
+                    setAvatarUrl(data.signedUrl)
+                    return
+                }
+            }
+
+            if (mounted) {
+                setAvatarUrl((user.user_metadata?.avatar_url as string | undefined) ?? undefined)
+            }
+        }
+
+        loadAvatar()
+
+        return () => {
+            mounted = false
+        }
+    }, [user?.id, user?.user_metadata?.avatar_storage_path, user?.user_metadata?.avatar_url])
+
+    useEffect(() => {
+        let mounted = true
         const loadProfile = async () => {
             if (!user) {
                 if (mounted) {
@@ -161,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user,
         profile,
+        avatarUrl,
         role,
         isLoading: stillLoading,
         isAdmin: role === 'admin',

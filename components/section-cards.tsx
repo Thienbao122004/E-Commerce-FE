@@ -5,6 +5,8 @@ import {
   IconShoppingCart,
   IconCurrencyDollar,
   IconAlertTriangle,
+  IconBuildingStore,
+  IconPackage,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -55,8 +57,8 @@ export function SectionCards({ stats, loading }: Props) {
 
   if (loading || !stats) {
     return (
-      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
@@ -103,10 +105,28 @@ export function SectionCards({ stats, loading }: Props) {
       footer: `Đang xem xét: ${fmt(stats.disputes.underReview)} · Đã giải quyết: ${fmt(stats.disputes.resolved)}`,
       sub: `Đã hoàn tiền: ${fmt(stats.disputes.refunded)}`,
     },
+    {
+      icon: IconBuildingStore,
+      label: "Cửa hàng",
+      value: fmt(stats.shops.total),
+      badge: `+${fmt(stats.shops.newThisMonth)} tháng này`,
+      badgePositive: true,
+      footer: `Hoạt động: ${fmt(stats.shops.active)} · Chờ duyệt: ${fmt(stats.shops.pendingVerification)}`,
+      sub: `Tạm khóa: ${fmt(stats.shops.suspended)}`,
+    },
+    {
+      icon: IconPackage,
+      label: "Sản phẩm",
+      value: fmt(stats.products.total),
+      badge: `+${fmt(stats.products.newThisMonth)} tháng này`,
+      badgePositive: true,
+      footer: `Đăng bán: ${fmt(stats.products.active)} · Hết hàng: ${fmt(stats.products.outOfStock)}`,
+      sub: `Bản nháp: ${fmt(stats.products.draft)} · Đã ẩn: ${fmt(stats.products.hidden)}`,
+    },
   ]
 
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
       {cards.map((card) => (
         <Card key={card.label} className="@container/card">
           <CardHeader>

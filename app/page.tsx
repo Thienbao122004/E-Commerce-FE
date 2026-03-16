@@ -1,9 +1,24 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
+import { useAuth } from "@/contexts/auth-context"
+import { useFavorites } from "@/contexts/favorites-context"
+import { Separator } from "@/components/ui/separator"
+import dynamic from "next/dynamic"
+
+const HeaderUser = dynamic(
+  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
+const CartDropdown = dynamic(
+  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
 
 /* ─────────────────── helpers ─────────────────── */
 
@@ -86,7 +101,71 @@ function ProductCardSkeleton() {
 
 const FLASH_DISCOUNTS = [30, 15, 25, 20, 40, 35, 10, 45, 18, 28]
 
+const HERO_SLIDES = [
+  {
+    image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
+    badge: "Ưu đãi hôm nay",
+    badgeColor: "#ec7f13",
+    title: "Sale lớn\ncuối tuần",
+    titleHighlight: "Giảm đến 50%",
+    desc: "Hàng ngàn sản phẩm chính hãng — giao nhanh toàn quốc",
+    cta: "Mua ngay",
+    btnColor: "#ec7f13",
+    overlay: "rgba(28, 14, 4, 0.58)",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
+    badge: "Hàng mới về",
+    badgeColor: "#9a734c",
+    title: "Thời trang\nthu đông 2025",
+    titleHighlight: "Xu hướng mới",
+    desc: "Phong cách hiện đại kết hợp nét truyền thống Việt Nam",
+    cta: "Khám phá",
+    btnColor: "#9a734c",
+    overlay: "rgba(20, 12, 6, 0.60)",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80",
+    badge: "Đặc sản vùng miền",
+    badgeColor: "#c47a2b",
+    title: "Tinh hoa\nẩm thực Việt",
+    titleHighlight: "Giao tận nhà",
+    desc: "Cà phê Đà Lạt, đặc sản Hội An, mắm Phú Quốc — chính gốc 100%",
+    cta: "Đặt hàng",
+    btnColor: "#c47a2b",
+    overlay: "rgba(24, 12, 2, 0.55)",
+  },
+]
+
+const SIDE_BANNERS = [
+  {
+    image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80",
+    sub: "Trang trí nhà cửa",
+    title: "Đồ thủ\ncông mỹ nghệ",
+    overlay: "rgba(28, 14, 4, 0.52)",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
+    sub: "Voucher giảm 30%",
+    title: "Làm đẹp\nchính hãng",
+    overlay: "rgba(28, 14, 4, 0.52)",
+  },
+]
+
 export default function LandingPage() {
+  const { session, isLoading: authLoading, role } = useAuth()
+  const { isFavorited, toggle: toggleFavorite } = useFavorites()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (authLoading) return
+    if (role === 'admin') {
+      window.location.href = '/admin/dashboard'
+    } else if (role === 'seller') {
+      window.location.href = '/seller/dashboard'
+    }
+  }, [authLoading, role])
+
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [flashProducts, setFlashProducts] = useState<StorefrontProduct[]>([])
   const [featuredProducts, setFeaturedProducts] = useState<StorefrontProduct[]>([])
@@ -94,45 +173,108 @@ export default function LandingPage() {
   const [loadingCats, setLoadingCats] = useState(true)
   const [loadingFlash, setLoadingFlash] = useState(true)
   const [loadingFeatured, setLoadingFeatured] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [featuredPage, setFeaturedPage] = useState(1)
+  const [totalFeaturedCount, setTotalFeaturedCount] = useState(0)
+
+  const PAGE_SIZE = 12
 
   const [search, setSearch] = useState("")
   const [countdown, setCountdown] = useState({ h: 2, m: 14, s: 55 })
+  const [heroSlide, setHeroSlide] = useState(0)
+  const [flashScroll, setFlashScroll] = useState({ canPrev: false, canNext: true })
+  const flashScrollRef = useRef<HTMLDivElement>(null)
 
   /* ── fetch ── */
-  const loadCategories = useCallback(async () => {
+  const loadAll = useCallback(async () => {
     setLoadingCats(true)
-    try {
-      const res = await getCategories({ pageSize: 6, level: 1 })
-      if (res.success) setCategories(res.categories)
-    } catch { /* silent */ }
-    finally { setLoadingCats(false) }
-  }, [])
-
-  const loadFlash = useCallback(async () => {
     setLoadingFlash(true)
-    try {
-      const res = await getProducts({ pageSize: 12, sortBy: "newest" })
-      if (res.success) setFlashProducts(res.products)
-    } catch { /* silent */ }
-    finally { setLoadingFlash(false) }
-  }, [])
-
-  const loadFeatured = useCallback(async () => {
     setLoadingFeatured(true)
-    try {
-      const res = await getProducts({ pageSize: 12, sortBy: "rating" })
-      if (res.success) setFeaturedProducts(res.products)
-    } catch { /* silent */ }
-    finally { setLoadingFeatured(false) }
+
+    const [catsRes, flashRes, featuredRes] = await Promise.allSettled([
+      getCategories({ pageSize: 6, level: 1 }),
+      getProducts({ pageSize: 12, sortBy: "newest" }),
+      getProducts({ pageSize: 12, sortBy: "rating" }),
+    ])
+
+    if (catsRes.status === "fulfilled" && catsRes.value.success)
+      setCategories(catsRes.value.categories)
+    setLoadingCats(false)
+
+    if (flashRes.status === "fulfilled" && flashRes.value.success)
+      setFlashProducts(flashRes.value.products)
+    setLoadingFlash(false)
+
+    if (featuredRes.status === "fulfilled" && featuredRes.value.success) {
+      const { products, totalCount } = featuredRes.value
+      setFeaturedProducts(products)
+      setTotalFeaturedCount(totalCount)
+    }
+    setLoadingFeatured(false)
   }, [])
 
   useEffect(() => {
-    loadCategories()
-    loadFlash()
-    loadFeatured()
-  }, [loadCategories, loadFlash, loadFeatured])
+    loadAll()
+  }, [loadAll])
 
-  /* ── countdown ── */
+  const uniqueFeaturedProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return featuredProducts.filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+  }, [featuredProducts])
+
+  const hasMore = uniqueFeaturedProducts.length < totalFeaturedCount
+
+  const handleLoadMore = useCallback(async () => {
+    if (!session) {
+      router.push("/login")
+      return
+    }
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = featuredPage + 1
+      const res = await getProducts({ page: nextPage, pageSize: PAGE_SIZE, sortBy: "newest" })
+      if (res.success) {
+        setFeaturedProducts((prev) => [...prev, ...res.products])
+        setTotalFeaturedCount(res.totalCount)
+        setFeaturedPage(nextPage)
+      }
+    } catch { }
+    finally { setLoadingMore(false) }
+  }, [session, router, loadingMore, hasMore, featuredPage])
+
+  const updateFlashScroll = useCallback(() => {
+    const el = flashScrollRef.current
+    if (!el) return
+    setFlashScroll({
+      canPrev: el.scrollLeft > 4,
+      canNext: el.scrollLeft < el.scrollWidth - el.clientWidth - 4,
+    })
+  }, [])
+
+  const scrollFlash = (dir: "prev" | "next") => {
+    const el = flashScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === "next" ? 540 : -540, behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    const el = flashScrollRef.current
+    if (!el) return
+    el.addEventListener("scroll", updateFlashScroll, { passive: true })
+    updateFlashScroll()
+    return () => el.removeEventListener("scroll", updateFlashScroll)
+  }, [flashProducts, updateFlashScroll])
+
+  useEffect(() => {
+    const t = setInterval(() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length), 4000)
+    return () => clearInterval(t)
+  }, [])
+
   useEffect(() => {
     const t = setInterval(() => {
       setCountdown((p) => {
@@ -146,6 +288,8 @@ export default function LandingPage() {
   }, [])
 
   const pad = (n: number) => String(n).padStart(2, "0")
+
+  if (authLoading || role === 'admin' || role === 'seller') return null
 
   return (
     <div
@@ -186,26 +330,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <Link
-              href="/login"
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">person</span>
-            </Link>
-            <button
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4] relative"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-2 right-2 size-2 rounded-full" style={{ backgroundColor: "#E07A5F" }} />
-            </button>
-            <button
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: "var(--color-text-main)" }}
-            >
-              <span className="material-symbols-outlined">shopping_cart</span>
-            </button>
+            <HeaderUser />
+            
+            <CartDropdown />
           </div>
         </div>
 
@@ -233,49 +360,114 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      {/* ══ MAIN ══ */}
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6 space-y-12">
-        <section className="rounded-2xl overflow-hidden relative min-h-[400px] md:min-h-[500px] flex items-center group">
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-700"
-            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=1400&q=80')" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-          <div className="relative z-10 p-6 md:p-16 max-w-2xl flex flex-col gap-6 items-start">
-            <span
-              className="inline-block px-3 py-1 rounded-full text-white text-xs font-bold tracking-wider uppercase"
-              style={{ backgroundColor: "rgba(236,127,19,0.9)" }}
-            >
-              Hàng thủ công tuyển chọn
-            </span>
-            <h1 className="text-4xl md:text-6xl font-black text-white leading-[1.1]">
-              Khám phá<br />
-              <span style={{ color: "var(--color-primary)" }}>Tinh hoa Việt Nam</span>
-            </h1>
-            <p className="text-gray-200 text-lg md:text-xl font-medium max-w-lg">
-              Hàng thủ công chất lượng giao tận nhà. Từ lụa Hội An đến gốm Bát Tràng — hỗ trợ trực tiếp nghệ nhân địa phương.
-            </p>
-            <div className="flex flex-wrap gap-4 mt-2">
-              <button
-                className="h-12 px-8 rounded-lg text-white font-bold text-base transition-all flex items-center gap-2 shadow-lg"
-                style={{ backgroundColor: "var(--color-text-secondary)" }}
+      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-4 space-y-6">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
+          <div className="relative rounded-xl overflow-hidden" style={{ height: "300px" }}>
+            {HERO_SLIDES.map((slide, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 transition-opacity duration-700 ${heroSlide === i ? "opacity-100" : "opacity-0 pointer-events-none"}`}
               >
-                Xem bộ sưu tập
-                <span className="material-symbols-outlined text-sm">arrow_forward</span>
-              </button>
-              <button className="h-12 px-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-base transition-all border border-white/30 backdrop-blur-sm">
-                Xem người bán
-              </button>
+                <div
+                  className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[6000ms]"
+                  style={{
+                    backgroundImage: `url(${slide.image})`,
+                    transform: heroSlide === i ? "scale(1.05)" : "scale(1)",
+                  }}
+                />
+                <div className="absolute inset-0" style={{ backgroundColor: slide.overlay }} />
+                <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6 max-w-md">
+                  <span
+                    className="self-start px-2.5 py-0.5 rounded text-white text-[11px] font-bold uppercase tracking-wide mb-3"
+                    style={{ backgroundColor: slide.badgeColor }}
+                  >
+                    {slide.badge}
+                  </span>
+                  <h2 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1 whitespace-pre-line">
+                    {slide.title}
+                  </h2>
+                  <span className="text-lg font-bold mb-2" style={{ color: "#ffd580" }}>
+                    {slide.titleHighlight}
+                  </span>
+                  <p className="text-white/75 text-sm mb-5 leading-relaxed">{slide.desc}</p>
+                  <button
+                    className="self-start px-5 py-2 rounded-lg text-white font-bold text-sm flex items-center gap-1.5 transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: slide.btnColor }}
+                  >
+                    {slide.cta}
+                    <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>arrow_forward</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setHeroSlide((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_left</span>
+            </button>
+            <button
+              onClick={() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_right</span>
+            </button>
+
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+              {HERO_SLIDES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setHeroSlide(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${heroSlide === i ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
+                />
+              ))}
             </div>
           </div>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
-            <div className="w-8 h-1 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
-            <div className="w-2 h-1 bg-white/50 rounded-full" />
-            <div className="w-2 h-1 bg-white/50 rounded-full" />
+
+          <div className="hidden lg:flex flex-col gap-2">
+            {SIDE_BANNERS.map((b, i) => (
+              <a
+                key={i}
+                href="#"
+                className="relative flex-1 rounded-xl overflow-hidden cursor-pointer group block"
+              >
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                  style={{ backgroundImage: `url(${b.image})` }}
+                />
+                <div className="absolute inset-0" style={{ background: b.overlay }} />
+                <div className="relative z-10 h-full flex flex-col justify-end p-4">
+                  <span className="text-[11px] font-semibold text-white/75 mb-0.5">{b.sub}</span>
+                  <h3 className="font-black text-white text-base leading-tight whitespace-pre-line">{b.title}</h3>
+                </div>
+              </a>
+            ))}
           </div>
         </section>
 
-        {/* ── Categories ── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[
+            { icon: "category", label: "Đa dạng sản phẩm", sub: "Có hơn 20 loại sản phẩm" },
+            { icon: "verified_user", label: "Hàng chính hãng 100%", sub: "Cam kết hoàn tiền" },
+            { icon: "replay", label: "Đổi trả dễ dàng", sub: "Trong vòng 7 ngày" },
+            { icon: "support_agent", label: "Hỗ trợ 24/7", sub: "Khiếu nại nhanh chóng" },
+          ].map((item) => (
+            <div
+              key={item.icon}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-100"
+            >
+              <span className="material-symbols-outlined text-2xl shrink-0" style={{ color: "var(--color-primary)" }}>
+                {item.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate" style={{ color: "var(--color-text-main)" }}>{item.label}</p>
+                <p className="text-[11px] text-gray-400 truncate">{item.sub}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
@@ -321,8 +513,7 @@ export default function LandingPage() {
           )}
         </section>
 
-        {/* ── Flash Sale ── */}
-        <section className="bg-white rounded-2xl shadow-sm border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
+        <section className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
           <div
             className="border-b px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
             style={{ backgroundColor: "rgba(224,122,95,0.08)", borderColor: "rgba(224,122,95,0.1)" }}
@@ -355,7 +546,7 @@ export default function LandingPage() {
           <div className="p-6">
             {loadingFlash ? (
               <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2">
-                {Array.from({ length: 4 }).map((_, i) => <FlashCardSkeleton key={i} />)}
+                {Array.from({ length: 5 }).map((_, i) => <FlashCardSkeleton key={i} />)}
               </div>
             ) : flashProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-400">
@@ -363,77 +554,106 @@ export default function LandingPage() {
                 <p>Chưa có sản phẩm Flash Sale</p>
               </div>
             ) : (
-              <div className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
-                {flashProducts.map((product, i) => {
-                  const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
-                  const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
-                  const soldPercents = [75, 40, 90, 20, 60, 55, 35, 80]
-                  const soldPercent = soldPercents[i % soldPercents.length]
-                  const img = product.imageUrls?.[0]
+              <div className="relative mx-4">
+                <button
+                  onClick={() => scrollFlash("prev")}
+                  className={`carousel-arrow carousel-arrow--prev carousel-arrow--hint${!flashScroll.canPrev ? " carousel-arrow--hidden" : ""}`}
+                  aria-label="Cuộn về trước"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chevron_left</span>
+                </button>
 
-                  return (
-                    <div
-                      key={product.id}
-                      className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300"
-                      style={{ backgroundColor: "var(--color-background-light)" }}
-                    >
-                      <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
-                        -{discount}%
-                      </div>
-                      <div className="aspect-[4/3] overflow-hidden bg-gray-100">
-                        {img ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={img}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="material-symbols-outlined text-4xl text-gray-300">image</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-4 flex flex-col gap-2">
-                        <span
-                          className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
-                          style={{ backgroundColor: "rgba(236,127,19,0.15)", color: "var(--color-text-secondary)" }}
-                        >
-                          {product.shopName}
-                        </span>
-                        <h3 className="font-bold line-clamp-2 min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
-                          {product.name}
-                        </h3>
-                        <div className="flex items-center justify-between mt-1">
-                          <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 line-through">{formatPrice(originalPrice)}</span>
-                            <span className="text-lg font-bold" style={{ color: "#E07A5F" }}>
-                              {formatPrice(product.basePrice)}
-                            </span>
-                          </div>
-                          <button
-                            className="size-10 rounded-full text-white flex items-center justify-center shadow-md transition-colors"
-                            style={{ backgroundColor: "var(--color-text-secondary)" }}
+                <button
+                  onClick={() => scrollFlash("next")}
+                  className={`carousel-arrow carousel-arrow--next carousel-arrow--hint${!flashScroll.canNext ? " carousel-arrow--hidden" : ""}`}
+                  aria-label="Cuộn tiếp theo"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chevron_right</span>
+                </button>
+
+                <div ref={flashScrollRef} className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
+                  {flashProducts.map((product, i) => {
+                    const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
+                    const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
+                    const img = product.imageUrls?.[0]
+
+                    return (
+                      <Link
+                        key={product.id}
+                        href={`/products/${product.id}`}
+                        className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-[rgba(236,127,19,0.4)]"
+                        style={{ backgroundColor: "var(--color-background-light)" }}
+                      >
+                        <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
+                          -{discount}%
+                        </div>
+                        <div className="aspect-[4/3] overflow-hidden bg-gray-100">
+                          {img ? (
+                            <img
+                              src={img}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="material-symbols-outlined text-4xl text-gray-300">image</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4 flex flex-col gap-2">
+                          <span
+                            className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                            style={{ backgroundColor: "rgba(236,127,19,0.15)", color: "var(--color-text-secondary)" }}
                           >
-                            <span className="material-symbols-outlined text-xl">add_shopping_cart</span>
-                          </button>
+                            {product.shopName}
+                          </span>
+                          <h3 className="font-bold line-clamp-2 min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
+                            {product.name}
+                          </h3>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-400 line-through">{formatPrice(originalPrice)}</span>
+                              <span className="text-lg font-bold" style={{ color: "#E07A5F" }}>
+                                {formatPrice(product.basePrice)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
+                              className="size-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                              style={{
+                                backgroundColor: isFavorited(product.id) ? "rgba(239,68,68,0.1)" : "rgba(0,0,0,0.04)",
+                                color: isFavorited(product.id) ? "#ef4444" : "#9ca3af",
+                              }}
+                              aria-label={isFavorited(product.id) ? "Bỏ yêu thích" : "Yêu thích"}
+                            >
+                              <span
+                                className="material-symbols-outlined text-xl"
+                                style={{ fontVariationSettings: isFavorited(product.id) ? "'FILL' 1" : "'FILL' 0" }}
+                              >
+                                favorite
+                              </span>
+                            </button>
+                          </div>
+                          {product.soldCount > 0 && (
+                            <span className="text-[10px] font-semibold text-gray-400">
+                              Đã bán{" "}
+                              <span className="font-bold" style={{ color: "#E07A5F" }}>
+                                {product.soldCount >= 1000
+                                  ? `${(product.soldCount / 1000).toFixed(1)}k`
+                                  : product.soldCount}
+                              </span>
+                            </span>
+                          )}
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1 overflow-hidden">
-                          <div className="h-1.5 rounded-full" style={{ width: `${soldPercent}%`, backgroundColor: "#E07A5F" }} />
-                        </div>
-                        <span className="text-[10px] font-bold" style={{ color: "#E07A5F" }}>
-                          {soldPercent >= 90 ? "Sắp hết hàng" : "Đang bán chạy"}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
         </section>
 
-          {/* ── Featured Products ── */}
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
@@ -446,7 +666,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
-          ) : featuredProducts.length === 0 ? (
+          ) : uniqueFeaturedProducts.length === 0 ? (
             <div className="py-16 text-center text-gray-400">
               <span className="material-symbols-outlined text-5xl block mb-3">inventory_2</span>
               <p className="font-medium">Chưa có sản phẩm nào</p>
@@ -455,18 +675,13 @@ export default function LandingPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                {featuredProducts.map((product, i) => {
+                {uniqueFeaturedProducts.map((product, i) => {
                   const img = product.imageUrls?.[0]
-                  const tagColors = [
-                    "bg-green-100 text-green-800", "bg-purple-100 text-purple-800",
-                    "bg-amber-100 text-amber-800", "bg-orange-100 text-orange-800",
-                    "bg-blue-100 text-blue-800", "bg-pink-100 text-pink-800",
-                    "bg-teal-100 text-teal-800", "bg-rose-100 text-rose-800",
-                  ][i % 8]
                   return (
-                    <div
+                    <Link
                       key={product.id}
-                      className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] transition-all duration-300"
+                      href={`/products/${product.id}`}
+                      className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
                     >
                       <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">
                         {img ? (
@@ -480,63 +695,78 @@ export default function LandingPage() {
                             <span className="material-symbols-outlined text-5xl text-gray-300">image</span>
                           </div>
                         )}
+                        <button
+                          onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
+                          className="absolute top-2 right-2 size-8 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+                          style={{
+                            backgroundColor: isFavorited(product.id) ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.85)",
+                            color: isFavorited(product.id) ? "#ef4444" : "#9ca3af",
+                          }}
+                          aria-label={isFavorited(product.id) ? "Bỏ yêu thích" : "Yêu thích"}
+                        >
+                          <span
+                            className="material-symbols-outlined"
+                            style={{ fontSize: "18px", fontVariationSettings: isFavorited(product.id) ? "'FILL' 1" : "'FILL' 0" }}
+                          >
+                            favorite
+                          </span>
+                        </button>
                       </div>
                       <div className="p-4 flex flex-col flex-1">
-                        <div className="mb-2">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${tagColors}`}>
-                            {product.categoryName || product.shopName}
-                          </span>
-                        </div>
                         <h3 className="text-sm mb-1 line-clamp-2" style={{ color: "var(--color-text-main)" }}>
                           {product.name}
                         </h3>
-                        <div className="mt-auto pt-3">
+                        <div className="mt-auto pt-3 flex items-end justify-between gap-1">
                           <span className="font-bold text-sm" style={{ color: "var(--color-text-secondary)" }}>
                             {formatPrice(product.basePrice)}
                           </span>
+                          {product.soldCount > 0 && (
+                            <span className="text-[12px] text-gray-400 shrink-0">
+                              Đã bán {product.soldCount >= 1000
+                                ? `${(product.soldCount / 1000).toFixed(1)}k`
+                                : product.soldCount}
+                            </span>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>
-              <div className="flex justify-center mt-10">
-                <button
-                  className="px-8 py-3 bg-white border border-gray-200 font-bold rounded-lg transition-all shadow-sm hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                  style={{ color: "var(--color-text-main)" }}
-                >
-                  Xem thêm sản phẩm
-                </button>
-              </div>
+              {hasMore && (
+                <div className="flex flex-col items-center gap-2 mt-8">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 px-8 py-3 bg-white border border-gray-200 font-bold rounded-lg transition-all shadow-sm hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ color: "var(--color-text-main)" }}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <span className="size-4 border-2 border-gray-300 border-t-[var(--color-primary)] rounded-full animate-spin" />
+                        Đang tải...
+                      </>
+                    ) : !session ? (
+                      <>
+                        Đăng nhập để xem thêm
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">expand_more</span>
+                        Xem thêm sản phẩm
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </section>
 
-        {/* ── Trust indicators ── */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8 border-t border-gray-100">
-          {[
-            { icon: "verified", title: "Thương hiệu địa phương xác thực", desc: "Trực tiếp từ nghệ nhân Việt Nam" },
-            { icon: "local_shipping", title: "Giao hàng toàn quốc", desc: "Vận chuyển nhanh đến 63 tỉnh thành" },
-            { icon: "lock", title: "Thanh toán bảo mật", desc: "Momo, ZaloPay & thẻ ngân hàng" },
-          ].map((item) => (
-            <div key={item.icon} className="flex items-center gap-4 p-4 rounded-xl bg-white border border-dashed border-gray-200">
-              <div
-                className="size-12 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: "rgba(236,127,19,0.1)", color: "var(--color-primary)" }}
-              >
-                <span className="material-symbols-outlined text-2xl">{item.icon}</span>
-              </div>
-              <div>
-                <h4 className="font-bold" style={{ color: "var(--color-text-main)" }}>{item.title}</h4>
-                <p className="text-sm text-gray-500">{item.desc}</p>
-              </div>
-            </div>
-          ))}
-        </section>
       </main>
 
-      {/* ══ FOOTER ══ */}
-      <footer className="pt-16 pb-8 mt-auto text-white" style={{ backgroundColor: "var(--color-surface-dark)" }}>
+      <Separator className="bg-gray-200 mt-12" />
+      <footer className="pt-8 pb-8 mt-auto">
         <div className="max-w-[1440px] mx-auto px-4 md:px-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             <div className="flex flex-col gap-4">
@@ -568,7 +798,7 @@ export default function LandingPage() {
                 <input
                   type="email"
                   placeholder="Địa chỉ email của bạn"
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
+                  className="border-gray-400 border rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
                 />
                 <button className="text-white font-bold py-3 px-4 rounded-lg transition-colors" style={{ backgroundColor: "var(--color-primary)" }}>
                   Đăng ký
@@ -579,8 +809,8 @@ export default function LandingPage() {
           <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
             <p>© 2025 EcomViet Marketplace. Tất cả quyền được bảo lưu.</p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-white transition-colors">Chính sách bảo mật</a>
-              <a href="#" className="hover:text-white transition-colors">Điều khoản dịch vụ</a>
+              <a href="#" className="hover:text-black transition-colors">Chính sách bảo mật</a>
+              <a href="#" className="hover:text-black transition-colors">Điều khoản dịch vụ</a>
             </div>
           </div>
         </div>

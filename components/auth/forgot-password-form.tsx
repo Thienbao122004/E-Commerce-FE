@@ -84,7 +84,7 @@ export function ForgotPasswordForm() {
                             className="w-full h-12 px-4 rounded-lg border border-[#e7dbcf] dark:border-[#4a3b2f] bg-white dark:bg-surface-dark text-text-main dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
                             id="email"
                             name="email"
-                            placeholder="name@example.com"
+                            placeholder="Nhập vào địa chỉ email của bạn"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}

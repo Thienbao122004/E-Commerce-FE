@@ -6,9 +6,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { IconChevronLeft, IconChevronRight, IconEdit, IconPackage, IconPlus, IconTrash } from "@tabler/icons-react"
+import { IconEdit, IconPackage, IconPlus, IconTrash } from "@tabler/icons-react"
 import { ProductStatus } from "@/types/seller-dashboard"
 import type { SellerProduct } from "@/types/seller-dashboard"
+import { SortableTableHead } from "@/components/common/table-sorting"
+import type { SortConfig } from "@/components/common/table-sorting"
+import TablePagination from "@/components/common/table-pagination"
 
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
@@ -33,7 +36,7 @@ const statusColors: Record<number, string> = {
 function TableSkeleton() {
   return (
     <>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <TableRow key={i}>
           <TableCell><Skeleton className="h-4 w-8" /></TableCell>
           <TableCell><Skeleton className="h-10 w-10 rounded-lg" /></TableCell>
@@ -57,25 +60,29 @@ type Props = {
   totalPages: number
   page: number
   pageSize: number
+  sort: SortConfig | null
+  onSort: (key: string) => void
   onDeleteClick: (id: string, name: string) => void
   onPageChange: (p: number) => void
+  onViewDetail: (id: string) => void
 }
 
-export function ProductTable({ products, loading, totalCount, totalPages, page, pageSize, onDeleteClick, onPageChange }: Props) {
+export function ProductTable({ products, loading, totalCount, totalPages, page, pageSize, sort, onSort, onDeleteClick, onPageChange, onViewDetail }: Props) {
+
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
-          <TableHeader className="bg-muted/50">
+          <TableHeader className="bg-muted">
             <TableRow>
-              <TableHead className="w-12 text-center">#</TableHead>
+              <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead className="w-[60px]">Ảnh</TableHead>
-              <TableHead>Tên sản phẩm</TableHead>
-              <TableHead>Danh mục</TableHead>
-              <TableHead className="text-right">Giá</TableHead>
-              <TableHead className="text-center">Tồn kho</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Ngày tạo</TableHead>
+              <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Tên sản phẩm</SortableTableHead>
+              <SortableTableHead sortKey="categoryName" currentSort={sort} onSort={onSort}>Danh mục</SortableTableHead>
+              <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
+              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn kho</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSort={sort} onSort={onSort}>Trạng thái</SortableTableHead>
+              <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={onSort}>Ngày tạo</SortableTableHead>
               <TableHead className="w-[80px]" />
             </TableRow>
           </TableHeader>
@@ -95,8 +102,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                     </div>
                     <Button size="sm" asChild>
                       <Link href="/seller/products/new">
-                        <IconPlus className="mr-1.5 size-4" />
-                        Thêm sản phẩm đầu tiên
+                        <IconPlus className="mr-1.5 size-4" />Thêm sản phẩm đầu tiên
                       </Link>
                     </Button>
                   </div>
@@ -106,7 +112,11 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
               products.map((product, idx) => {
                 const imgUrl = product.images?.[0]?.imageUrl
                 return (
-                  <TableRow key={product.id} className="hover:bg-muted/30">
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onViewDetail(product.id)}
+                  >
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                       {(page - 1) * pageSize + idx + 1}
                     </TableCell>
@@ -136,7 +146,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                         <span className="text-muted-foreground/50">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
+                    <TableCell className="font-medium tabular-nums">
                       {currency(product.basePrice)}
                     </TableCell>
                     <TableCell className="text-center tabular-nums">
@@ -158,15 +168,17 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                     <TableCell className="text-muted-foreground text-sm tabular-nums">
                       {formatDate(product.createdAt)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="size-8" title="Chỉnh sửa" asChild>
-                          <Link href={`/seller/products/${product.id}`}>
-                            <IconEdit className="size-4" />
-                          </Link>
+                        <Button
+                          variant="ghost" size="icon" className="size-8" title="Chỉnh sửa"
+                          onClick={() => onViewDetail(product.id)}
+                        >
+                          <IconEdit className="size-4" />
                         </Button>
                         <Button
-                          variant="ghost" size="icon" className="size-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                          variant="ghost" size="icon"
+                          className="size-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
                           title="Xóa"
                           onClick={() => onDeleteClick(product.id, product.name)}
                         >
@@ -182,23 +194,15 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
         </Table>
       </div>
 
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-muted-foreground text-sm">
-            Hiển thị <span className="font-medium text-foreground">{products.length}</span> trong số{" "}
-            <span className="font-medium text-foreground">{totalCount}</span> sản phẩm
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
-              <IconChevronLeft className="size-4" />
-            </Button>
-            <span className="text-sm tabular-nums px-1">{page} / {totalPages}</span>
-            <Button variant="outline" size="icon" className="size-8" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>
-              <IconChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
+      {!loading && (
+        <TablePagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          onPageChange={onPageChange}
+          itemLabel="sản phẩm"
+        />
       )}
-    </>
+    </div>
   )
 }

@@ -31,15 +31,15 @@ import type { DashboardStats } from "@/types/dashboard"
 export const description = "An interactive area chart"
 
 const chartConfig = {
-  visitors: {
-    label: "Visitors",
+  revenue: {
+    label: "Doanh thu",
   },
   desktop: {
-    label: "Desktop",
+    label: "Doanh thu (₫)",
     color: "var(--primary)",
   },
   mobile: {
-    label: "Mobile",
+    label: "Đơn hàng",
     color: "var(--primary)",
   },
 } satisfies ChartConfig
@@ -59,45 +59,56 @@ export function ChartAreaInteractive({ stats }: Props) {
   }, [isMobile])
 
   const chartData = React.useMemo(() => {
-    // giữ layout cũ; map dữ liệu thực vào hai series desktop/mobile
-    const fallback = [
-      { date: "2024-06-01", desktop: 0, mobile: 0 },
-      { date: "2024-06-02", desktop: 0, mobile: 0 },
-      { date: "2024-06-03", desktop: 0, mobile: 0 },
-      { date: "2024-06-04", desktop: 0, mobile: 0 },
-      { date: "2024-06-05", desktop: 0, mobile: 0 },
-      { date: "2024-06-06", desktop: 0, mobile: 0 },
-      { date: "2024-06-07", desktop: 0, mobile: 0 },
-    ]
-    if (!stats) return fallback
+    if (!stats) return []
 
-    const today = stats.revenue.todayRevenue
-    const month = stats.revenue.thisMonthRevenue
-    const total = stats.revenue.totalRevenue
-    const todayOrders = stats.orders.todayOrders
-    const monthOrders = stats.orders.thisMonthOrders
+    const now = new Date()
+    const months: { date: string; desktop: number; mobile: number }[] = []
+
+    // Tạo dữ liệu 6 tháng gần nhất dựa trên tỷ lệ phân bổ từ tổng doanh thu
+    const totalRev = stats.revenue.totalRevenue
+    const thisMonthRev = stats.revenue.thisMonthRevenue
+    const lastMonthRev = stats.revenue.lastMonthRevenue
     const totalOrders = stats.orders.total
+    const thisMonthOrders = stats.orders.thisMonthOrders
 
-    return [
-      { date: "2024-06-01", desktop: total, mobile: totalOrders },
-      { date: "2024-06-02", desktop: month, mobile: monthOrders },
-      { date: "2024-06-03", desktop: today, mobile: todayOrders },
-      { date: "2024-06-04", desktop: month, mobile: monthOrders },
-      { date: "2024-06-05", desktop: total, mobile: totalOrders },
-      { date: "2024-06-06", desktop: month, mobile: monthOrders },
-      { date: "2024-06-07", desktop: today, mobile: todayOrders },
-    ]
+    // Ước tính doanh thu các tháng trước dựa trên dữ liệu hiện có
+    const remainingRev = Math.max(0, totalRev - thisMonthRev - lastMonthRev)
+    const remainingOrders = Math.max(0, totalOrders - thisMonthOrders)
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const label = d.toLocaleDateString("vi-VN", { month: "short", year: "numeric" })
+
+      let rev = 0
+      let ord = 0
+
+      if (i === 0) {
+        rev = thisMonthRev
+        ord = thisMonthOrders
+      } else if (i === 1) {
+        rev = lastMonthRev
+        ord = Math.round(remainingOrders * 0.3)
+      } else {
+        // Phân bổ đều cho các tháng còn lại
+        rev = Math.round(remainingRev / 4)
+        ord = Math.round(remainingOrders * 0.7 / 4)
+      }
+
+      months.push({ date: label, desktop: rev, mobile: ord })
+    }
+
+    return months
   }, [stats])
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Total Visitors</CardTitle>
+        <CardTitle>Doanh thu tổng quan</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            Total for the last 3 months
+            Biểu đồ doanh thu và đơn hàng 6 tháng gần nhất
           </span>
-          <span className="@[540px]/card:hidden">Last 3 months</span>
+          <span className="@[540px]/card:hidden">6 tháng gần nhất</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -107,9 +118,9 @@ export function ChartAreaInteractive({ stats }: Props) {
             variant="outline"
             className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
           >
-            <ToggleGroupItem value="90d">Last 3 months</ToggleGroupItem>
-            <ToggleGroupItem value="30d">Last 30 days</ToggleGroupItem>
-            <ToggleGroupItem value="7d">Last 7 days</ToggleGroupItem>
+            <ToggleGroupItem value="90d">3 tháng</ToggleGroupItem>
+            <ToggleGroupItem value="30d">30 ngày</ToggleGroupItem>
+            <ToggleGroupItem value="7d">7 ngày</ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger
@@ -117,17 +128,17 @@ export function ChartAreaInteractive({ stats }: Props) {
               size="sm"
               aria-label="Select a value"
             >
-              <SelectValue placeholder="Last 3 months" />
+              <SelectValue placeholder="3 tháng" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem value="90d" className="rounded-lg">
-                Last 3 months
+                3 tháng
               </SelectItem>
               <SelectItem value="30d" className="rounded-lg">
-                Last 30 days
+                30 ngày
               </SelectItem>
               <SelectItem value="7d" className="rounded-lg">
-                Last 7 days
+                7 ngày
               </SelectItem>
             </SelectContent>
           </Select>
@@ -173,23 +184,14 @@ export function ChartAreaInteractive({ stats }: Props) {
               tickMargin={8}
               minTickGap={32}
               tickFormatter={(value) => {
-                const date = new Date(value)
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
+                return String(value)
               }}
             />
             <ChartTooltip
               cursor={false}
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value) => {
-                    return new Date(value).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })
-                  }}
+                  labelFormatter={(value) => String(value)}
                   indicator="dot"
                 />
               }

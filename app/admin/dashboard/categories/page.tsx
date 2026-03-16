@@ -281,14 +281,14 @@ export default function CategoriesPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-20" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : categories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                       <IconFolderOpen className="mx-auto mb-2 size-8 opacity-50" />
                       Chưa có danh mục nào.
                     </TableCell>

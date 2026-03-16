@@ -11,10 +11,11 @@ export default function AuthCallbackPage() {
 
             const code = params.get('code')
             const error = params.get('error') || hashParams.get('error')
+            const errorDescription = params.get('error_description') || hashParams.get('error_description')
 
             if (error) {
                 if (window.opener) {
-                    window.opener.postMessage({ type: 'supabase:auth:error', error }, window.location.origin)
+                    window.opener.postMessage({ type: 'supabase:auth:error', error, errorDescription }, window.location.origin)
                     window.close()
                 }
                 return

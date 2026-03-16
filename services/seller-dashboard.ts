@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { api } from "@/lib/api-client"
 import type {
   SellerShopResponse,
@@ -42,13 +43,16 @@ export function createWithdrawal(dto: CreateWithdrawalPayload) {
 
 // ====== Products ======
 
-export function fetchMyProducts(page = 1, pageSize = 20, status?: number) {
+export function fetchMyProducts(page = 1, pageSize = 10, status?: number, search?: string) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
   })
   if (status !== undefined && status !== null) {
     params.set("status", String(status))
+  }
+  if (search && search.trim()) {
+    params.set("search", search.trim())
   }
   return api.get<SellerProductsResponse>(`/api/seller/products?${params}`)
 }

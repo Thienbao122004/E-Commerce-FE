@@ -44,7 +44,7 @@ function getInitials(name: string | null | undefined, email: string | null | und
 
 export function NavUser() {
   const { isMobile } = useSidebar()
-  const { user, profile, role, signOut } = useAuth()
+  const { user, profile, role, avatarUrl, signOut } = useAuth()
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Người dùng'
   const displayEmail = user?.email || ''
@@ -70,7 +70,7 @@ export function NavUser() {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user?.user_metadata?.avatar_url} alt={displayName} />
+                <AvatarImage src={avatarUrl} alt={displayName} />
                 <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">

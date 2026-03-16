@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { RegisterForm } from '@/components/auth/register-form'
 
 export default function RegisterPage() {
@@ -24,9 +25,18 @@ export default function RegisterPage() {
             <span className="material-symbols-outlined text-primary text-3xl">manufacturing</span>
             <span className="text-xl font-bold tracking-tight text-text-main dark:text-white">Đăng ký</span>
           </div>
-          <a className="text-sm font-medium text-text-secondary hover:text-primary transition-colors hidden sm:block" href="#">
-            Bạn cần giúp đỡ?
-          </a>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-base" style={{ fontSize: '18px' }}>arrow_back</span>
+              <span>Trang chủ</span>
+            </Link>
+            <a className="text-sm font-medium text-text-secondary hover:text-primary transition-colors hidden sm:block" href="#">
+              Bạn cần giúp đỡ?
+            </a>
+          </div>
         </header>
 
         <main className="flex-1 flex items-center justify-center p-6 sm:p-12 lg:p-18">

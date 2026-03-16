@@ -5,6 +5,7 @@ export interface ProductVariantStorefront {
   variantName: string
   price: number | null
   isActive: boolean
+  stockQuantity: number
 }
 
 /** Dùng cho danh sách sản phẩm */
@@ -20,6 +21,7 @@ export interface StorefrontProduct {
   categorySlug: string | null
   imageUrls: string[]
   createdAt: string
+  soldCount: number
 }
 
 /** Dùng cho trang chi tiết sản phẩm */
@@ -28,6 +30,7 @@ export interface StorefrontProductDetail extends StorefrontProduct {
   averageRating: number
   reviewCount: number
   variants: ProductVariantStorefront[]
+  totalStock: number
 }
 
 export interface StorefrontProductsResponse {
