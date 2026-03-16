@@ -78,7 +78,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Loading Skeleton */}
         {loading && (
           <div className="grid divide-y">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -97,7 +96,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
           </div>
         )}
 
-        {/* Empty State */}
         {!loading && withdrawals.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
             <div className="flex size-14 items-center justify-center rounded-full bg-muted">

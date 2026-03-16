@@ -15,6 +15,7 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { getNextSort } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 export default function SellerOrdersPage() {
   const {
@@ -80,16 +81,12 @@ export default function SellerOrdersPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-5 lg:p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Quản lý đơn hàng</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Theo dõi và quản lý đơn hàng của cửa hàng</p>
-        </div>
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <SetHeaderActions>
         <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-          <IconRefresh className={`mr-1.5 size-4 ${loading ? "animate-spin" : ""}`} />Làm mới
+          <IconRefresh className="mr-1.5 size-4" />Làm mới
         </Button>
-      </div>
+      </SetHeaderActions>
 
       <OrderStats orders={orders} totalCount={totalCount} loading={loading} />
 

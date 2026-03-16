@@ -14,15 +14,6 @@ export default function SellerProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Hồ sơ cửa hàng</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Quản lý thông tin và hình ảnh thương hiệu của bạn.
-        </p>
-      </div>
-
-      {/* Cover + Avatar */}
       <ProfileCover
         shop={shop}
         loading={loading}

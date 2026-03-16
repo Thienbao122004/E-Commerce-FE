@@ -33,7 +33,7 @@ export function ReviewOverview({ reviews, pendingReplyCount }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 h-full flex flex-col !justify-center">
           <p className="text-xs text-muted-foreground font-medium mb-2">Điểm trung bình</p>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold tabular-nums text-yellow-500">
@@ -69,7 +69,7 @@ export function ReviewOverview({ reviews, pendingReplyCount }: Props) {
       </Card>
 
       <Card className={pendingReplyCount > 0 ? "border-orange-200 dark:border-orange-800" : ""}>
-        <CardContent className="p-4">
+        <CardContent className="p-4 h-full flex flex-col justify-center">
           <p className="text-xs font-medium mb-1 text-orange-600">Chờ phản hồi</p>
           <p className="text-3xl font-bold tabular-nums text-orange-500">{pendingReplyCount}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">đánh giá chưa trả lời</p>

@@ -47,14 +47,8 @@ export default function SellerReviewsPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-5 lg:p-5">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight">Đánh giá & Nhận xét</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Quản lý và phản hồi đánh giá từ khách hàng</p>
-      </div>
-
+    <div className="flex flex-1 flex-col gap-4 p-4">
       <ReviewOverview reviews={MOCK_REVIEWS} pendingReplyCount={needReply} />
-
       <ReviewFilters
         search={search}
         filterRating={filterRating}
