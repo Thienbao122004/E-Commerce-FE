@@ -104,3 +104,43 @@ export type DisputeResponse = {
   message?: string | null
   dispute?: AdminDispute
 }
+
+// ---------- Seller Dispute Types ----------
+export type SellerDispute = {
+  id: string
+  orderId: string
+  customerId: string
+  customerName: string
+  shopId: string
+  type: number
+  typeName: string
+  status: number
+  statusName: string
+  title: string
+  reason: string
+  requestedAmount: number
+  approvedAmount: number | null
+  resolution: string | null
+  evidenceUrls: string[]
+  sellerEvidenceUrls: string[]
+  sellerResponse: string | null
+  sellerRespondedAt: string | null
+  createdAt: string
+  updatedAt: string
+  canRespond: boolean
+}
+
+export type SellerDisputeListResponse = {
+  success: boolean
+  message?: string | null
+  disputes: SellerDispute[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type SellerDisputeResponse = {
+  success: boolean
+  message?: string | null
+  dispute?: SellerDispute
+}
