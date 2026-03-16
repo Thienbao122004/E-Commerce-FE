@@ -40,10 +40,9 @@ export function HeaderUser() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-2 px-2 py-1 rounded-full transition-colors hover:bg-[#f0ebe4] max-w-[180px]"
+            className="flex items-center gap-2 px-2 py-1 rounded-full transition-colors hover:bg-[#f0ebe4] max-w-[180px] focus:outline-none"
           >
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={avatarUrl}
                 alt={displayName}

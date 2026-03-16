@@ -57,9 +57,8 @@ export function ProfileInfoCards({ shop, loading }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Status Card */}
       <Card className="shadow-sm">
-        <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
+        <CardHeader className="border-b">
           <CardTitle className="text-sm flex items-center gap-2">
             <div className="flex size-7 items-center justify-center rounded-md bg-muted">
               <IconShieldCheck className="size-3.5 text-muted-foreground" />
@@ -67,7 +66,7 @@ export function ProfileInfoCards({ shop, loading }: Props) {
             Trạng thái
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 lg:p-5 grid gap-4">
+        <CardContent className="grid gap-4">
           <div>
             <p className="text-xs text-muted-foreground mb-2">Xác thực thương hiệu</p>
             <Badge className={`text-xs gap-1 ${VerificationStatusColors[shop.verificationStatus] ?? ""}`}>
@@ -85,8 +84,8 @@ export function ProfileInfoCards({ shop, loading }: Props) {
       </Card>
 
       {/* System Info Card */}
-      <Card className="shadow-sm">
-        <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
+      <Card>
+        <CardHeader className="border-b">
           <CardTitle className="text-sm flex items-center gap-2">
             <div className="flex size-7 items-center justify-center rounded-md bg-muted">
               <IconHash className="size-3.5 text-muted-foreground" />
@@ -94,7 +93,7 @@ export function ProfileInfoCards({ shop, loading }: Props) {
             Thông tin hệ thống
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 lg:p-5 grid gap-3.5">
+        <CardContent className="grid gap-3.5">
           <div>
             <p className="text-xs text-muted-foreground mb-1">ID cửa hàng</p>
             <div className="flex items-center gap-1.5">

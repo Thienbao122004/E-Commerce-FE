@@ -441,13 +441,13 @@ export default function AddressPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6" style={{ borderColor: '#e5ded6' }}>
+      <div className="bg-white rounded-[5px] shadow-sm border p-6" style={{ borderColor: '#e5ded6' }}>
         <div className="animate-pulse space-y-4">
           <div className="h-6 w-40 bg-gray-200 rounded" />
           <div className="h-4 w-60 bg-gray-200 rounded" />
           <Separator />
           {[...Array(2)].map((_, i) => (
-            <div key={i} className="border rounded-lg p-4 space-y-2">
+            <div key={i} className="border rounded-[5px] p-4 space-y-2">
               <div className="h-4 w-48 bg-gray-200 rounded" />
               <div className="h-3 w-80 bg-gray-200 rounded" />
               <div className="h-3 w-64 bg-gray-200 rounded" />
@@ -495,7 +495,7 @@ export default function AddressPage() {
               {addresses.map((addr) => (
                 <div
                   key={addr.id}
-                  className="border rounded-lg p-4 transition-colors hover:bg-gray-50/50"
+                  className="border rounded-[5px] p-4 transition-colors hover:bg-gray-50/50"
                   style={{ borderColor: addr.isDefault ? 'var(--color-primary)' : '#e5ded6' }}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -565,7 +565,6 @@ export default function AddressPage() {
         </div>
       </div>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -573,7 +572,6 @@ export default function AddressPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Name & Phone */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="addr-fullName" className="text-sm">

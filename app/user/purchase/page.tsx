@@ -52,7 +52,7 @@ export default function PurchasePage() {
     : orders
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
+    <div className="bg-white rounded-[5px] shadow-sm border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
       <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: '#e5ded6' }}>
         <span className="material-symbols-outlined text-muted-foreground text-[20px]">search</span>
         <input
@@ -65,7 +65,7 @@ export default function PurchasePage() {
         />
       </div>
 
-      <div className="flex overflow-x-auto">
+      <div className="flex justify-between overflow-x-auto">
         {STATUS_TABS.map((tab) => {
           const isActive = activeStatus === tab.value
           return (
@@ -87,7 +87,6 @@ export default function PurchasePage() {
           )
         })}
       </div>
-
       {loading ? (
         <div className="flex justify-center py-20">
           <div
@@ -96,7 +95,7 @@ export default function PurchasePage() {
           />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-lg border py-20 text-center" style={{ borderColor: '#e5ded6' }}>
+        <div className="bg-white border-t py-20 text-center" style={{ borderColor: '#e5ded6' }}>
           <span className="material-symbols-outlined text-[64px] text-muted-foreground block">
             receipt_long
           </span>
