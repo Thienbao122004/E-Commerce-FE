@@ -18,7 +18,6 @@ import {
   IconPalette,
   IconAlertCircle,
   IconPencil,
-  IconInfoCircle,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -35,6 +34,7 @@ import {
   aiSuggestMaterials,
   aiSendFeedback,
 } from "@/services/ai-seller"
+import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
 import type {
   CategorySuggestion,
   TagSuggestion,
@@ -111,6 +111,8 @@ export default function CreateProductPage() {
   const [catSuggestions, setCatSuggestions] = React.useState<CategorySuggestion[]>([])
   const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
   const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
+  const [allCategories, setAllCategories] = React.useState<StorefrontCategory[]>([])
+  const [manualCatQuery, setManualCatQuery] = React.useState("")
 
   const [catLogId, setCatLogId] = React.useState<string | null>(null)
   const [tagLogId, setTagLogId] = React.useState<string | null>(null)
@@ -124,6 +126,61 @@ export default function CreateProductPage() {
   const [showCustomTag, setShowCustomTag] = React.useState(false)
 
   const hasInput = name.trim().length > 0 || description.trim().length > 0
+  const aiKeyword = React.useMemo(
+    () => `${name.trim()}|${description.trim()}`,
+    [name, description]
+  )
+  const categoryReqRef = React.useRef(0)
+  const tagMatReqRef = React.useRef(0)
+
+  const manualCategoryOptions = React.useMemo(() => {
+    const q = manualCatQuery.trim().toLowerCase()
+    if (!q) return allCategories.slice(0, 8)
+    return allCategories
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 8)
+  }, [allCategories, manualCatQuery])
+
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await getCategories({ page: 1, pageSize: 300 })
+        if (!mounted || !res.success) return
+        setAllCategories(res.categories ?? [])
+      } catch {
+        // non-blocking
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // ── 2. suggest-tags + suggest-materials when category changes ──
+  const fetchTagsAndMaterials = React.useCallback(
+    async (categoryId: number) => {
+      if (!name.trim() && !description.trim()) return
+      const reqId = ++tagMatReqRef.current
+      setTagLoading(true)
+      try {
+        const [tagsRes, matsRes] = await Promise.all([
+          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId }),
+          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId }),
+        ])
+        if (reqId !== tagMatReqRef.current) return
+        setTagSuggestions(tagsRes.suggestions ?? [])
+        setMatSuggestions(matsRes.suggestions ?? [])
+        if (tagsRes.logId) setTagLogId(tagsRes.logId)
+      } catch {
+        // silent fail for tags/materials
+      } finally {
+        if (reqId !== tagMatReqRef.current) return
+        setTagLoading(false)
+      }
+    },
+    [name, description]
+  )
 
   // ── 1. suggest-category (debounced on name/description change) ──
   const aiCatTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -137,6 +194,7 @@ export default function CreateProductPage() {
     }
     clearTimeout(aiCatTimer.current)
     aiCatTimer.current = setTimeout(async () => {
+      const reqId = ++categoryReqRef.current
       setCatLoading(true)
       setCatError(false)
       try {
@@ -145,6 +203,7 @@ export default function CreateProductPage() {
           description: description.trim(),
           imageUrls: imageUrls.filter((u) => u.startsWith("http")),
         })
+        if (reqId !== categoryReqRef.current) return
         setCatSuggestions(res.suggestions ?? [])
         setCatLogId(res.logId ?? null)
         // Auto-select top suggestion if nothing chosen yet
@@ -153,37 +212,26 @@ export default function CreateProductPage() {
           fetchTagsAndMaterials(res.suggestions[0].categoryId)
         }
       } catch {
+        if (reqId !== categoryReqRef.current) return
         setCatError(true)
       } finally {
+        if (reqId !== categoryReqRef.current) return
         setCatLoading(false)
       }
     }, 900)
 
     return () => clearTimeout(aiCatTimer.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, description])
+  }, [aiKeyword, imageUrls, selCategory, name, description, fetchTagsAndMaterials])
 
-  // ── 2. suggest-tags + suggest-materials when category changes ──
-  const fetchTagsAndMaterials = React.useCallback(
-    async (categoryId: number) => {
-      if (!name.trim() && !description.trim()) return
-      setTagLoading(true)
-      try {
-        const [tagsRes, matsRes] = await Promise.all([
-          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId }),
-          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId }),
-        ])
-        setTagSuggestions(tagsRes.suggestions ?? [])
-        setMatSuggestions(matsRes.suggestions ?? [])
-        if (tagsRes.logId) setTagLogId(tagsRes.logId)
-      } catch {
-        // silent fail for tags/materials
-      } finally {
-        setTagLoading(false)
-      }
-    },
-    [name, description]
-  )
+  const aiTagTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  React.useEffect(() => {
+    if (!selCategory || !hasInput) return
+    clearTimeout(aiTagTimer.current)
+    aiTagTimer.current = setTimeout(() => {
+      fetchTagsAndMaterials(selCategory.categoryId)
+    }, 700)
+    return () => clearTimeout(aiTagTimer.current)
+  }, [aiKeyword, selCategory, fetchTagsAndMaterials, hasInput])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
     setSelCategory(cat)
@@ -554,7 +602,7 @@ export default function CreateProductPage() {
                             }`}
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-[25px] font-semibold text-[#2d3a25]">{cat.categoryName}</p>
+                              <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
                               <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -565,6 +613,49 @@ export default function CreateProductPage() {
                           </button>
                         )
                       })}
+
+                      <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
+                        <p className="mb-2 text-[11px] text-[#6d7f62]">
+                          Không đúng gợi ý? Chọn danh mục thủ công:
+                        </p>
+                        <Input
+                          value={manualCatQuery}
+                          onChange={(e) => setManualCatQuery(e.target.value)}
+                          placeholder="Tìm danh mục..."
+                          className="h-8 text-xs bg-white"
+                        />
+                        <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                          {manualCategoryOptions.map((c) => {
+                            const active = selCategory?.categoryId === c.id
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() =>
+                                  handleSelectCategory({
+                                    categoryId: c.id,
+                                    categoryName: c.name,
+                                    categoryPath: c.name,
+                                    confidenceScore: 1,
+                                  })
+                                }
+                                className={`w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
+                                  active
+                                    ? "bg-[#e9f0e2] text-[#2f3f27] font-medium"
+                                    : "hover:bg-[#f2f6ee] text-[#5f7253]"
+                                }`}
+                              >
+                                {c.name}
+                              </button>
+                            )
+                          })}
+                          {manualCategoryOptions.length === 0 && (
+                            <p className="px-2 py-1 text-[11px] italic text-[#8a9a80]">
+                              Không tìm thấy danh mục phù hợp
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
