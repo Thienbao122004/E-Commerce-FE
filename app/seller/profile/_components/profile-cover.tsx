@@ -137,7 +137,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
   return (
     <>
       <div className="rounded-xl border overflow-hidden bg-card shadow-sm">
-        {/* Cover Image */}
         <div className="relative h-48 group cursor-pointer" onClick={handleOpenCoverDialog}>
           {coverUrl ? (
             <img
@@ -152,7 +151,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               <div className="absolute inset-0 opacity-15 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_20px)]" />
             </div>
           )}
-          {/* Cover overlay on hover */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-white text-sm font-medium bg-black/50 rounded-lg px-4 py-2">
               <IconPhoto className="size-4" />
@@ -161,10 +159,8 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
           </div>
         </div>
 
-        {/* Profile Info Bar */}
         <div className="relative px-5 lg:px-6 pb-5">
           <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 -mt-10">
-            {/* Avatar */}
             <div className="relative shrink-0 group/avatar">
               <div
                 className="size-24 rounded-full border-4 border-background overflow-hidden bg-muted shadow-lg cursor-pointer"
@@ -177,7 +173,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                     {shop.name.charAt(0).toUpperCase()}
                   </div>
                 )}
-                {/* Avatar hover overlay */}
                 <div className="absolute inset-0 rounded-full bg-black/0 group-hover/avatar:bg-black/40 transition-all flex items-center justify-center">
                   <IconCamera className="size-5 text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity" />
                 </div>
@@ -185,7 +180,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               <span className="absolute bottom-1.5 right-1.5 size-4 rounded-full border-2 border-background bg-green-500 shadow-sm" />
             </div>
 
-            {/* Name & badges */}
             <div className="flex-1 min-w-0 text-center sm:text-left pt-5">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
                 <h1 className="text-xl font-bold truncate">{shop.name}</h1>
@@ -201,17 +195,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                   </Badge>
                 )}
               </div>
-
-              {shop.description && (
-                <p className="mt-1 text-sm text-muted-foreground italic line-clamp-1">
-                  &ldquo;{shop.description}&rdquo;
-                </p>
-              )}
-
               <div className="mt-1.5 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <Badge variant="outline" className={`text-xs ${ShopStatusColors[shop.status] ?? ""}`}>
-                  {ShopStatusLabels[shop.status] ?? "—"}
-                </Badge>
                 <span className="text-xs text-muted-foreground">
                   Tham gia từ{" "}
                   {new Date(shop.createdAt).toLocaleDateString("vi-VN", {
@@ -222,7 +206,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               </div>
             </div>
 
-            {/* View shop button */}
             <div className="pb-1">
               <Button variant="outline" size="sm" className="shrink-0 text-xs" asChild>
                 <a href={`/shop/${shop.slug}`} target="_blank" rel="noopener noreferrer">

@@ -337,7 +337,6 @@ export default function CreateProductPage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-3 p-3 lg:gap-4 lg:p-5">
-
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Link href="/seller/products" className="hover:text-foreground transition-colors">

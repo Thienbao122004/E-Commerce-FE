@@ -24,7 +24,7 @@ function FormSkeleton() {
       <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
         <Skeleton className="h-5 w-36" />
       </CardHeader>
-      <CardContent className="p-4 lg:p-5 grid gap-5">
+      <CardContent className="grid gap-5">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="grid gap-2">
             <Skeleton className="h-3.5 w-24" />
@@ -64,7 +64,7 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
 
   return (
     <Card className="shadow-sm">
-      <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
+      <CardHeader className="border-b">
         <CardTitle className="text-sm flex items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-md bg-muted">
             <IconInfoCircle className="size-3.5 text-muted-foreground" />
@@ -72,7 +72,7 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
           Thông tin cơ bản
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 lg:p-5">
+      <CardContent className="">
         <form onSubmit={handleSubmit} className="grid gap-5">
           <div className="grid gap-2">
             <Label htmlFor="shop-name" className="text-xs font-medium">
@@ -106,15 +106,7 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
             </p>
           </div>
 
-          <div className="grid gap-2">
-            <Label className="text-xs font-medium">Slug (đường dẫn)</Label>
-            <Input value={shop?.slug ?? ""} disabled className="text-sm bg-muted/50" />
-            <p className="text-xs text-muted-foreground">
-              Slug được tạo tự động và không thể thay đổi
-            </p>
-          </div>
-
-          <div className="flex justify-end pt-3 border-t">
+          <div className="flex justify-end">
             <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
               {saving ? (
                 <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>

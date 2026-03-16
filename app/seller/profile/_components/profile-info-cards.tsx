@@ -57,33 +57,6 @@ export function ProfileInfoCards({ shop, loading }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="shadow-sm">
-        <CardHeader className="border-b">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-muted">
-              <IconShieldCheck className="size-3.5 text-muted-foreground" />
-            </div>
-            Trạng thái
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Xác thực thương hiệu</p>
-            <Badge className={`text-xs gap-1 ${VerificationStatusColors[shop.verificationStatus] ?? ""}`}>
-              {isVerified && <IconCircleCheckFilled className="size-3" />}
-              {VerificationStatusLabels[shop.verificationStatus] ?? "Không rõ"}
-            </Badge>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Trạng thái cửa hàng</p>
-            <Badge variant="outline" className={`text-xs ${ShopStatusColors[shop.status] ?? ""}`}>
-              {ShopStatusLabels[shop.status] ?? "Không rõ"}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* System Info Card */}
       <Card>
         <CardHeader className="border-b">
           <CardTitle className="text-sm flex items-center gap-2">
