@@ -218,7 +218,7 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <span className="font-medium line-clamp-1 max-w-[250px]">{product.name}</span>
+                        <span className="font-medium max-w-[250px]">{product.name}</span>
                         {product.categoryName && <p className="text-muted-foreground text-xs mt-0.5">{product.categoryName}</p>}
                       </div>
                     </TableCell>

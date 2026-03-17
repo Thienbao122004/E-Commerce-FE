@@ -131,7 +131,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                     </TableCell>
                     <TableCell>
                       <div className="max-w-[200px]">
-                        <p className="font-medium line-clamp-1">{product.name}</p>
+                        <p className="font-medium">{product.name}</p>
                         {product.description && (
                           <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
                         )}

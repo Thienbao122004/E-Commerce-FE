@@ -1,7 +1,8 @@
 "use client"
 
+import { IconMessageReply, IconStarFilled } from "@tabler/icons-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { IconStarFilled } from "@tabler/icons-react"
+import { StatsCard, StatsGrid } from "@/components/common/stats-card"
 import type { Review } from "./review-data"
 
 function StarRating({ rating }: { rating: number }) {
@@ -31,9 +32,10 @@ export function ReviewOverview({ reviews, pendingReplyCount }: Props) {
   }))
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <StatsGrid cols={4} gap="sm">
+      {/* Average rating — custom content */}
       <Card>
-        <CardContent className="p-4 h-full flex flex-col !justify-center">
+        <CardContent className="p-4 h-full flex flex-col justify-center">
           <p className="text-xs text-muted-foreground font-medium mb-2">Điểm trung bình</p>
           <div className="flex items-end gap-2">
             <span className="text-3xl font-bold tabular-nums text-yellow-500">
@@ -47,6 +49,7 @@ export function ReviewOverview({ reviews, pendingReplyCount }: Props) {
         </CardContent>
       </Card>
 
+      {/* Rating distribution — custom content */}
       <Card className="col-span-1 md:col-span-2">
         <CardContent className="p-4">
           <p className="text-xs text-muted-foreground font-medium mb-2">Phân bố đánh giá</p>
@@ -68,13 +71,16 @@ export function ReviewOverview({ reviews, pendingReplyCount }: Props) {
         </CardContent>
       </Card>
 
-      <Card className={pendingReplyCount > 0 ? "border-orange-200 dark:border-orange-800" : ""}>
-        <CardContent className="p-4 h-full flex flex-col justify-center">
-          <p className="text-xs font-medium mb-1 text-orange-600">Chờ phản hồi</p>
-          <p className="text-3xl font-bold tabular-nums text-orange-500">{pendingReplyCount}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">đánh giá chưa trả lời</p>
-        </CardContent>
-      </Card>
-    </div>
+      <StatsCard
+        label="Chờ phản hồi"
+        value={pendingReplyCount}
+        icon={<IconMessageReply />}
+        iconBg="bg-orange-100 dark:bg-orange-900/30"
+        iconColor="text-orange-600 dark:text-orange-400"
+        valueColor="text-orange-500"
+        subText="đánh giá chưa trả lời"
+        className={pendingReplyCount > 0 ? "border-orange-200 dark:border-orange-800" : undefined}
+      />
+    </StatsGrid>
   )
 }

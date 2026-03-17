@@ -469,7 +469,6 @@ export default function CreateProductPage() {
                     if (url && !brokenUrls.has(url)) {
                       return (
                         <div key={i} className="relative aspect-square rounded-lg border overflow-hidden group">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt="" className="w-full h-full object-cover"
                             onError={() => setBrokenUrls((p) => new Set(p).add(url))} />
                           <button type="button" onClick={() => removeImage(i + 1)}

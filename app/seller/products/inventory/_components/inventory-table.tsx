@@ -104,7 +104,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                     </TableCell>
                     <TableCell>
                       <div className="max-w-[250px]">
-                        <p className="font-medium line-clamp-1">{product.name}</p>
+                        <p className="font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {product.categoryName ?? "Chưa phân loại"} · {product.currency}
                         </p>
