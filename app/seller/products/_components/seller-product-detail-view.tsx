@@ -345,8 +345,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                           )}
                        </div>
 
-                       {/* Thumbnails Grid */}
-                       {fileList.length > 0 && (
+                        {/* Thumbnails Grid */}
+                        {fileList.length > 0 && (
                           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                              {fileList.map((file, idx) => (
                                 <div 
@@ -410,16 +410,16 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                                   </div>
                                 </div>
                              )}
-                             <input 
-                               type="file" 
-                               ref={fileInputRef} 
-                               hidden 
-                               multiple 
-                               accept="image/*" 
-                               onChange={handleNativeUpload} 
-                             />
                            </div>
                         )}
+                       <input
+                         type="file"
+                         ref={fileInputRef}
+                         hidden
+                         multiple
+                         accept="image/*"
+                         onChange={handleNativeUpload}
+                       />
                     </CardContent>
                   </Card>
                 </div>

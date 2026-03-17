@@ -24,12 +24,23 @@ function SellerProductsContent({ onReady }: { onReady?: (reload: () => void, loa
   const router = useRouter()
   const searchParams = useSearchParams()
   const productIdFromUrl = searchParams.get("id")
+  const prevProductIdRef = React.useRef<string | null>(productIdFromUrl)
 
   const { products, totalCount, loading, actionLoading, params, totalPages, setPage, setStatus, setSearch, remove, reload } = useSellerProducts()
 
   React.useEffect(() => {
     onReady?.(reload, loading)
   }, [reload, loading, onReady])
+
+  React.useEffect(() => {
+    const prevProductId = prevProductIdRef.current
+
+    if (prevProductId && !productIdFromUrl) {
+      reload()
+    }
+
+    prevProductIdRef.current = productIdFromUrl
+  }, [productIdFromUrl, reload])
 
   const [searchInput, setSearchInput] = useState("")
   const [sort, setSort] = useState<SortConfig | null>(null)
