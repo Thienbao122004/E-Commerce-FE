@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { IconFilter, IconSearch } from "@tabler/icons-react"
+import { IconSearch } from "@tabler/icons-react"
 
 type Props = {
   search: string
@@ -16,7 +16,7 @@ type Props = {
 export function ReviewFilters({ search, filterRating, filterReply, onSearchChange, onRatingChange, onReplyChange }: Props) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="relative flex-1 max-w-sm">
+      <div className="relative flex-1">
         <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
         <Input
           placeholder="Tìm theo tên, sản phẩm, nội dung..."
@@ -28,7 +28,6 @@ export function ReviewFilters({ search, filterRating, filterReply, onSearchChang
       <div className="flex gap-2">
         <Select value={filterRating} onValueChange={onRatingChange}>
           <SelectTrigger className="w-[130px] h-9 text-xs">
-            <IconFilter className="size-3.5 mr-1.5" />
             <SelectValue placeholder="Số sao" />
           </SelectTrigger>
           <SelectContent>
