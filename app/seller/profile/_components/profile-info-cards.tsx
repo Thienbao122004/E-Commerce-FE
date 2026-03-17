@@ -1,23 +1,16 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   VerificationStatus,
-  VerificationStatusLabels,
-  VerificationStatusColors,
-  ShopStatusLabels,
-  ShopStatusColors,
 } from "@/types/seller"
 import type { SellerShopInfo } from "@/types/seller-dashboard"
 import {
-  IconCircleCheckFilled,
   IconClock,
   IconCopy,
   IconHash,
   IconLink,
-  IconShieldCheck,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -48,11 +41,14 @@ export function ProfileInfoCards({ shop, loading }: Props) {
     )
   }
 
-  const isVerified = shop.verificationStatus === VerificationStatus.Verified
+  const copyCode = () => {
+    navigator.clipboard.writeText(shop.shopCode)
+    toast.success("Đã sao chép mã cửa hàng")
+  }
 
   const copyId = () => {
     navigator.clipboard.writeText(shop.id)
-    toast.success("Đã sao chép ID")
+    toast.success("Đã sao chép UUID")
   }
 
   return (
@@ -68,12 +64,12 @@ export function ProfileInfoCards({ shop, loading }: Props) {
         </CardHeader>
         <CardContent className="grid gap-3.5">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">ID cửa hàng</p>
+            <p className="text-xs text-muted-foreground mb-1">Mã cửa hàng</p>
             <div className="flex items-center gap-1.5">
-              <p className="text-xs font-mono truncate text-foreground flex-1">{shop.id}</p>
+              <p className="font-mono font-bold text-sm text-foreground tracking-wider flex-1">{shop.shopCode}</p>
               <button
                 type="button"
-                onClick={copyId}
+                onClick={copyCode}
                 className="shrink-0 flex items-center justify-center size-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
               >
                 <IconCopy className="size-3" />

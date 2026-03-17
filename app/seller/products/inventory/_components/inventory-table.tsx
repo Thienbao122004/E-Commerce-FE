@@ -14,18 +14,6 @@ import TablePagination from "@/components/common/table-pagination"
 const currency = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
-function StockBar({ current, max }: { current: number; max: number }) {
-  const pct = max > 0 ? Math.min(100, (current / max) * 100) : 0
-  const color = pct === 0 ? "bg-red-500" : pct < 30 ? "bg-orange-500" : pct < 70 ? "bg-yellow-500" : "bg-green-500"
-  return (
-    <div className="flex items-center gap-2 min-w-[120px]">
-      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs tabular-nums text-muted-foreground w-16 text-right">{current}/{max}</span>
-    </div>
-  )
-}
 
 function getStockWarning(stock: number | null): { label: string; cls: string } | null {
   if (stock === null || stock === undefined) return null
@@ -44,7 +32,6 @@ function TableSkeleton() {
           <TableCell><Skeleton className="h-10 w-10 rounded" /></TableCell>
           <TableCell><Skeleton className="h-4 w-40" /></TableCell>
           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-          <TableCell><Skeleton className="h-3 w-28" /></TableCell>
           <TableCell><Skeleton className="h-4 w-12" /></TableCell>
           <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
         </TableRow>
@@ -78,9 +65,8 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
               <TableHead className="w-[60px]">Ảnh</TableHead>
               <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Sản phẩm</SortableTableHead>
               <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
-              <TableHead>Số lượng tồn kho</TableHead>
-              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn</SortableTableHead>
-              <TableHead>Cảnh báo</TableHead>
+              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn kho</SortableTableHead>
+              <TableHead>Trạng thái</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -88,7 +74,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
               <TableSkeleton />
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <IconPackage className="size-10 opacity-30" />
                     <p>Chưa có sản phẩm trong kho</p>
@@ -118,7 +104,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                     </TableCell>
                     <TableCell>
                       <div className="max-w-[250px]">
-                        <p className="font-medium line-clamp-1">{product.name}</p>
+                        <p className="font-medium">{product.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {product.categoryName ?? "Chưa phân loại"} · {product.currency}
                         </p>
@@ -127,10 +113,7 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                     <TableCell className="font-medium tabular-nums">
                       {currency(product.basePrice)}
                     </TableCell>
-                    <TableCell>
-                      <StockBar current={stock} max={Math.max(stock, 100)} />
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums font-semibold">
+                    <TableCell className="tabular-nums font-bold text-sm">
                       <span className={stock === 0 ? "text-red-500" : stock <= 10 ? "text-orange-500" : ""}>
                         {stock}
                       </span>
