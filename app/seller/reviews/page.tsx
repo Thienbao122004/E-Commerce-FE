@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
 import { MOCK_REVIEWS } from "./_components/review-data"
@@ -9,10 +9,12 @@ import { ReviewOverview } from "./_components/review-overview"
 import { ReviewFilters } from "./_components/review-filters"
 import { ReviewList } from "./_components/review-list"
 import { ReplyDialog } from "./_components/reply-dialog"
+import { useDebounce } from "@/hooks/use-debounce"
 
 const PAGE_SIZE = 10
 
 export default function SellerReviewsPage() {
+  const [searchInput, setSearchInput] = useState("")
   const [search, setSearch] = useState("")
   const [filterRating, setFilterRating] = useState("all")
   const [filterReply, setFilterReply] = useState("all")
@@ -21,11 +23,19 @@ export default function SellerReviewsPage() {
   const [replyText, setReplyText] = useState("")
   const [replies, setReplies] = useState<Record<string, string>>({})
 
+  const debouncedSearch = useDebounce(searchInput)
+  useEffect(() => {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }, [debouncedSearch])
+
   const filtered = MOCK_REVIEWS.filter((r) => {
+    const q = search.toLowerCase()
     const matchSearch =
-      r.buyerName.toLowerCase().includes(search.toLowerCase()) ||
-      r.productName.toLowerCase().includes(search.toLowerCase()) ||
-      r.comment.toLowerCase().includes(search.toLowerCase())
+      !q ||
+      r.buyerName.toLowerCase().includes(q) ||
+      r.productName.toLowerCase().includes(q) ||
+      r.comment.toLowerCase().includes(q)
     const matchRating = filterRating === "all" || r.rating === Number(filterRating)
     const hasReply = r.sellerReply || replies[r.id]
     const matchReply =
@@ -50,10 +60,10 @@ export default function SellerReviewsPage() {
     <div className="flex flex-1 flex-col gap-4 p-4">
       <ReviewOverview reviews={MOCK_REVIEWS} pendingReplyCount={needReply} />
       <ReviewFilters
-        search={search}
+        search={searchInput}
         filterRating={filterRating}
         filterReply={filterReply}
-        onSearchChange={(v) => { setSearch(v); setPage(1) }}
+        onSearchChange={setSearchInput}
         onRatingChange={(v) => { setFilterRating(v); setPage(1) }}
         onReplyChange={(v) => { setFilterReply(v); setPage(1) }}
       />

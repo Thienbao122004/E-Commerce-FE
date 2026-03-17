@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { IconSearch } from "@tabler/icons-react"
+import { IconSearch, IconX } from "@tabler/icons-react"
+import { useDebounce } from "@/hooks/use-debounce"
 
 type Props = {
   search: string
@@ -14,6 +16,9 @@ type Props = {
 }
 
 export function ReviewFilters({ search, filterRating, filterReply, onSearchChange, onRatingChange, onReplyChange }: Props) {
+  const debounced = useDebounce(search)
+  const isPending = search !== debounced
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <div className="relative flex-1">
@@ -22,8 +27,22 @@ export function ReviewFilters({ search, filterRating, filterReply, onSearchChang
           placeholder="Tìm theo tên, sản phẩm, nội dung..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-8 h-9 text-sm"
+          className="pl-8 pr-8 h-9 text-sm"
         />
+        {isPending && (
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5">
+            <div className="size-3.5 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
+          </div>
+        )}
+        {!isPending && search && (
+          <button
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => onSearchChange("")}
+            tabIndex={-1}
+          >
+            <IconX className="size-3.5" />
+          </button>
+        )}
       </div>
       <div className="flex gap-2">
         <Select value={filterRating} onValueChange={onRatingChange}>
