@@ -145,7 +145,7 @@ export function OrderTable({
                       {currency(order.totalAmount)}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1 max-w-[200px]">
+                      <p className="text-sm text-muted-foreground">
                         {order.shippingAddress ?? "—"}
                       </p>
                     </TableCell>

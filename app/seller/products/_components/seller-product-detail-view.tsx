@@ -110,7 +110,7 @@ function DetailSkeleton() {
   return (
     <div className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
       <div className="flex flex-col gap-4">
-        <Skeleton className="aspect-[4/3] w-full rounded-2xl" />
+        <Skeleton className="aspect-[4/3] w-full" />
         <div className="grid grid-cols-4 gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="aspect-square rounded-xl" />
@@ -118,13 +118,13 @@ function DetailSkeleton() {
         </div>
       </div>
       <div className="flex flex-col gap-4">
-        <Skeleton className="h-[280px] rounded-2xl" />
+        <Skeleton className="h-[280px]" />
         <div className="grid grid-cols-3 gap-3">
           <Skeleton className="h-20 rounded-xl" />
           <Skeleton className="h-20 rounded-xl" />
           <Skeleton className="h-20 rounded-xl" />
         </div>
-        <Skeleton className="h-[200px] rounded-2xl" />
+        <Skeleton className="h-[200px]" />
       </div>
     </div>
   )
@@ -696,7 +696,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="shadow-sm border-dashed">
+                <Card className="shadow-sm border-dashed rounded">
                   <CardContent className="py-10 flex flex-col items-center gap-3 text-muted-foreground">
                     <div className="size-12 rounded-2xl bg-muted/50 flex items-center justify-center">
                       <IconClipboard className="size-6 opacity-30" />
