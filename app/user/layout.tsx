@@ -17,7 +17,7 @@ const CartDropdown = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
-const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat']
+const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout']
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth()
