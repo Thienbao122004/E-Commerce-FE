@@ -1,6 +1,7 @@
 
 export type ProductModeration = {
   id: string
+  productCode: string
   name: string
   shopId: string
   shopName: string

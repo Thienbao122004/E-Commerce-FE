@@ -19,6 +19,7 @@ export const UserStatusColors: Record<number, string> = {
 
 export type AdminUser = {
   id: string
+  userCode: string
   email: string | null
   fullName: string | null
   phone: string | null

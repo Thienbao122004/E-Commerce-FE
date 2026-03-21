@@ -305,7 +305,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
               </div>
               {!loading && product && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  ID: <span className="font-mono">{product.id.slice(0, 8)}...</span>
+                  Mã SP: <span className="font-mono">{product.productCode}</span>
                   {product.categoryName && (
                     <> · <span className="text-foreground/70">{product.categoryName}</span></>
                   )}

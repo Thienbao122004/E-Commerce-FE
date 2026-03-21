@@ -48,6 +48,7 @@ export type SellerProductImage = {
 
 export type SellerProduct = {
   id: string
+  productCode: string
   shopId: string
   categoryId: number | null
   categoryName: string | null

@@ -54,10 +54,6 @@ export function LoginForm() {
     const interval = setInterval(() => {
       if (popupRef.current && popupRef.current.closed) {
         clearInterval(interval)
-        // Do NOT null popupRef here yet — browser temporarily reports closed
-        // during cross-origin redirects (Google → Supabase → callback).
-        // Keeping the ref set prevents handleGoogleSignIn from opening a new
-        // popup (via the same named window) while the callback is still running.
         setTimeout(() => {
           if (!authSucceededRef.current) {
             popupRef.current = null

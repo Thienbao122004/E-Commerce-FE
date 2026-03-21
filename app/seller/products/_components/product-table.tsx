@@ -40,6 +40,7 @@ function TableSkeleton() {
         <TableRow key={i}>
           <TableCell><Skeleton className="h-4 w-8" /></TableCell>
           <TableCell><Skeleton className="h-10 w-10 rounded-lg" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
           <TableCell><Skeleton className="h-4 w-40" /></TableCell>
           <TableCell><Skeleton className="h-4 w-20" /></TableCell>
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
@@ -77,6 +78,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
             <TableRow>
               <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead className="w-[60px]">Ảnh</TableHead>
+              <TableHead className="w-28">Mã SP</TableHead>
               <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Tên sản phẩm</SortableTableHead>
               <SortableTableHead sortKey="categoryName" currentSort={sort} onSort={onSort}>Danh mục</SortableTableHead>
               <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
@@ -91,7 +93,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
               <TableSkeleton />
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-40 text-center">
+                <TableCell colSpan={10} className="h-40 text-center">
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <div className="flex items-center justify-center size-14 rounded-full bg-muted">
                       <IconPackage className="size-7 opacity-50" />
@@ -129,6 +131,7 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                         </div>
                       )}
                     </TableCell>
+                    <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
                     <TableCell>
                       <div className="max-w-[200px]">
                         <p className="font-medium">{product.name}</p>

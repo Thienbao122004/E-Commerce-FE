@@ -180,6 +180,7 @@ export default function ProductsPage() {
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <TableHead className="w-[60px]">Ảnh</TableHead>
+                  <TableHead className="w-28">Mã SP</TableHead>
                   <SortableTableHead sortKey="name" currentSort={sort} onSort={handleSort}>Tên sản phẩm</SortableTableHead>
                   <SortableTableHead sortKey="shopName" currentSort={sort} onSort={handleSort}>Cửa hàng</SortableTableHead>
                   <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={handleSort}>Giá</SortableTableHead>
@@ -194,6 +195,7 @@ export default function ProductsPage() {
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       <TableCell><Skeleton className="h-10 w-10 rounded" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
@@ -204,7 +206,7 @@ export default function ProductsPage() {
                   ))
                 ) : sorted.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Không tìm thấy sản phẩm nào.</TableCell>
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Không tìm thấy sản phẩm nào.</TableCell>
                   </TableRow>
                 ) : sorted.map((product, idx) => (
                   <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewDetail(product)}>
@@ -216,6 +218,7 @@ export default function ProductsPage() {
                         <div className="bg-muted flex size-10 items-center justify-center rounded border text-xs text-muted-foreground">N/A</div>
                       )}
                     </TableCell>
+                    <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
                     <TableCell>
                       <div>
                         <span className="font-medium max-w-[250px]">{product.name}</span>

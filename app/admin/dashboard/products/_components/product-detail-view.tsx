@@ -193,9 +193,14 @@ export function ProductDetailView({
               <div className="flex flex-col gap-4">
                 <div className="rounded-lg border p-4 space-y-3">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thông tin sản phẩm</h3>
-                  <Badge variant="secondary" className={ProductStatusColors[product.status] ?? ""}>
-                    {ProductStatusLabels[product.status] ?? product.statusName}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className={ProductStatusColors[product.status] ?? ""}>
+                      {ProductStatusLabels[product.status] ?? product.statusName}
+                    </Badge>
+                    <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                      {product.productCode}
+                    </span>
+                  </div>
                   <p className="font-semibold text-lg leading-tight">{product.name}</p>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">

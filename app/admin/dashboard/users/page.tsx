@@ -152,12 +152,12 @@ export default function UsersPage() {
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
-                  <TableHead className="w-24">ID</TableHead>
+                  <TableHead className="w-28">Mã NSD</TableHead>
                   <SortableTableHead sortKey="fullName" currentSort={sort} onSort={handleSort} className="w-[200px]">Họ tên</SortableTableHead>
                   <TableHead className="w-28">SĐT</TableHead>
                   <SortableTableHead sortKey="role" currentSort={sort} onSort={handleSort} className="w-24">Vai trò</SortableTableHead>
                   <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort} className="w-28">Trạng thái</SortableTableHead>
-                  <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort} className="w-24">Ngày tạo</SortableTableHead>
+                  <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort} className="w-28">Ngày tạo</SortableTableHead>
                   <TableHead className="w-24 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -169,7 +169,7 @@ export default function UsersPage() {
                 ) : sorted.map((u, idx) => (
                   <TableRow key={u.id}>
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(pg - 1) * ps + idx + 1}</TableCell>
-                    <TableCell className="font-mono text-xs truncate">{u.id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-mono text-xs font-medium">{u.userCode}</TableCell>
                     <TableCell>
                       <div className="min-w-0">
                         <span className="text-sm font-medium block truncate">{u.fullName ?? "—"}</span>

@@ -62,6 +62,7 @@ export type RecentActivity = {
 export type TopProduct = {
   id: string
   name: string
+  code: string
   shopName: string
   totalSold: number
   revenue: number
