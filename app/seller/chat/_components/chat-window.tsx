@@ -10,13 +10,14 @@ import {
   IconChevronLeft,
   IconCircleFilled,
   IconDotsVertical,
+  IconLoader2,
   IconMessage2,
-  IconPackage,
   IconPhone,
   IconPhoto,
   IconSend,
 } from "@tabler/icons-react"
-import type { Conversation } from "./chat-types"
+import type { ConversationDto, MessageDto } from "./chat-types"
+import { useAuth } from "@/contexts/auth-context"
 
 function Avatar({ name, online, size = "md" }: { name: string; online?: boolean; size?: "sm" | "md" | "lg" }) {
   const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
@@ -38,30 +39,38 @@ function Avatar({ name, online, size = "md" }: { name: string; online?: boolean;
   )
 }
 
-function MessageStatus({ status }: { status?: "sent" | "delivered" | "read" }) {
-  if (!status) return null
-  if (status === "read") return <IconChecks className="size-3.5 text-blue-500" />
-  if (status === "delivered") return <IconChecks className="size-3.5 text-muted-foreground" />
+function MessageStatus({ isRead }: { isRead: boolean }) {
+  if (isRead) return <IconChecks className="size-3.5 text-blue-500" />
   return <IconCheck className="size-3.5 text-muted-foreground" />
+}
+
+function formatMessageTime(dateStr: string) {
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
 }
 
 const QUICK_REPLIES = ["Còn hàng bạn nhé!", "Shop sẽ phản hồi sớm", "Cảm ơn bạn đã quan tâm!", "Bạn có thể đặt hàng tại đây"]
 
 type Props = {
-  conversation: Conversation
+  conversation: ConversationDto
+  messages: MessageDto[]
   message: string
+  loadingMessages: boolean
+  sending: boolean
   onMessageChange: (v: string) => void
   onSend: () => void
   onBack: () => void
   className?: string
 }
 
-export function ChatWindow({ conversation, message, onMessageChange, onSend, onBack, className }: Props) {
+export function ChatWindow({ conversation, messages, message, loadingMessages, sending, onMessageChange, onSend, onBack, className }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { user } = useAuth()
+  const currentUserId = user?.id
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [conversation.id])
+  }, [messages.length, conversation.id])
 
   return (
     <div className={cn("flex flex-col flex-1 min-w-0", className)}>
@@ -69,13 +78,11 @@ export function ChatWindow({ conversation, message, onMessageChange, onSend, onB
         <Button variant="ghost" size="icon" className="size-8 md:hidden" onClick={onBack}>
           <IconChevronLeft className="size-4" />
         </Button>
-        <Avatar name={conversation.buyerName} online={conversation.online} />
+        <Avatar name={conversation.buyerName} />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{conversation.buyerName}</p>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-            {conversation.online ? (
-              <><IconCircleFilled className="size-2 text-green-500" />Đang hoạt động</>
-            ) : "Không hoạt động"}
+            Khách hàng
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -88,43 +95,53 @@ export function ChatWindow({ conversation, message, onMessageChange, onSend, onB
         </div>
       </div>
 
-      {conversation.productName && (
-        <div className="flex items-center gap-2.5 px-4 py-2 bg-muted/40 border-b text-xs">
-          <IconPackage className="size-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground">Hỏi về sản phẩm:</span>
-          <span className="font-medium text-foreground truncate">{conversation.productName}</span>
-        </div>
-      )}
-
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-muted/10">
-        {conversation.messages.map((msg, i) => {
-          const isSeller = msg.from === "seller"
-          const prevMsg = conversation.messages[i - 1]
-          const showAvatar = !isSeller && (!prevMsg || prevMsg.from !== "buyer")
-          return (
-            <div key={msg.id} className={cn("flex items-end gap-2", isSeller ? "justify-end" : "justify-start")}>
-              {!isSeller && (
-                <div className="w-7 shrink-0">
-                  {showAvatar && <Avatar name={conversation.buyerName} size="sm" />}
-                </div>
-              )}
-              <div className={cn("flex flex-col gap-0.5 max-w-[72%]", isSeller && "items-end")}>
-                <div className={cn(
-                  "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                  isSeller
-                    ? "bg-primary text-primary-foreground rounded-br-sm"
-                    : "bg-background border rounded-bl-sm shadow-sm"
-                )}>
-                  {msg.text}
-                </div>
-                <div className="flex items-center gap-1 px-1">
-                  <span className="text-[10px] text-muted-foreground">{msg.time}</span>
-                  {isSeller && <MessageStatus status={msg.status} />}
+        {loadingMessages ? (
+          <div className="flex items-center justify-center h-full">
+            <IconLoader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Chưa có tin nhắn
+          </div>
+        ) : (
+          messages.map((msg, i) => {
+            const isSeller = msg.senderId === currentUserId
+            const prevMsg = messages[i - 1]
+            const showAvatar = !isSeller && (!prevMsg || prevMsg.senderId === currentUserId)
+            return (
+              <div key={msg.id} className={cn("flex items-end gap-2", isSeller ? "justify-end" : "justify-start")}>
+                {!isSeller && (
+                  <div className="w-7 shrink-0">
+                    {showAvatar && <Avatar name={conversation.buyerName} size="sm" />}
+                  </div>
+                )}
+                <div className={cn("flex flex-col gap-0.5 max-w-[72%]", isSeller && "items-end")}>
+                  <div className={cn(
+                    "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                    isSeller
+                      ? "bg-primary text-primary-foreground rounded-br-sm"
+                      : "bg-background border rounded-bl-sm shadow-sm"
+                  )}>
+                    {msg.messageType === "image" ? (
+                      <img
+                        src={msg.content}
+                        alt="Ảnh đã gửi"
+                        className="max-h-56 w-auto rounded-lg object-contain"
+                      />
+                    ) : (
+                      msg.content
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 px-1">
+                    <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.createdAt)}</span>
+                    {isSeller && <MessageStatus isRead={msg.isRead} />}
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -157,8 +174,14 @@ export function ChatWindow({ conversation, message, onMessageChange, onSend, onB
             rows={1}
             className="min-h-[38px] max-h-[120px] resize-none text-sm leading-relaxed py-2"
           />
-          <Button size="icon" className="size-9 shrink-0" disabled={!message.trim()} onClick={onSend} title="Gửi (Enter)">
-            <IconSend className="size-4" />
+          <Button
+            size="icon"
+            className="size-9 shrink-0"
+            disabled={!message.trim() || sending}
+            onClick={onSend}
+            title="Gửi (Enter)"
+          >
+            {sending ? <IconLoader2 className="size-4 animate-spin" /> : <IconSend className="size-4" />}
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground mt-1 text-right">Enter để gửi · Shift+Enter xuống dòng</p>

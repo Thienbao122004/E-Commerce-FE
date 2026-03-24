@@ -3,6 +3,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
 export interface ProductVariantStorefront {
   id: string
   variantName: string
+  attributes?: string | null
   price: number | null
   isActive: boolean
   stockQuantity: number
@@ -11,9 +12,11 @@ export interface ProductVariantStorefront {
 /** Dùng cho danh sách sản phẩm */
 export interface StorefrontProduct {
   id: string
+  slug: string
   name: string
   shopId: string
   shopName: string
+  shopSlug: string
   basePrice: number
   currency: string
   categoryId: number | null
@@ -87,4 +90,10 @@ export function getProductById(
   productId: string
 ): Promise<StorefrontProductDetailResponse> {
   return fetchJson<StorefrontProductDetailResponse>(`/api/products/${productId}`)
+}
+
+export function getProductBySlug(
+  slug: string
+): Promise<StorefrontProductDetailResponse> {
+  return fetchJson<StorefrontProductDetailResponse>(`/api/products/${slug}`)
 }

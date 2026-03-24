@@ -17,6 +17,7 @@ export interface ProductToAdd {
 
 export interface ProductSuggestion {
   id: string
+  slug?: string
   name: string
   basePrice: number
   imageUrl?: string

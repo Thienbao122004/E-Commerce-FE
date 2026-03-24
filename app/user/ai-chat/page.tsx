@@ -668,7 +668,7 @@ export default function UserAiChatPage() {
                         </div>
                         <div className="mt-2 flex justify-end">
                           <Link
-                            href={`/products/${p.id}`}
+                            href={`/products/${p.slug || p.id}`}
                             className="text-[11px] underline"
                             style={{ color: 'var(--color-primary)' }}
                           >

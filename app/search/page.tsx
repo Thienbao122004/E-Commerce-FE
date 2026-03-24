@@ -366,7 +366,7 @@ function SearchPageContent() {
                     return (
                       <Link
                         key={product.id}
-                        href={`/products/${product.id}`}
+                        href={`/products/${product.slug || product.id}`}
                         className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
                       >
                         <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">

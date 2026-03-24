@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context"
 import { FavoritesProvider } from "@/contexts/favorites-context";
+import { ChatWidgetWrapper } from "@/components/chat/chat-widget-wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             >
               {children}
               <Toaster richColors position="top-right" />
+              <ChatWidgetWrapper />
             </ThemeProvider>
           </FavoritesProvider>
         </AuthProvider>
