@@ -905,10 +905,9 @@ export default function ProductDetailPage() {
               <span className="w-1 h-5 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
               Mô tả sản phẩm
             </h2>
-            <div
-              className="text-sm leading-relaxed text-gray-600 whitespace-pre-line"
-              dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, "<br/>") }}
-            />
+            <div className="text-sm leading-relaxed text-gray-600 whitespace-pre-line">
+              {product.description}
+            </div>
           </section>
         )}
 

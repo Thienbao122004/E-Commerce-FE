@@ -90,9 +90,18 @@ export function NavUser() {
           >
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href={role === 'admin' ? '/admin/dashboard/settings' : (role === 'seller' ? '/seller/dashboard/settings' : '/dashboard/settings')} className="cursor-pointer">
+                <Link 
+                  href={
+                    role === 'admin' 
+                      ? '/admin/dashboard/settings' 
+                      : role === 'seller' 
+                        ? '/seller/settings' 
+                        : '/user/profile'
+                  } 
+                  className="cursor-pointer"
+                >
                   <IconSettings />
-                  Cài đặt
+                  {role === 'customer' ? 'Hồ sơ' : 'Cài đặt'}
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>

@@ -322,8 +322,11 @@ export default function LandingPage() {
   }, [])
 
   const handleSearch = (term: string) => {
-    if (!term.trim()) return
     setShowSuggestions(false)
+    if (!term.trim()) {
+      router.push('/search')
+      return
+    }
     router.push(`/search?q=${encodeURIComponent(term.trim())}`)
   }
 
@@ -426,19 +429,19 @@ export default function LandingPage() {
           <div className="max-w-[1440px] mx-auto px-10">
             <ul className="flex items-center gap-8 py-3 overflow-x-auto no-scrollbar">
               <li>
-                <a href="#" className="text-sm font-bold whitespace-nowrap" style={{ color: "var(--color-primary)" }}>
+                <Link href="/" className="text-sm font-bold whitespace-nowrap" style={{ color: "var(--color-primary)" }}>
                   Trang chủ
-                </a>
+                </Link>
               </li>
               {categories.slice(0, 5).map((cat) => (
                 <li key={cat.id}>
-                  <a
-                    href="#"
+                  <Link
+                    href={`/search?category=${cat.slug || cat.id}`}
                     className="text-sm font-medium whitespace-nowrap transition-colors hover:text-[var(--color-primary)]"
                     style={{ color: "var(--color-text-main)" }}
                   >
                     {cat.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -513,9 +516,9 @@ export default function LandingPage() {
 
           <div className="hidden lg:flex flex-col gap-2">
             {SIDE_BANNERS.map((b, i) => (
-              <a
+              <Link
                 key={i}
-                href="#"
+                href="/search"
                 className="relative flex-1 rounded-xl overflow-hidden cursor-pointer group block"
               >
                 <div
@@ -527,7 +530,7 @@ export default function LandingPage() {
                   <span className="text-[11px] font-semibold text-white/75 mb-0.5">{b.sub}</span>
                   <h3 className="font-black text-white text-base leading-tight whitespace-pre-line">{b.title}</h3>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         </section>
@@ -560,10 +563,10 @@ export default function LandingPage() {
               <span className="w-1 h-6 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
               Danh mục nổi bật
             </h2>
-            <a href="#" className="font-bold text-sm hover:underline flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+            <Link href="/search" className="font-bold text-sm hover:underline flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
               Xem tất cả
               <span className="material-symbols-outlined text-sm">chevron_right</span>
-            </a>
+            </Link>
           </div>
 
           {loadingCats ? (
@@ -578,9 +581,9 @@ export default function LandingPage() {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
               {categories.map((cat) => (
-                <a
+                <Link
                   key={cat.id}
-                  href="#"
+                  href={`/search?category=${cat.slug || cat.id}`}
                   className="group flex flex-col items-center gap-2 p-6 rounded-xl bg-white border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-lg transition-all text-center"
                 >
                   <div
@@ -593,7 +596,7 @@ export default function LandingPage() {
                   {cat.productCount > 0 && (
                     <span className="text-xs text-gray-400">{cat.productCount} sản phẩm</span>
                   )}
-                </a>
+                </Link>
               ))}
             </div>
           )}

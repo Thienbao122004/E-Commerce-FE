@@ -84,8 +84,11 @@ function SearchBox({ initialValue }: { initialValue: string }) {
   }, [])
 
   const handleSearch = (term: string) => {
-    if (!term.trim()) return
     setShowSuggestions(false)
+    if (!term.trim()) {
+      router.push('/search')
+      return
+    }
     router.push(`/search?q=${encodeURIComponent(term.trim())}`)
   }
 
@@ -159,6 +162,7 @@ function SearchPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const query = searchParams.get("q") ?? ""
+  const categorySlug = searchParams.get("category") ?? ""
   const { isFavorited, toggle: toggleFavorite } = useFavorites()
 
   const [products, setProducts] = useState<StorefrontProduct[]>([])
@@ -169,6 +173,7 @@ function SearchPageContent() {
   const [totalCount, setTotalCount] = useState(0)
   const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc" | "rating">("newest")
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined)
+  const [initialCategorySet, setInitialCategorySet] = useState(false)
 
   const PAGE_SIZE = 24
 
@@ -202,9 +207,21 @@ function SearchPageContent() {
 
   useEffect(() => {
     getCategories({ pageSize: 20, level: 1 }).then((res) => {
-      if (res.success) setCategories(res.categories)
+      if (res.success) {
+        setCategories(res.categories)
+        
+        if (categorySlug && !initialCategorySet) {
+          const matchedCategory = res.categories.find(
+            (cat) => cat.slug === categorySlug || cat.code === categorySlug || String(cat.id) === categorySlug
+          )
+          if (matchedCategory) {
+            setSelectedCategory(matchedCategory.id)
+          }
+          setInitialCategorySet(true)
+        }
+      }
     }).catch(() => { })
-  }, [])
+  }, [categorySlug, initialCategorySet])
 
   const handleLoadMore = () => {
     if (loadingMore) return

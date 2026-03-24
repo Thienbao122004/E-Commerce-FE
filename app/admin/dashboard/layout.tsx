@@ -9,17 +9,21 @@ import { LoadingScreen } from '@/components/ui/loading-screen'
 import { HeaderActionsProvider } from '@/hooks/use-header-actions'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { session, isLoading } = useAuth()
+    const { session, isLoading, role } = useAuth()
 
     useEffect(() => {
-        if (!isLoading && !session) {
-            window.location.href = '/login'
+        if (!isLoading) {
+            if (!session) {
+                window.location.href = '/login'
+            } else if (role !== 'admin') {
+                window.location.href = '/'
+            }
         }
-    }, [isLoading, session])
+    }, [isLoading, session, role])
 
     if (isLoading) return <LoadingScreen />
 
-    if (!session) return null
+    if (!session || role !== 'admin') return null
 
     return (
         <HeaderActionsProvider>
