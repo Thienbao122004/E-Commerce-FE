@@ -24,7 +24,7 @@ function FormSkeleton() {
       <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
         <Skeleton className="h-5 w-36" />
       </CardHeader>
-      <CardContent className="p-4 lg:p-5 grid gap-5">
+      <CardContent className="grid gap-5">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="grid gap-2">
             <Skeleton className="h-3.5 w-24" />
@@ -63,68 +63,63 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
   }
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-muted">
-            <IconInfoCircle className="size-3.5 text-muted-foreground" />
-          </div>
-          Thông tin cơ bản
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4 lg:p-5">
-        <form onSubmit={handleSubmit} className="grid gap-5">
-          <div className="grid gap-2">
-            <Label htmlFor="shop-name" className="text-xs font-medium">
-              Tên thương hiệu
-            </Label>
-            <Input
-              id="shop-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nhập tên thương hiệu"
-              maxLength={255}
-              className="text-sm"
-            />
-          </div>
+    <>
 
-          <div className="grid gap-2">
-            <Label htmlFor="shop-description" className="text-xs font-medium">
-              Câu chuyện thương hiệu (Storytelling)
-            </Label>
-            <Textarea
-              id="shop-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Mô tả câu chuyện thương hiệu, sứ mệnh và giá trị của bạn..."
-              rows={5}
-              maxLength={2000}
-              className="resize-none text-sm"
-            />
-            <p className="text-xs text-muted-foreground text-right tabular-nums">
-              {description.length} / 2000
-            </p>
-          </div>
+      <Card className="shadow-sm">
+        <CardHeader className="border-b">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-md bg-muted">
+              <IconInfoCircle className="size-3.5 text-muted-foreground" />
+            </div>
+            Thông tin cơ bản
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="">
+          <form onSubmit={handleSubmit} className="grid gap-5">
+            <div className="grid gap-2">
+              <Label htmlFor="shop-name" className="text-xs font-medium">
+                Tên thương hiệu
+              </Label>
+              <Input
+                id="shop-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nhập tên thương hiệu"
+                maxLength={255}
+                className="text-sm"
+              />
+            </div>
 
-          <div className="grid gap-2">
-            <Label className="text-xs font-medium">Slug (đường dẫn)</Label>
-            <Input value={shop?.slug ?? ""} disabled className="text-sm bg-muted/50" />
-            <p className="text-xs text-muted-foreground">
-              Slug được tạo tự động và không thể thay đổi
-            </p>
-          </div>
+            <div className="grid gap-2">
+              <Label htmlFor="shop-description" className="text-xs font-medium">
+                Câu chuyện thương hiệu (Storytelling)
+              </Label>
+              <Textarea
+                id="shop-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Mô tả câu chuyện thương hiệu, sứ mệnh và giá trị của bạn..."
+                rows={5}
+                maxLength={2000}
+                className="resize-none text-sm"
+              />
+              <p className="text-xs text-muted-foreground text-right tabular-nums">
+                {description.length} / 2000
+              </p>
+            </div>
 
-          <div className="flex justify-end pt-3 border-t">
-            <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
-              {saving ? (
-                <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>
-              ) : (
-                <><IconDeviceFloppy className="mr-2 size-4" />Lưu thay đổi</>
-              )}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          </form>
+        </CardContent>
+      </Card>
+      <div className="flex justify-end mt-4">
+        <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
+          {saving ? (
+            <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>
+          ) : (
+            <><IconDeviceFloppy className="mr-2 size-4" />Lưu thay đổi</>
+          )}
+        </Button>
+      </div>
+    </>
   )
 }

@@ -22,7 +22,7 @@ export function WalletSummary({ wallet, loading }: Props) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i} className={i === 0 ? "md:col-span-2" : ""}>
             <CardContent className="p-4 lg:p-5">
               <div className="flex items-center gap-3">
@@ -46,7 +46,6 @@ export function WalletSummary({ wallet, loading }: Props) {
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-      {/* Available Balance — featured card */}
       <Card className="md:col-span-2 border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
@@ -64,7 +63,6 @@ export function WalletSummary({ wallet, loading }: Props) {
         </CardContent>
       </Card>
 
-      {/* Pending */}
       <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
@@ -82,7 +80,6 @@ export function WalletSummary({ wallet, loading }: Props) {
         </CardContent>
       </Card>
 
-      {/* Total Earnings */}
       <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">

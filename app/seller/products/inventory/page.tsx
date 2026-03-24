@@ -13,6 +13,7 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { getNextSort } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 export default function InventoryPage() {
   const { products, totalCount, loading, params, totalPages, setPage, setSearch, reload } = useSellerProducts()
@@ -68,19 +69,12 @@ export default function InventoryPage() {
   ]
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-5 lg:p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <IconPackage className="size-5 text-muted-foreground" />
-            Kho hàng
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Theo dõi và cập nhật số lượng tồn kho sản phẩm</p>
-        </div>
+    <div className="flex flex-1 flex-col gap-4 p-4">
+      <SetHeaderActions>
         <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
           <IconRefresh className="mr-1.5 size-4" />Làm mới
         </Button>
-      </div>
+      </SetHeaderActions>
 
       <InventoryStats products={products} loading={loading} />
 

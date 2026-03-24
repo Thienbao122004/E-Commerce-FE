@@ -2,17 +2,25 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ordersService, type OrderSummary } from '@/services/orders'
 import { usePurchaseOrders } from '@/hooks/use-purchase-orders'
+import { cartService } from '@/services/cart'
+import { paymentsService } from '@/services/payments'
+import { toast } from 'sonner'
+import { MessageCircle, RotateCcw, Store, StoreIcon, Wallet } from 'lucide-react'
 
 const STATUS_TABS = [
   { label: 'Tất cả', value: undefined },
   { label: 'Chờ thanh toán', value: 0 },
   { label: 'Chờ xác nhận', value: 1 },
-  { label: 'Vận chuyển', value: 4 },
+  { label: 'Đã xác nhận', value: 2 },
+  { label: 'Đang chuẩn bị', value: 3 },
+  { label: 'Đang giao hàng', value: 4 },
+  { label: 'Đã giao', value: 5 },
   { label: 'Hoàn thành', value: 6 },
   { label: 'Đã hủy', value: 7 },
-  { label: 'Trả hàng/Hoàn tiền', value: 8 },
+  { label: 'Đã hoàn tiền', value: 8 },
 ] as const
 
 const STATUS_LABELS: Record<number, string> = {
@@ -24,7 +32,7 @@ const STATUS_LABELS: Record<number, string> = {
   5: 'Đã giao hàng',
   6: 'Hoàn thành',
   7: 'Đã hủy',
-  8: 'Trả hàng/Hoàn tiền',
+  8: 'Đã hoàn tiền',
 }
 
 const STATUS_COLORS: Record<number, string> = {
@@ -39,9 +47,22 @@ const STATUS_COLORS: Record<number, string> = {
   8: '#dc2626',
 }
 
+const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
+
+function formatPrice(value: number) {
+  return value.toLocaleString('vi-VN') + 'đ'
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 export default function PurchasePage() {
+  const router = useRouter()
   const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders()
   const [searchTerm, setSearchTerm] = useState('')
+  const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null)
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
 
   const filtered = searchTerm
     ? orders.filter(
@@ -104,7 +125,57 @@ export default function PurchasePage() {
       ) : (
         <div className="space-y-4 p-4">
           {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} onRefresh={invalidateAndRefresh} />
+            <OrderCard
+              key={order.id}
+              order={order}
+              reorderingOrderId={reorderingOrderId}
+              payingOrderId={payingOrderId}
+              onRefresh={invalidateAndRefresh}
+              onReorder={async (targetOrder) => {
+                setReorderingOrderId(targetOrder.id)
+                let successCount = 0
+                let failedCount = 0
+
+                for (const item of targetOrder.items) {
+                  try {
+                    await cartService.addItem({
+                      productId: item.productId,
+                      quantity: item.quantity,
+                    })
+                    successCount += 1
+                  } catch {
+                    failedCount += 1
+                  }
+                }
+
+                if (successCount > 0) {
+                  toast.success(`Đã thêm ${successCount} sản phẩm vào giỏ hàng`)
+                  router.push('/user/cart')
+                }
+                if (failedCount > 0) {
+                  toast.error(`${failedCount} sản phẩm mua lại thất bại`)
+                }
+                setReorderingOrderId(null)
+              }}
+              onPayNow={async (targetOrder) => {
+                setPayingOrderId(targetOrder.id)
+                try {
+                  const paymentRes = await paymentsService.createVNPayPayment(targetOrder.id)
+                  if (!paymentRes.success || !paymentRes.paymentUrl) {
+                    toast.error(paymentRes.message || 'Không thể tạo giao dịch VNPay')
+                    return
+                  }
+                  window.location.href = paymentRes.paymentUrl
+                } catch {
+                  toast.error('Không thể thanh toán đơn hàng này')
+                } finally {
+                  setPayingOrderId(null)
+                }
+              }}
+              onChatShop={(shopName) => {
+                toast.message(`Chat trực tiếp với shop "${shopName}"`)
+              }}
+            />
           ))}
         </div>
       )}
@@ -112,7 +183,23 @@ export default function PurchasePage() {
   )
 }
 
-function OrderCard({ order, onRefresh }: { order: OrderSummary; onRefresh: () => void }) {
+function OrderCard({
+  order,
+  onRefresh,
+  onReorder,
+  onPayNow,
+  onChatShop,
+  reorderingOrderId,
+  payingOrderId,
+}: {
+  order: OrderSummary
+  onRefresh: () => void
+  onReorder: (order: OrderSummary) => Promise<void>
+  onPayNow: (order: OrderSummary) => Promise<void>
+  onChatShop: (shopName: string) => void
+  reorderingOrderId: string | null
+  payingOrderId: string | null
+}) {
   const [confirming, setConfirming] = useState(false)
 
   const handleConfirm = async () => {
@@ -129,17 +216,38 @@ function OrderCard({ order, onRefresh }: { order: OrderSummary; onRefresh: () =>
 
   const statusColor = STATUS_COLORS[order.status] ?? '#6b7280'
   const statusLabel = STATUS_LABELS[order.status] ?? order.statusName
+  const canConfirm = order.status === 4
+  const canPayNow = order.status === 0
+  const canReorder = REORDERABLE_STATUSES.has(order.status)
+  const isReordering = reorderingOrderId === order.id
+  const isPaying = payingOrderId === order.id
 
   return (
     <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#e5ded6' }}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="material-symbols-outlined text-[18px]" style={{ color: 'var(--color-primary)' }}>
-            storefront
-          </span>
+          <Store size={16} style={{ color: 'var(--color-primary)' }} />
           <span className="font-semibold text-sm" style={{ color: 'var(--color-text-main)' }}>
             {order.shopName}
           </span>
+          <button
+            type="button"
+            onClick={() => onChatShop(order.shopName)}
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors hover:bg-[rgba(236,127,19,0.08)]"
+            style={{ borderColor: '#d9cec2', color: 'var(--color-primary)' }}
+          >
+            <MessageCircle size={12} />
+            <span>Chat shop</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => toast.message(`Trang chi tiết của shop "${order.shopName}"`)}
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors hover:bg-gray-50"
+            style={{ borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }}
+          >
+            <StoreIcon size={12} />
+            <span>Xem chi tiết shop</span>
+          </button>
         </div>
         <span className="text-sm font-semibold" style={{ color: statusColor }}>
           {statusLabel}
@@ -168,7 +276,7 @@ function OrderCard({ order, onRefresh }: { order: OrderSummary; onRefresh: () =>
             </div>
             <div className="text-right shrink-0">
               <p className="text-sm" style={{ color: 'var(--color-primary)' }}>
-                {item.unitPrice.toLocaleString('vi-VN')}đ
+                {formatPrice(item.unitPrice)}
               </p>
             </div>
           </div>
@@ -179,16 +287,27 @@ function OrderCard({ order, onRefresh }: { order: OrderSummary; onRefresh: () =>
         <div className="flex items-center justify-end gap-2">
           <span className="text-sm text-muted-foreground">Thành tiền:</span>
           <span className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
-            {order.totalAmount.toLocaleString('vi-VN')}đ
+            {formatPrice(order.totalAmount)}
           </span>
         </div>
 
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            {new Date(order.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            {formatDate(order.createdAt)}
           </p>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {(order.status === 4 || order.status === 5) && (
+            {canPayNow && (
+              <button
+                onClick={() => void onPayNow(order)}
+                disabled={isPaying}
+                className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60 inline-flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                <Wallet size={14} />
+                <span>{isPaying ? 'Đang chuyển hướng...' : 'Thanh toán ngay'}</span>
+              </button>
+            )}
+            {canConfirm && (
               <button
                 onClick={handleConfirm}
                 disabled={confirming}
@@ -196,6 +315,17 @@ function OrderCard({ order, onRefresh }: { order: OrderSummary; onRefresh: () =>
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
                 {confirming ? 'Đang xử lý...' : 'Đã nhận được hàng'}
+              </button>
+            )}
+            {canReorder && (
+              <button
+                onClick={() => void onReorder(order)}
+                disabled={isReordering}
+                className="text-sm px-4 py-1.5 rounded border transition-colors hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1.5"
+                style={{ borderColor: '#d1c9c0', color: 'var(--color-text-main)' }}
+              >
+                <RotateCcw size={14} />
+                <span>{isReordering ? 'Đang thêm...' : 'Mua lại'}</span>
               </button>
             )}
             <Link

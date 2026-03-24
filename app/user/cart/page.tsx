@@ -7,6 +7,7 @@ import { cartService, type Cart, type CartItem } from '@/services/cart'
 import { toast } from 'sonner'
 
 const CART_UPDATED_EVENT = 'cart:updated'
+const CHECKOUT_SELECTED_IDS_KEY = 'checkout:selected-item-ids'
 
 function formatPrice(price: number) {
   return price.toLocaleString('vi-VN') + 'đ'
@@ -395,6 +396,11 @@ export default function CartPage() {
           <button
             onClick={() => {
               if (!cart?.id || selectedIds.size === 0) return
+              try {
+                sessionStorage.setItem(CHECKOUT_SELECTED_IDS_KEY, JSON.stringify(Array.from(selectedIds)))
+              } catch {
+                // Ignore storage errors, checkout page sẽ fallback về toàn bộ giỏ hàng.
+              }
               router.push('/user/checkout')
             }}
             disabled={selectedIds.size === 0}

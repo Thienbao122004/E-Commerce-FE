@@ -87,7 +87,7 @@ export default function UserDetailPage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()}><IconArrowLeft className="size-5" /></Button>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Chi tiết người dùng</h1>
-              <p className="text-muted-foreground text-sm font-mono">{loading ? "Đang tải..." : user?.id}</p>
+              <p className="text-muted-foreground text-sm font-mono">{loading ? "Đang tải..." : (user?.userCode ?? user?.id)}</p>
             </div>
           </div>
 

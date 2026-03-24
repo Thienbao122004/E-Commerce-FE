@@ -4,19 +4,19 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import {
-  getProductById,
+  getProductBySlug,
   getProducts,
   type StorefrontProductDetail,
   type StorefrontProduct,
   type ProductVariantStorefront,
 } from "@/services/storefront-products"
+import { getShopBySlug, type ShopPublicDto } from "@/services/storefront-shops"
 import { useFavorites } from "@/contexts/favorites-context"
 import { cartService } from "@/services/cart"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import dynamic from "next/dynamic"
 import { useAuth } from "@/contexts/auth-context"
-
 const CART_UPDATED_EVENT = "cart:updated"
 
 const HeaderUser = dynamic(
@@ -39,9 +39,45 @@ function formatPrice(price: number) {
   }).format(price)
 }
 
+function parseVariantAttributes(raw?: string | null): Record<string, string> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+
+    return Object.entries(parsed).reduce<Record<string, string>>((acc, [k, v]) => {
+      if (!k) return acc
+      if (typeof v === "string" || typeof v === "number") {
+        acc[k] = String(v)
+      }
+      return acc
+    }, {})
+  } catch {
+    return {}
+  }
+}
+
 function formatSold(n: number) {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return String(n)
+}
+
+function formatCompactNumber(n: number) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace(/\.0$/, "")}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`
+  return String(n)
+}
+
+function formatJoinTime(dateStr?: string | null) {
+  if (!dateStr) return "Đang cập nhật"
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
+  if (years > 0) return `${years} năm trước`
+  const months = Math.floor(diff / (30 * 24 * 60 * 60 * 1000))
+  if (months > 0) return `${months} tháng trước`
+  return "Mới tham gia"
 }
 
 function showAddedToCartToast(productName: string, quantity: number) {
@@ -155,16 +191,18 @@ function RelatedCardSkeleton() {
 /* ─────────── main page ─────────── */
 
 export default function ProductDetailPage() {
-  const { id } = useParams<{ id: string }>()
+  const { slug } = useParams<{ slug: string }>()
   const router = useRouter()
   const { session } = useAuth()
 
   const [product, setProduct] = useState<StorefrontProductDetail | null>(null)
+  const [shopInfo, setShopInfo] = useState<ShopPublicDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [selectedImage, setSelectedImage] = useState(0)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantStorefront | null>(null)
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
   const [quantity, setQuantity] = useState(1)
 
   const [relatedProducts, setRelatedProducts] = useState<StorefrontProduct[]>([])
@@ -175,16 +213,29 @@ export default function ProductDetailPage() {
   const { isFavorited, toggle: toggleFavorite } = useFavorites()
 
   const load = useCallback(async () => {
-    if (!id) return
+    if (!slug) return
     setLoading(true)
     setError(null)
     try {
-      const res = await getProductById(id)
+      const res = await getProductBySlug(slug)
       if (res.success && res.product) {
         setProduct(res.product)
+        setShopInfo(null)
         setSelectedImage(0)
-        setSelectedVariant(null)
+        const firstActiveVariant = res.product.variants?.find((v) => v.isActive) ?? null
+        setSelectedVariant(firstActiveVariant)
+        setSelectedAttributes(firstActiveVariant ? parseVariantAttributes(firstActiveVariant.attributes) : {})
         setQuantity(1)
+
+        if (res.product.shopSlug) {
+          try {
+            const shopRes = await getShopBySlug(res.product.shopSlug, session?.access_token)
+            if (shopRes.success && shopRes.shop) {
+              setShopInfo(shopRes.shop)
+            }
+          } catch {
+          }
+        }
 
         if (res.product.categoryId) {
           setLoadingRelated(true)
@@ -195,7 +246,7 @@ export default function ProductDetailPage() {
               sortBy: "newest",
             })
             if (rel.success) {
-              setRelatedProducts(rel.products.filter((p) => p.id !== id))
+              setRelatedProducts(rel.products.filter((p) => p.slug !== slug))
             }
           } catch {
           } finally {
@@ -210,7 +261,7 @@ export default function ProductDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [slug, session?.access_token])
 
   useEffect(() => {
     load()
@@ -295,11 +346,37 @@ export default function ProductDetailPage() {
     () => product?.variants?.filter((v) => v.isActive) ?? [],
     [product?.variants]
   )
+  const variantsWithParsedAttributes = useMemo(
+    () => activeVariants.map((v) => ({ ...v, parsedAttributes: parseVariantAttributes(v.attributes) })),
+    [activeVariants]
+  )
+  const variantAttributeGroups = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const variant of variantsWithParsedAttributes) {
+      for (const [key, value] of Object.entries(variant.parsedAttributes)) {
+        if (!map.has(key)) map.set(key, new Set<string>())
+        map.get(key)!.add(value)
+      }
+    }
+    return Array.from(map.entries()).map(([key, values]) => ({ key, values: Array.from(values) }))
+  }, [variantsWithParsedAttributes])
   const images = useMemo(() => product?.imageUrls ?? [], [product?.imageUrls])
   const currentStock = useMemo(
     () => selectedVariant?.stockQuantity ?? product?.totalStock ?? 0,
     [selectedVariant?.stockQuantity, product?.totalStock]
   )
+
+  useEffect(() => {
+    if (!variantsWithParsedAttributes.length || !Object.keys(selectedAttributes).length) return
+
+    const matched = variantsWithParsedAttributes.find((variant) =>
+      Object.entries(selectedAttributes).every(([key, value]) => variant.parsedAttributes[key] === value)
+    )
+
+    if (matched && matched.id !== selectedVariant?.id) {
+      setSelectedVariant(matched)
+    }
+  }, [variantsWithParsedAttributes, selectedAttributes, selectedVariant?.id])
 
   useEffect(() => {
     if (!product) return
@@ -580,7 +657,34 @@ export default function ProductDetailPage() {
                 </div>
 
                 {/* Variants */}
-                {activeVariants.length > 0 && (
+                {variantAttributeGroups.length > 0 ? (
+                  <div className="space-y-3">
+                    {variantAttributeGroups.map((group) => (
+                      <div key={group.key} className="space-y-2">
+                        <p className="text-sm font-medium text-gray-600">{group.key}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {group.values.map((value) => {
+                            const selected = selectedAttributes[group.key] === value
+                            return (
+                              <button
+                                key={`${group.key}-${value}`}
+                                type="button"
+                                onClick={() => setSelectedAttributes((prev) => ({ ...prev, [group.key]: value }))}
+                                className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${
+                                  selected
+                                    ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
+                                    : "border-gray-200 text-gray-600 hover:border-gray-300"
+                                }`}
+                              >
+                                {value}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : activeVariants.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-600">Phân loại</p>
                     <div className="flex flex-wrap gap-2">
@@ -711,38 +815,88 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
 
-                <Separator className="bg-gray-100" />
-
-                {/* Shop info */}
-                <div
-                  className="flex items-center justify-between p-4 rounded-xl border border-gray-100"
-                  style={{ backgroundColor: "var(--color-background-light)" }}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="size-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                      style={{ backgroundColor: "var(--color-text-secondary)" }}
-                    >
-                      {product.shopName.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: "var(--color-text-main)" }}>
-                        {product.shopName}
-                      </p>
-                      <p className="text-xs text-gray-400">Cửa hàng chính thức</p>
-                    </div>
-                  </div>
-                  <button
-                    className="px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-gray-50"
-                    style={{ borderColor: "#e5ded6", color: "var(--color-text-secondary)" }}
-                  >
-                    Xem shop
-                  </button>
-                </div>
               </div>
             </div>
           ) : null}
         </section>
+
+        {!loading && product && (
+          <section className="bg-white shadow-sm border border-gray-100 overflow-hidden p-4 md:p-6">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-5">
+              <div className="flex items-start gap-4 lg:min-w-[430px]">
+                <div className="size-20 rounded-full overflow-hidden border-2 border-white shadow-sm flex items-center justify-center" style={{ backgroundColor: "#f0ebe4" }}>
+                  {shopInfo?.logoUrl ? (
+                    <img src={shopInfo.logoUrl} alt={product.shopName} className="size-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold" style={{ color: "var(--color-text-secondary)" }}>
+                      {product.shopName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="text-3xl font-semibold leading-tight" style={{ color: "var(--color-text-main)" }}>{product.shopName}</h3>
+                  <p className="text-sm mt-0.5" style={{ color: "var(--color-text-secondary)" }}>Online gần đây</p>
+
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("open-chat-widget", {
+                          detail: {
+                            shopId: product.shopId,
+                            product: {
+                              id: product.id,
+                              slug: product.slug,
+                              name: product.name,
+                              imageUrl: product.imageUrls?.[0] ?? null,
+                              price: displayPrice,
+                              shopId: product.shopId,
+                            },
+                          },
+                        }))
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border transition-colors hover:bg-orange-50"
+                      style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>chat</span>
+                      Chat Ngay
+                    </button>
+                    <Link
+                      href={`/shop/${product.shopSlug || product.shopId}`}
+                      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border transition-colors hover:bg-gray-50"
+                      style={{ borderColor: "#e5ded6", color: "var(--color-text-secondary)" }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>storefront</span>
+                      Xem Shop
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden lg:block self-stretch w-px bg-gray-200" />
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 flex-1">
+                <div>
+                  <p className="text-sm text-gray-500">Sản Phẩm</p>
+                  <p className="text-sm" style={{ color: "var(--color-primary)" }}>{shopInfo ? formatCompactNumber(shopInfo.productCount) : "Đang cập nhật"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Đánh Giá</p>
+                  <p className="text-sm" style={{ color: "var(--color-primary)" }}>{shopInfo ? `${shopInfo.averageRating.toFixed(1)} (${formatCompactNumber(shopInfo.reviewCount)})` : "Đang cập nhật"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Tham Gia</p>
+                  <p className="text-sm" style={{ color: "var(--color-primary)" }}>{formatJoinTime(shopInfo?.createdAt)}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-500">Người Theo Dõi</p>
+                  <p className="text-sm" style={{ color: "var(--color-primary)" }}>{shopInfo ? formatCompactNumber(shopInfo.followerCount) : "Đang cập nhật"}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Description */}
         {!loading && product?.description && (
@@ -821,7 +975,7 @@ export default function ProductDetailPage() {
                   return (
                     <Link
                       key={p.id}
-                      href={`/products/${p.id}`}
+                      href={`/products/${p.slug || p.id}`}
                       className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
                     >
                       <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">

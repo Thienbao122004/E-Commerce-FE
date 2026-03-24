@@ -18,13 +18,29 @@ import { useTableData } from "@/hooks/use-table-data"
 import { getNextSort } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import type { SellerProduct } from "@/types/seller-dashboard"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
-function SellerProductsContent() {
+function SellerProductsContent({ onReady }: { onReady?: (reload: () => void, loading: boolean) => void }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const productIdFromUrl = searchParams.get("id")
+  const prevProductIdRef = React.useRef<string | null>(productIdFromUrl)
 
   const { products, totalCount, loading, actionLoading, params, totalPages, setPage, setStatus, setSearch, remove, reload } = useSellerProducts()
+
+  React.useEffect(() => {
+    onReady?.(reload, loading)
+  }, [reload, loading, onReady])
+
+  React.useEffect(() => {
+    const prevProductId = prevProductIdRef.current
+
+    if (prevProductId && !productIdFromUrl) {
+      reload()
+    }
+
+    prevProductIdRef.current = productIdFromUrl
+  }, [productIdFromUrl, reload])
 
   const [searchInput, setSearchInput] = useState("")
   const [sort, setSort] = useState<SortConfig | null>(null)
@@ -91,23 +107,7 @@ function SellerProductsContent() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-5 lg:p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Sản phẩm</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Quản lý tất cả sản phẩm của cửa hàng</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-            <IconRefresh className="mr-1.5 size-4" />Làm mới
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/seller/products/new">
-              <IconPlus className="mr-1.5 size-4" />Thêm mới
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-1 flex-col gap-4 p-4">
 
       <ProductStats products={products} totalCount={totalCount} loading={loading} />
 
@@ -145,9 +145,29 @@ function SellerProductsContent() {
 }
 
 export default function SellerProductsPage() {
+  const [reload, setReload] = React.useState<(() => void) | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  const handleReady = React.useCallback((reloadFn: () => void, isLoading: boolean) => {
+    setReload(() => reloadFn)
+    setLoading(isLoading)
+  }, [])
+
   return (
-    <Suspense>
-      <SellerProductsContent />
-    </Suspense>
+    <>
+      <SetHeaderActions>
+        <Button variant="outline" size="sm" onClick={() => reload?.()} disabled={loading || !reload}>
+          <IconRefresh className="mr-1.5 size-4" />Làm mới
+        </Button>
+        <Button size="sm" asChild>
+          <Link href="/seller/products/new">
+            <IconPlus className="mr-1.5 size-4" />Thêm mới
+          </Link>
+        </Button>
+      </SetHeaderActions>
+      <Suspense>
+        <SellerProductsContent onReady={handleReady} />
+      </Suspense>
+    </>
   )
 }

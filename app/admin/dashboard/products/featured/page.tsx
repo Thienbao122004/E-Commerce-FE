@@ -72,7 +72,6 @@ export default function FeaturedProductsPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
-          {/* Top 3 Cards */}
           {!loading && products.length >= 3 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {products.slice(0, 3).map((product, i) => (
@@ -120,12 +119,12 @@ export default function FeaturedProductsPage() {
             </div>
           )}
 
-          {/* Full table */}
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
+                  <TableHead>Mã sản phẩm</TableHead>
                   <TableHead>Tên sản phẩm</TableHead>
                   <TableHead>Cửa hàng</TableHead>
                   <TableHead className="text-right">Đã bán</TableHead>
@@ -138,9 +137,10 @@ export default function FeaturedProductsPage() {
                     {Array.from({ length: 10 }).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-4 w-6" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       </TableRow>
                     ))}
@@ -165,6 +165,7 @@ export default function FeaturedProductsPage() {
                           <span className="text-sm text-muted-foreground font-medium tabular-nums">{i + 1}</span>
                         )}
                       </TableCell>
+                      <TableCell className="font-medium">{product.code}</TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-muted-foreground">

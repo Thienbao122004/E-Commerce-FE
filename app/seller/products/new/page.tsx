@@ -337,8 +337,6 @@ export default function CreateProductPage() {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-3 p-3 lg:gap-4 lg:p-5">
-
-        {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Link href="/seller/products" className="hover:text-foreground transition-colors">
             Sản phẩm
@@ -349,20 +347,9 @@ export default function CreateProductPage() {
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:items-stretch">
 
-          {/* ── LEFT: Form ──────────────────────────── */}
           <div className="lg:col-span-2 flex flex-col gap-4 lg:h-full">
-
-            {/* Basic info */}
-            <Card>
-              <CardHeader className="py-1 px-4">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <span className="flex items-center justify-center size-6 rounded-md bg-primary/10">
-                    <IconBoxSeam className="size-3.5 text-primary" />
-                  </span>
-                  Thông tin cơ bản
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 grid gap-3">
+            <Card className="!rounded">
+              <CardContent className="grid gap-3">
                 <div className="grid gap-1">
                   <Label htmlFor="name" className="text-xs">
                     Tên sản phẩm <span className="text-red-500">*</span>
@@ -418,20 +405,8 @@ export default function CreateProductPage() {
               </CardContent>
             </Card>
 
-            {/* Images */}
-            <Card>
-              <CardHeader className="py-1 px-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <span className="flex items-center justify-center size-6 rounded-md bg-primary/10">
-                      <IconPhoto className="size-3.5 text-primary" />
-                    </span>
-                    Hình ảnh sản phẩm
-                  </CardTitle>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{imageUrls.length}/6</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="px-4 pb-4 grid gap-3">
+            <Card className="!rounded">
+              <CardContent className="grid gap-3">
                 <div
                   className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer select-none ${
                     imageUrls.length >= 6
@@ -450,7 +425,6 @@ export default function CreateProductPage() {
                     onChange={(e) => handleFilesSelected(e.target.files)} />
                   {hasMainPreview ? (
                     <div className="relative h-[180px] w-full">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={mainImage} alt="Ảnh chính" className="absolute inset-0 h-full w-full object-cover"
                         onError={() => setBrokenUrls((p) => new Set(p).add(mainImage))} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
@@ -495,7 +469,6 @@ export default function CreateProductPage() {
                     if (url && !brokenUrls.has(url)) {
                       return (
                         <div key={i} className="relative aspect-square rounded-lg border overflow-hidden group">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={url} alt="" className="w-full h-full object-cover"
                             onError={() => setBrokenUrls((p) => new Set(p).add(url))} />
                           <button type="button" onClick={() => removeImage(i + 1)}
@@ -532,10 +505,9 @@ export default function CreateProductPage() {
             </Card>
           </div>
 
-          {/* ── RIGHT: AI Panel ─────────────────────── */}
           <div className="flex flex-col gap-4 lg:h-full">
-            <Card className="border border-[#d7dfcf] shadow-sm">
-              <CardHeader className="py-1 px-4">
+            <Card className="!rounded">
+              <CardHeader>
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <IconSparkles className="size-3.5" />
@@ -554,8 +526,7 @@ export default function CreateProductPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="px-4 pb-4 grid gap-4">
-                {/* ── DANH MỤC ── */}
+              <CardContent className="grid gap-4">
                 <div>
                   <SectionLabel
                     icon={IconCategory}
@@ -660,7 +631,6 @@ export default function CreateProductPage() {
                   )}
                 </div>
 
-                {/* ── CHẤT LIỆU ── */}
                 <div>
                   <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
                   {!selCategory ? (
@@ -797,8 +767,8 @@ export default function CreateProductPage() {
               </CardContent>
             </Card>
 
-            <Card className="border border-[#d7dfcf] shadow-sm">
-              <CardHeader className="py-1 px-4">
+            <Card>
+              <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2 text-foreground">
                   <span className="flex size-6 items-center justify-center rounded-md bg-primary/10">
                     <IconPencil className="size-3.5 text-primary" />
@@ -806,7 +776,7 @@ export default function CreateProductPage() {
                   Góp ý AI cải thiện
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4">
+              <CardContent>
                 <p className="mb-2 text-xs text-muted-foreground">
                   Chia sẻ góp ý để hệ thống gợi ý danh mục, tag và chất liệu chính xác hơn cho lần đăng tiếp theo.
                 </p>

@@ -1,6 +1,7 @@
 // ====== Shop Info ======
 export type SellerShopInfo = {
   id: string
+  shopCode: string
   name: string
   slug: string
   description: string | null
@@ -47,6 +48,7 @@ export type SellerProductImage = {
 
 export type SellerProduct = {
   id: string
+  productCode: string
   shopId: string
   categoryId: number | null
   categoryName: string | null

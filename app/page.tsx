@@ -666,7 +666,7 @@ export default function LandingPage() {
                     return (
                       <Link
                         key={product.id}
-                        href={`/products/${product.id}`}
+                        href={`/products/${product.slug || product.id}`}
                         className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-[rgba(236,127,19,0.4)]"
                         style={{ backgroundColor: "var(--color-background-light)" }}
                       >
@@ -766,7 +766,7 @@ export default function LandingPage() {
                   return (
                     <Link
                       key={product.id}
-                      href={`/products/${product.id}`}
+                      href={`/products/${product.slug || product.id}`}
                       className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
                     >
                       <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">

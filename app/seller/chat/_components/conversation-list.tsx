@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { IconDotsVertical, IconMessage2, IconSearch } from "@tabler/icons-react"
-import type { Conversation } from "./chat-types"
+import type { ConversationDto } from "./chat-types"
 
 function Avatar({ name, online, size = "md" }: { name: string; online?: boolean; size?: "sm" | "md" }) {
   const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
@@ -27,8 +27,29 @@ function Avatar({ name, online, size = "md" }: { name: string; online?: boolean;
   )
 }
 
+function formatTime(dateStr: string) {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+  }
+  if (diffDays === 1) return "Hôm qua"
+  if (diffDays < 7) return `${diffDays} ngày trước`
+  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+}
+
+function getLastMessagePreview(conversation: ConversationDto): string {
+  const lastMessage = conversation.lastMessage
+  if (!lastMessage) return "Chưa có tin nhắn"
+  if (lastMessage.messageType === "image") return "[Hình ảnh]"
+  return lastMessage.content || "Chưa có tin nhắn"
+}
+
 type Props = {
-  conversations: Conversation[]
+  conversations: ConversationDto[]
   activeId: string | null
   search: string
   totalUnread: number
@@ -86,23 +107,23 @@ export function ConversationList({ conversations, activeId, search, totalUnread,
                 activeId === conv.id && "bg-muted/60"
               )}
             >
-              <Avatar name={conv.buyerName} online={conv.online} />
+              <Avatar name={conv.buyerName} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <p className={cn("text-sm truncate", conv.unread > 0 ? "font-semibold" : "font-medium")}>
+                  <p className={cn("text-sm truncate", conv.unreadCount > 0 ? "font-semibold" : "font-medium")}>
                     {conv.buyerName}
                   </p>
-                  <span className={cn("text-[10px] shrink-0 ml-1", conv.unread > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
-                    {conv.lastTime}
+                  <span className={cn("text-[10px] shrink-0 ml-1", conv.unreadCount > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+                    {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">
-                  <p className={cn("text-xs truncate", conv.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
-                    {conv.lastMessage}
+                  <p className={cn("text-xs truncate", conv.unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>
+                    {getLastMessagePreview(conv)}
                   </p>
-                  {conv.unread > 0 && (
+                  {conv.unreadCount > 0 && (
                     <span className="ml-1 flex items-center justify-center shrink-0 size-4 rounded-full bg-primary text-[10px] text-primary-foreground font-bold">
-                      {conv.unread}
+                      {conv.unreadCount}
                     </span>
                   )}
                 </div>

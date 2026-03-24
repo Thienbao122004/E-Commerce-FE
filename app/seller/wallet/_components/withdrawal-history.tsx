@@ -78,7 +78,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Loading Skeleton */}
         {loading && (
           <div className="grid divide-y">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -97,7 +96,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
           </div>
         )}
 
-        {/* Empty State */}
         {!loading && withdrawals.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
             <div className="flex size-14 items-center justify-center rounded-full bg-muted">
@@ -110,7 +108,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
           </div>
         )}
 
-        {/* Withdrawal List */}
         {!loading && withdrawals.length > 0 && (
           <div className="divide-y">
             {withdrawals.map((w) => {
@@ -120,12 +117,10 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
                   key={w.id}
                   className="flex items-center gap-3 px-4 lg:px-5 py-3.5 hover:bg-muted/30 transition-colors"
                 >
-                  {/* Icon */}
                   <div className="flex items-center justify-center size-10 rounded-lg shrink-0 bg-muted/60">
                     <IconArrowUpRight className="size-4.5 text-muted-foreground" />
                   </div>
 
-                  {/* Details */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       Rút về {w.bankName}
@@ -149,7 +144,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
                     )}
                   </div>
 
-                  {/* Amount */}
                   <div className="text-right shrink-0">
                     <p className="font-semibold text-sm tabular-nums">-{currency(w.amount)}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{w.bankAccountName}</p>
@@ -161,7 +155,6 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
         )}
       </CardContent>
 
-      {/* Pagination */}
       {!loading && total > 0 && (
         <div className="flex items-center justify-between px-4 lg:px-5 py-3 border-t bg-muted/20">
           <p className="text-xs text-muted-foreground">

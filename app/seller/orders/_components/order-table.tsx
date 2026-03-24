@@ -85,7 +85,7 @@ export function OrderTable({
               <SortableTableHead sortKey="status" currentSort={sort} onSort={onSort}>Trạng thái</SortableTableHead>
               <SortableTableHead sortKey="totalAmount" currentSort={sort} onSort={onSort}>Tổng tiền</SortableTableHead>
               <TableHead className="hidden lg:table-cell">Địa chỉ</TableHead>
-              <TableHead className="w-[100px] text-center">Thao tác</TableHead>
+              <TableHead className="w-[100px] text-center"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -145,7 +145,7 @@ export function OrderTable({
                       {currency(order.totalAmount)}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                      <p className="text-sm text-muted-foreground line-clamp-1 max-w-[200px]">
+                      <p className="text-sm text-muted-foreground">
                         {order.shippingAddress ?? "—"}
                       </p>
                     </TableCell>
