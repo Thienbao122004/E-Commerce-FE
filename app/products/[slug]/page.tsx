@@ -29,6 +29,11 @@ const CartDropdown = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
+const NotificationDropdown = dynamic(
+  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
 /* ─────────── helpers ─────────── */
 
 function formatPrice(price: number) {
@@ -423,6 +428,7 @@ export default function ProductDetailPage() {
 
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <HeaderUser />
+          <NotificationDropdown />
           <CartDropdown />
         </div>
       </div>

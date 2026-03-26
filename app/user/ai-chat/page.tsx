@@ -3,6 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import {
+  Send,
+  MapPin,
+  RotateCcw,
+  ShoppingBag,
+  ChevronDown,
+  Check,
+  CircleCheck,
+} from 'lucide-react'
 import { aiChatService, type AiChatSendResponse } from '@/services/ai-chat'
 import { cartService } from '@/services/cart'
 import { profileService } from '@/services/profile'
@@ -43,8 +52,93 @@ function formatPrice(price: number) {
   return price.toLocaleString('vi-VN') + 'đ'
 }
 
+function formatTime(dateStr?: string) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+}
+
 function isOrderRequestText(text: string) {
   return /tạo đơn|đặt đơn|checkout|thanh toán|mua luôn|chốt đơn/i.test(text)
+}
+
+/* ─── Shopio Assistant Avatar ─── */
+function ShopioAvatar({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClass = size === 'sm' ? 'size-7' : size === 'md' ? 'size-9' : 'size-12'
+  const iconSize = size === 'sm' ? 14 : size === 'md' ? 18 : 24
+  return (
+    <div
+      className={`${sizeClass} rounded-full flex items-center justify-center shrink-0`}
+      style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, #f59c2a 100%)' }}
+    >
+      <ShoppingBag size={iconSize} className="text-white" />
+    </div>
+  )
+}
+
+/* ─── Typing indicator ─── */
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-3 py-2">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="size-1.5 rounded-full animate-bounce"
+          style={{
+            backgroundColor: '#c4b8aa',
+            animationDelay: `${i * 0.15}s`,
+            animationDuration: '1s',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ─── Welcome message ─── */
+function WelcomeScreen() {
+  const suggestions = [
+    'Tôi cần áo thun nam dưới 200k',
+    'Tìm giúp tôi son môi đỏ',
+    'Laptop gaming tầm 15 triệu',
+    'Đồ ăn vặt ngon ngon',
+  ]
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-6 px-6">
+      <div className="flex flex-col items-center gap-3">
+        <ShopioAvatar size="lg" />
+        <div className="text-center">
+          <p className="font-semibold text-base" style={{ color: 'var(--color-text-main)' }}>
+            Trợ lý mua hàng Shopio
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Mô tả món đồ bạn muốn, mình sẽ tìm sản phẩm phù hợp nhất!
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className="rounded-xl border px-3 py-2.5 text-left text-xs leading-snug transition-colors hover:bg-[#fdf6ee]"
+            style={{ borderColor: '#e7ddd2', color: 'var(--color-text-secondary)' }}
+            onClick={() => {
+              const input = document.getElementById('shopio-chat-input') as HTMLInputElement | null
+              if (input) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+                nativeInputValueSetter?.call(input, s)
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+                input.focus()
+              }
+            }}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function UserAiChatPage() {
@@ -63,6 +157,7 @@ export default function UserAiChatPage() {
   const [applyingSelectionMessageId, setApplyingSelectionMessageId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTargetState | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const defaultAddress = useMemo(
     () => addresses.find((a) => a.isDefault) ?? addresses[0] ?? null,
@@ -104,13 +199,12 @@ export default function UserAiChatPage() {
         const session = await aiChatService.getOrCreateSession()
         if (!mounted) return
         setSessionId(session.sessionId)
-        const historyMessages: UiMessage[] =
-          (session.history ?? []).map((m) => ({
-            id: `${m.id}`,
-            role: m.role,
-            content: m.content,
-            createdAt: m.createdAt,
-          }))
+        const historyMessages: UiMessage[] = (session.history ?? []).map((m) => ({
+          id: `${m.id}`,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt,
+        }))
         setMessages(historyMessages)
 
         const cachedRaw = sessionStorage.getItem(`${AI_CHAT_CACHE_PREFIX}${session.sessionId}`)
@@ -129,25 +223,21 @@ export default function UserAiChatPage() {
               setSelectedProductsByMessageId(cached.selectedProductsByMessageId)
             }
           } catch {
-            // ignore invalid cache
+            // ignore
           }
         }
         await loadAddresses()
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Không thể khởi tạo AI chat'
+        const msg = err instanceof Error ? err.message : 'Không thể khởi tạo trợ lý'
         toast.error(msg)
       } finally {
         if (mounted) setBootLoading(false)
       }
     })()
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [loadAddresses])
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
   useEffect(() => {
     if (!sessionId) return
@@ -199,10 +289,7 @@ export default function UserAiChatPage() {
         .map((p) => {
           const selection = selections[p.id]
           if (!selection?.checked) return null
-          return {
-            ...p,
-            quantity: Math.max(1, Number(selection.quantity) || 1),
-          }
+          return { ...p, quantity: Math.max(1, Number(selection.quantity) || 1) }
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
     },
@@ -223,10 +310,7 @@ export default function UserAiChatPage() {
       setApplyingSelectionMessageId(message.id)
       try {
         for (const item of selectedItems) {
-          await cartService.addItem({
-            productId: item.id,
-            quantity: item.quantity,
-          })
+          await cartService.addItem({ productId: item.id, quantity: item.quantity })
         }
 
         const cart = await cartService.getMyCart()
@@ -272,7 +356,7 @@ export default function UserAiChatPage() {
             : `Đã thêm ${selectedItems.length} sản phẩm đã chọn vào giỏ`
         )
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Không thể thêm các sản phẩm đã chọn vào giỏ')
+        toast.error(err instanceof Error ? err.message : 'Không thể thêm sản phẩm vào giỏ')
       } finally {
         setApplyingSelectionMessageId(null)
       }
@@ -297,9 +381,10 @@ export default function UserAiChatPage() {
     try {
       const res = await aiChatService.sendMessage(sessionId, msg)
       const resolvedCartId = res.cartId
-      const fallbackAssistantReply = (res.products?.length ?? 0) > 0
-        ? 'Mình đã tìm thấy sản phẩm phù hợp ở bên dưới.'
-        : 'Mình chưa tìm thấy sản phẩm phù hợp. Bạn thử thêm từ khóa ngành hàng, mức giá, thuộc tính hoặc thương hiệu để mình lọc chính xác hơn nhé.'
+      const fallbackAssistantReply =
+        (res.products?.length ?? 0) > 0
+          ? 'Mình đã tìm thấy sản phẩm phù hợp ở bên dưới.'
+          : 'Mình chưa tìm thấy sản phẩm phù hợp. Bạn thử thêm từ khóa ngành hàng, mức giá, thuộc tính hoặc thương hiệu để mình lọc chính xác hơn nhé.'
 
       const assistantMsg: UiMessage = {
         id: `a-${Date.now()}`,
@@ -320,7 +405,6 @@ export default function UserAiChatPage() {
             }
             return acc
           }, {})
-
           return { ...prev, [assistantMsg.id]: nextMap }
         })
       }
@@ -333,12 +417,7 @@ export default function UserAiChatPage() {
 
       if (shouldOpenConfirm) {
         if (resolvedCartId) {
-          setConfirmTarget({
-            cartId: resolvedCartId,
-            messageId: assistantMsg.id,
-            preview: undefined,
-            previews: undefined,
-          })
+          setConfirmTarget({ cartId: resolvedCartId, messageId: assistantMsg.id })
         } else {
           const ok = await buildConfirmFromCart(assistantMsg.id)
           if (!ok && isOrderRequestText(msg)) {
@@ -363,9 +442,7 @@ export default function UserAiChatPage() {
     try {
       const latestAddressRes = await profileService.getAddresses().catch(() => null)
       const latestAddresses = latestAddressRes?.success ? (latestAddressRes.data ?? []) : []
-      if (latestAddresses.length > 0) {
-        setAddresses(latestAddresses)
-      }
+      if (latestAddresses.length > 0) setAddresses(latestAddresses)
 
       const resolvedAddress =
         latestAddresses.find((a) => a.id === selectedAddressId) ??
@@ -377,10 +454,7 @@ export default function UserAiChatPage() {
         toast.message('Bạn chưa có địa chỉ giao hàng. Hãy bấm "Quản lý địa chỉ" để thêm địa chỉ trước khi tạo đơn.')
         return
       }
-
-      if (resolvedAddress.id !== selectedAddressId) {
-        setSelectedAddressId(resolvedAddress.id)
-      }
+      if (resolvedAddress.id !== selectedAddressId) setSelectedAddressId(resolvedAddress.id)
 
       let cartId = confirmTarget?.cartId
       if (!cartId) {
@@ -392,11 +466,7 @@ export default function UserAiChatPage() {
         return
       }
 
-      const res = await aiChatService.confirmOrder(
-        sessionId,
-        cartId,
-        resolvedAddress.id
-      )
+      const res = await aiChatService.confirmOrder(sessionId, cartId, resolvedAddress.id)
       if (res.success) {
         setMessages((prev) => [
           ...prev,
@@ -407,7 +477,7 @@ export default function UserAiChatPage() {
             createdAt: new Date().toISOString(),
           },
         ])
-        toast.success('Tạo đơn hàng thành công từ AI chat')
+        toast.success('Tạo đơn hàng thành công')
       } else {
         toast.error(res.message || 'Không thể tạo đơn hàng')
       }
@@ -446,9 +516,7 @@ export default function UserAiChatPage() {
   }, [sessionId])
 
   useEffect(() => {
-    if (confirmTarget) {
-      setShowAddressPicker(false)
-    }
+    if (confirmTarget) setShowAddressPicker(false)
   }, [confirmTarget])
 
   useEffect(() => {
@@ -470,9 +538,7 @@ export default function UserAiChatPage() {
         prevPreview.imageUrl === picked.imageUrl &&
         prevPreview.basePrice === picked.basePrice &&
         prevPreview.name === picked.name
-      ) {
-        return prev
-      }
+      ) return prev
       return {
         ...prev,
         preview: {
@@ -508,314 +574,428 @@ export default function UserAiChatPage() {
     sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sessionId}`)
   }, [sessionId])
 
+  /* ─── Loading screen ─── */
   if (bootLoading) {
     return (
-      <div className="flex justify-center py-16">
+      <div
+        className="rounded-2xl border overflow-hidden flex flex-col"
+        style={{ height: 'calc(100vh - 130px)', borderColor: '#e5ded6' }}
+      >
         <div
-          className="size-8 rounded-full border-2 animate-spin"
-          style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }}
-        />
+          className="flex items-center gap-3 px-4 py-3 border-b"
+          style={{ borderColor: '#e5ded6', background: 'white' }}
+        >
+          <ShopioAvatar size="md" />
+          <div className="grid gap-1">
+            <div className="h-3.5 w-36 rounded bg-gray-200 animate-pulse" />
+            <div className="h-2.5 w-20 rounded bg-gray-100 animate-pulse" />
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-[#faf8f6]">
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="size-8 rounded-full border-2 animate-spin"
+              style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }}
+            />
+            <p className="text-sm text-muted-foreground">Đang kết nối trợ lý...</p>
+          </div>
+        </div>
       </div>
     )
   }
 
+  /* ─── Main chat UI ─── */
   return (
-    <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
-      <div className="px-4 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: '#e5ded6' }}>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-main)' }}>
-            Trợ lý mua sắm AI
-          </p>
-          <p className="text-xs text-muted-foreground">
-            AI tư vấn sản phẩm, gợi ý shop và hỗ trợ tạo đơn khi bạn đồng ý.
-          </p>
+    <div
+      className="rounded-2xl border overflow-hidden flex flex-col"
+      style={{ height: 'calc(100vh - 130px)', borderColor: '#e5ded6' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between gap-3 px-4 py-3 border-b shrink-0"
+        style={{ borderColor: '#e5ded6', background: 'white' }}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <ShopioAvatar size="md" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-main)' }}>
+              Trợ lý mua hàng Shopio
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-green-500 inline-block" />
+              <span className="text-[11px] text-muted-foreground">Luôn sẵn sàng hỗ trợ</span>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/user/profile/addresses"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors hover:bg-[#fdf6ee]"
+            style={{ borderColor: '#e0d2c2', color: 'var(--color-text-secondary)' }}
+          >
+            <MapPin size={12} />
+            Địa chỉ
+          </Link>
           <button
             type="button"
             onClick={handleNewConversation}
-            className="px-2.5 py-1 rounded border text-[11px]"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors hover:bg-[#fdf6ee]"
             style={{ borderColor: '#e0d2c2', color: 'var(--color-text-secondary)' }}
+            title="Cuộc trò chuyện mới"
           >
-            Cuộc chat mới
+            <RotateCcw size={12} />
+            Mới
           </button>
-          <Link href="/user/profile/addresses" className="text-xs hover:underline" style={{ color: 'var(--color-primary)' }}>
-            Quản lý địa chỉ
-          </Link>
         </div>
       </div>
 
-      <div ref={listRef} className="h-[60vh] overflow-y-auto px-4 py-4 space-y-3 bg-[#fcfbfa]">
-        {messages.length === 0 && (
-          <div className="text-center py-12 text-sm text-muted-foreground">
-            Hãy mô tả món đồ bạn muốn mua, ví dụ: &quot;Tôi cần áo thun nam dưới 200k&quot;
-          </div>
-        )}
+      {/* Messages area */}
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto px-4 py-4"
+        style={{ background: '#faf8f6' }}
+      >
+        {messages.length === 0 ? (
+          <WelcomeScreen />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {m.role === 'assistant' && <ShopioAvatar size="sm" />}
 
-        {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                m.role === 'user'
-                  ? 'text-white'
-                  : 'bg-white border'
-              }`}
-              style={
-                m.role === 'user'
-                  ? { backgroundColor: 'var(--color-primary)' }
-                  : { borderColor: '#e5ded6', color: 'var(--color-text-main)' }
-              }
-            >
-              {!(m.role === 'assistant' && m.responseMeta?.products?.length) && (
-                <p className="whitespace-pre-wrap">{m.content}</p>
-              )}
-              {m.responseMeta?.intent === 'checkout' && confirmTarget?.messageId !== m.id && (
-                <p className="mt-2 text-[11px] text-[#8a6a36]">
-                  Lưu ý: để tạo đơn thành công, bạn cần bấm xác nhận ở khối bên dưới.
-                </p>
-              )}
+                <div className={`flex flex-col gap-1 max-w-[78%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                      m.role === 'user'
+                        ? 'rounded-br-sm text-white'
+                        : 'rounded-bl-sm bg-white border'
+                    }`}
+                    style={
+                      m.role === 'user'
+                        ? { backgroundColor: 'var(--color-primary)' }
+                        : { borderColor: '#e8e0d6', color: 'var(--color-text-main)' }
+                    }
+                  >
+                    {/* Text content */}
+                    {!(m.role === 'assistant' && m.responseMeta?.products?.length) && (
+                      <p className="whitespace-pre-wrap">{m.content}</p>
+                    )}
 
-              {m.responseMeta?.products?.length ? (
-                <div className="mt-3 space-y-2">
-                  {m.responseMeta.products.map((p) => {
-                    const selection = selectedProductsByMessageId[m.id]?.[p.id]
-                    const checked = selection?.checked ?? false
-                    const quantity = Math.max(1, Number(selection?.quantity) || 1)
+                    {/* Product list */}
+                    {m.responseMeta?.products?.length ? (
+                      <div className="flex flex-col gap-2">
+                        {m.responseMeta.products.map((p) => {
+                          const selection = selectedProductsByMessageId[m.id]?.[p.id]
+                          const checked = selection?.checked ?? false
+                          const quantity = Math.max(1, Number(selection?.quantity) || 1)
 
-                    return (
-                      <div
-                        key={p.id}
-                        className="rounded-lg border bg-white px-2.5 py-2"
-                        style={{ borderColor: checked ? '#f3d7ad' : '#eee6de' }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
+                          return (
+                            <div
+                              key={p.id}
+                              className="rounded-xl border bg-white overflow-hidden"
+                              style={{ borderColor: checked ? '#f3c97b' : '#ede5db' }}
+                            >
+                              <div className="flex items-start gap-2.5 p-2.5">
+                                {/* Checkbox */}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedProductsByMessageId((prev) => {
+                                      const messageMap = prev[m.id] ?? {}
+                                      const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
+                                      return {
+                                        ...prev,
+                                        [m.id]: {
+                                          ...messageMap,
+                                          [p.id]: {
+                                            checked: !current.checked,
+                                            quantity: Math.max(1, Number(current.quantity) || 1),
+                                          },
+                                        },
+                                      }
+                                    })
+                                  }
+                                  className="mt-0.5 size-4 rounded border shrink-0 flex items-center justify-center transition-colors"
+                                  style={{
+                                    borderColor: checked ? 'var(--color-primary)' : '#c8bdb1',
+                                    backgroundColor: checked ? 'var(--color-primary)' : 'transparent',
+                                  }}
+                                  aria-label={`Chọn ${p.name}`}
+                                >
+                                  {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+                                </button>
+
+                                {/* Product image */}
+                                <div className="size-12 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                                  {p.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={p.imageUrl} alt={p.name} className="size-full object-cover" />
+                                  ) : (
+                                    <div className="size-full flex items-center justify-center">
+                                      <ShoppingBag size={16} className="text-gray-300" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Info */}
+                                <div className="min-w-0 flex-1 flex flex-col gap-1">
+                                  <p className="text-xs font-semibold line-clamp-2" style={{ color: '#2f2f2f' }}>
+                                    {p.name}
+                                  </p>
+                                  <p className="text-[11px] text-muted-foreground">{p.categoryName ?? 'Sản phẩm gợi ý'}</p>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>
+                                      {formatPrice(p.basePrice)}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <label className="text-[11px] text-muted-foreground">SL</label>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={quantity}
+                                        onChange={(e) => {
+                                          const parsed = Number(e.target.value)
+                                          const nextQty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1
+                                          setSelectedProductsByMessageId((prev) => {
+                                            const messageMap = prev[m.id] ?? {}
+                                            const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
+                                            return {
+                                              ...prev,
+                                              [m.id]: {
+                                                ...messageMap,
+                                                [p.id]: { checked: current.checked, quantity: nextQty },
+                                              },
+                                            }
+                                          })
+                                        }}
+                                        className="h-6 w-12 rounded border px-1.5 text-[11px] focus:outline-none text-center"
+                                        style={{ borderColor: '#e3d3b7' }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div
+                                className="flex items-center justify-end px-2.5 py-1.5 border-t"
+                                style={{ borderColor: '#f0e8de', backgroundColor: '#fdfaf6' }}
+                              >
+                                <Link
+                                  href={`/products/${p.slug || p.id}`}
+                                  className="text-[11px] font-medium underline"
+                                  style={{ color: 'var(--color-primary)' }}
+                                >
+                                  Xem chi tiết →
+                                </Link>
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {/* Apply selection row */}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          <p className="text-[11px]" style={{ color: '#8a6a36' }}>
+                            Đã chọn {getSelectedProducts(m.id, m.responseMeta.products).length} sản phẩm
+                          </p>
                           <button
                             type="button"
-                            onClick={() =>
-                              setSelectedProductsByMessageId((prev) => {
-                                const messageMap = prev[m.id] ?? {}
-                                const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
-                                return {
-                                  ...prev,
-                                  [m.id]: {
-                                    ...messageMap,
-                                    [p.id]: {
-                                      checked: !current.checked,
-                                      quantity: Math.max(1, Number(current.quantity) || 1),
-                                    },
-                                  },
-                                }
-                              })
+                            onClick={() => void handleApplySelectedProducts(m)}
+                            disabled={
+                              applyingSelectionMessageId === m.id ||
+                              getSelectedProducts(m.id, m.responseMeta.products).length === 0
                             }
-                            className="mt-1 size-4 rounded border shrink-0 flex items-center justify-center"
-                            style={{
-                              borderColor: checked ? 'var(--color-primary)' : '#d1c5b8',
-                              backgroundColor: checked ? 'rgba(236,127,19,0.12)' : 'transparent',
-                            }}
-                            aria-label={`Chọn ${p.name}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[11px] font-medium disabled:opacity-50 transition-opacity"
+                            style={{ backgroundColor: 'var(--color-primary)' }}
                           >
-                            {checked && (
-                              <span className="material-symbols-outlined text-[12px]" style={{ color: 'var(--color-primary)' }}>
-                                check
-                              </span>
+                            {applyingSelectionMessageId === m.id ? (
+                              'Đang xử lý...'
+                            ) : (
+                              <>
+                                <CircleCheck size={12} />
+                                Thêm vào giỏ
+                              </>
                             )}
                           </button>
-                          <div className="size-12 rounded-md overflow-hidden bg-gray-100 shrink-0">
-                            {p.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.imageUrl} alt={p.name} className="size-full object-cover" />
-                            ) : (
-                              <div className="size-full flex items-center justify-center text-gray-400 text-[10px]">
-                                No img
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold line-clamp-2 text-[#2f2f2f]">{p.name}</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{p.categoryName ?? 'Sản phẩm gợi ý'}</p>
-                            <div className="mt-1.5 flex items-center gap-2">
-                              <label className="text-[11px] text-muted-foreground">SL</label>
-                              <input
-                                type="number"
-                                min={1}
-                                value={quantity}
-                                onChange={(e) => {
-                                  const parsed = Number(e.target.value)
-                                  const nextQty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1
-                                  setSelectedProductsByMessageId((prev) => {
-                                    const messageMap = prev[m.id] ?? {}
-                                    const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
-                                    return {
-                                      ...prev,
-                                      [m.id]: {
-                                        ...messageMap,
-                                        [p.id]: {
-                                          checked: current.checked,
-                                          quantity: nextQty,
-                                        },
-                                      },
-                                    }
-                                  })
-                                }}
-                                className="h-7 w-16 rounded border px-2 text-[11px] focus:outline-none"
-                                style={{ borderColor: '#e3d3b7' }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-xs font-semibold text-[var(--color-primary)]">
-                            {formatPrice(p.basePrice)}
-                          </span>
                         </div>
-                        <div className="mt-2 flex justify-end">
-                          <Link
-                            href={`/products/${p.slug || p.id}`}
-                            className="text-[11px] underline"
-                            style={{ color: 'var(--color-primary)' }}
-                          >
-                            Xem chi tiết
-                          </Link>
-                        </div>
+
+                        {/* Text below products */}
+                        <p className="whitespace-pre-wrap text-sm pt-1">{m.content}</p>
                       </div>
-                    )
-                  })}
-                  <div className="pt-1 flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-[#8a6a36]">
-                      Đã chọn{' '}
-                      {getSelectedProducts(m.id, m.responseMeta.products).length}
-                      {' '}sản phẩm
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void handleApplySelectedProducts(m)}
-                      disabled={
-                        applyingSelectionMessageId === m.id ||
-                        getSelectedProducts(m.id, m.responseMeta.products).length === 0
-                      }
-                      className="px-3 py-1.5 rounded text-white text-[11px] disabled:opacity-50"
-                      style={{ backgroundColor: 'var(--color-primary)' }}
-                    >
-                      {applyingSelectionMessageId === m.id ? 'Đang xử lý...' : 'OK'}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {m.role === 'assistant' && Boolean(m.responseMeta?.products?.length) && (
-                <p className="whitespace-pre-wrap mt-2">{m.content}</p>
-              )}
+                    ) : null}
 
-              {confirmTarget?.messageId === m.id && (
-                <div className="mt-3 rounded-lg border bg-[#fffaf3] p-2.5" style={{ borderColor: '#f3d7ad' }}>
-                  <p className="text-[12px] font-semibold text-[#7a5b29]">Xác nhận tạo đơn hàng</p>
-                  <p className="text-[12px] mt-1 text-[#7a5b29]">
-                    Bạn có đồng ý tạo đơn hàng từ giỏ hiện tại không?
-                  </p>
-                  {(() => {
-                    const confirmPreviews =
-                      confirmTarget.previews?.length
-                        ? confirmTarget.previews
-                        : confirmTarget.preview
-                          ? [confirmTarget.preview]
-                          : []
-                    if (!confirmPreviews.length) return null
+                    {/* Confirm order block */}
+                    {confirmTarget?.messageId === m.id && (
+                      <div
+                        className="mt-3 rounded-xl border p-3 flex flex-col gap-2"
+                        style={{ borderColor: '#f3d7ad', backgroundColor: '#fffcf5' }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <CircleCheck size={15} style={{ color: '#b07d2a' }} />
+                          <p className="text-[12px] font-semibold" style={{ color: '#7a5b29' }}>
+                            Xác nhận tạo đơn hàng
+                          </p>
+                        </div>
+                        <p className="text-[12px]" style={{ color: '#7a5b29' }}>
+                          Bạn có đồng ý tạo đơn từ giỏ hàng hiện tại không?
+                        </p>
 
-                    return (
-                      <div className="mt-2 rounded-md border bg-white p-2 space-y-2" style={{ borderColor: '#efddbf' }}>
-                        {confirmPreviews.map((item, index) => (
-                          <div key={`${item.id}-${index}`} className="flex items-center gap-2">
-                            <div className="size-12 rounded-md overflow-hidden bg-gray-100 shrink-0">
-                              {item.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.imageUrl}
-                                  alt={item.name}
-                                  className="size-full object-cover"
-                                />
-                              ) : (
-                                <div className="size-full flex items-center justify-center text-gray-400 text-[10px]">
-                                  No img
+                        {/* Preview items */}
+                        {(() => {
+                          const confirmPreviews = confirmTarget.previews?.length
+                            ? confirmTarget.previews
+                            : confirmTarget.preview ? [confirmTarget.preview] : []
+                          if (!confirmPreviews.length) return null
+                          return (
+                            <div
+                              className="rounded-lg border p-2 flex flex-col gap-2"
+                              style={{ borderColor: '#efddbf', backgroundColor: 'white' }}
+                            >
+                              {confirmPreviews.map((item, index) => (
+                                <div key={`${item.id}-${index}`} className="flex items-center gap-2">
+                                  <div className="size-10 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                                    {item.imageUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={item.imageUrl} alt={item.name} className="size-full object-cover" />
+                                    ) : (
+                                      <div className="size-full flex items-center justify-center">
+                                        <ShoppingBag size={14} className="text-gray-300" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium line-clamp-1" style={{ color: '#3d3d3d' }}>
+                                      {item.name}
+                                    </p>
+                                    <p className="text-[11px]" style={{ color: '#8a6a36' }}>
+                                      SL: {item.quantity} · {formatPrice(item.basePrice)}
+                                    </p>
+                                  </div>
                                 </div>
-                              )}
+                              ))}
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-[#3d3d3d] line-clamp-2">
-                                {item.name}
-                              </p>
-                              <p className="text-[11px] text-[#8a6a36]">
-                                SL: {item.quantity} · {formatPrice(item.basePrice)}
+                          )
+                        })()}
+
+                        {/* Address */}
+                        {!effectiveAddress && (
+                          <p className="text-[11px]" style={{ color: '#9b6a20' }}>
+                            Bạn chưa có địa chỉ giao hàng.{' '}
+                            <Link href="/user/profile/addresses" className="underline">
+                              Thêm địa chỉ
+                            </Link>
+                          </p>
+                        )}
+                        {effectiveAddress && (
+                          <div
+                            className="rounded-lg border px-2.5 py-2"
+                            style={{ borderColor: '#efddbf', backgroundColor: 'white' }}
+                          >
+                            <div className="flex items-start gap-1.5">
+                              <MapPin size={11} className="mt-0.5 shrink-0" style={{ color: '#b07d2a' }} />
+                              <p className="text-[11px] leading-snug flex-1" style={{ color: '#7a5b29' }}>
+                                {effectiveAddress.fullName ?? 'Người nhận'} — {effectiveAddress.addressLine1}, {effectiveAddress.ward ?? ''}, {effectiveAddress.district ?? ''}, {effectiveAddress.city}
                               </p>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddressPicker((prev) => !prev)}
+                              className="mt-1 flex items-center gap-1 text-[11px] font-medium"
+                              style={{ color: 'var(--color-primary)' }}
+                            >
+                              <ChevronDown size={11} className={showAddressPicker ? 'rotate-180' : ''} />
+                              {showAddressPicker ? 'Ẩn' : 'Đổi địa chỉ'}
+                            </button>
                           </div>
-                        ))}
+                        )}
+                        {showAddressPicker && addresses.length > 0 && (
+                          <select
+                            value={selectedAddressId}
+                            onChange={(e) => setSelectedAddressId(e.target.value)}
+                            className="w-full h-8 rounded-lg border px-2 text-xs bg-white"
+                            style={{ borderColor: '#e3d3b7' }}
+                          >
+                            {addresses.map((addr) => (
+                              <option key={addr.id} value={addr.id}>
+                                {addr.fullName ?? 'Người nhận'} — {addr.addressLine1}, {addr.ward ?? ''}, {addr.district ?? ''}, {addr.city}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleConfirmOrder}
+                            disabled={orderLoading}
+                            className="flex-1 py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50 transition-opacity"
+                            style={{ backgroundColor: 'var(--color-primary)' }}
+                          >
+                            {orderLoading ? 'Đang tạo...' : 'Đồng ý tạo đơn'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRejectOrder}
+                            disabled={orderLoading}
+                            className="flex-1 py-2 rounded-lg text-xs border font-medium"
+                            style={{ borderColor: '#d9cdc0', color: 'var(--color-text-secondary)' }}
+                          >
+                            Không đồng ý
+                          </button>
+                        </div>
                       </div>
-                    )
-                  })()}
-                  {!effectiveAddress && (
-                    <p className="text-[11px] mt-1 text-[#9b6a20]">
-                      Bạn chưa có địa chỉ giao hàng. Hãy thêm địa chỉ để hệ thống có thể tạo đơn cho bạn.
-                    </p>
-                  )}
-                  {effectiveAddress && (
-                    <div className="mt-2 rounded-md border bg-white p-2" style={{ borderColor: '#efddbf' }}>
-                      <p className="text-[11px] text-[#8a6a36]">
-                        Giao đến: {effectiveAddress.fullName ?? 'Người nhận'} - {effectiveAddress.addressLine1}, {effectiveAddress.ward ?? ''}, {effectiveAddress.district ?? ''}, {effectiveAddress.city}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddressPicker((prev) => !prev)}
-                        className="mt-1 text-[11px] underline"
-                        style={{ color: 'var(--color-primary)' }}
-                      >
-                        {showAddressPicker ? 'Ẩn đổi địa chỉ' : 'Đổi địa chỉ'}
-                      </button>
-                    </div>
-                  )}
-                  {showAddressPicker && addresses.length > 0 && (
-                    <div className="mt-2">
-                      <label className="text-[11px] text-[#8a6a36]">Chọn địa chỉ khác</label>
-                      <select
-                        value={selectedAddressId}
-                        onChange={(e) => setSelectedAddressId(e.target.value)}
-                        className="mt-1 w-full h-8 rounded border px-2 text-xs bg-white"
-                        style={{ borderColor: '#e3d3b7' }}
-                      >
-                        {addresses.map((addr) => (
-                          <option key={addr.id} value={addr.id}>
-                            {addr.fullName ?? 'Người nhận'} - {addr.addressLine1}, {addr.ward ?? ''}, {addr.district ?? ''}, {addr.city}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleConfirmOrder}
-                      disabled={orderLoading}
-                      className="px-3 py-1.5 rounded text-white text-xs disabled:opacity-50"
-                      style={{ backgroundColor: 'var(--color-primary)' }}
-                    >
-                      {orderLoading ? 'Đang tạo...' : 'Đồng ý tạo đơn'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRejectOrder}
-                      disabled={orderLoading}
-                      className="px-3 py-1.5 rounded text-xs border"
-                      style={{ borderColor: '#d9cdc0', color: 'var(--color-text-secondary)' }}
-                    >
-                      Không đồng ý
-                    </button>
+                    )}
                   </div>
+
+                  {/* Timestamp */}
+                  {m.createdAt && (
+                    <span className="text-[10px] text-muted-foreground px-1">
+                      {formatTime(m.createdAt)}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {m.role === 'user' && (
+                  <div
+                    className="size-7 rounded-full flex items-center justify-center shrink-0 text-white text-[11px] font-semibold"
+                    style={{ backgroundColor: '#b07d2a' }}
+                  >
+                    B
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {sending && (
+              <div className="flex gap-2.5 justify-start">
+                <ShopioAvatar size="sm" />
+                <div
+                  className="rounded-2xl rounded-bl-sm bg-white border"
+                  style={{ borderColor: '#e8e0d6' }}
+                >
+                  <TypingDots />
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="border-t p-3" style={{ borderColor: '#e5ded6' }}>
-        <div className="flex gap-2">
+      {/* Input area */}
+      <div
+        className="border-t px-4 py-3 shrink-0"
+        style={{ borderColor: '#e5ded6', background: 'white' }}
+      >
+        <div
+          className="flex items-center gap-2 rounded-xl border px-3 py-2 transition-shadow focus-within:shadow-sm"
+          style={{ borderColor: '#d9cdc0' }}
+        >
           <input
+            id="shopio-chat-input"
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -825,20 +1005,24 @@ export default function UserAiChatPage() {
               }
             }}
             placeholder="Nhập nhu cầu mua sắm của bạn..."
-            className="flex-1 h-10 rounded-md border px-3 text-sm focus:outline-none"
-            style={{ borderColor: '#d9cdc0' }}
+            className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-gray-400"
+            style={{ color: 'var(--color-text-main)' }}
             disabled={sending || !sessionId}
           />
           <button
             type="button"
             onClick={() => void handleSend()}
             disabled={sending || !input.trim() || !sessionId}
-            className="h-10 px-4 rounded text-white text-sm disabled:opacity-50"
+            className="flex items-center justify-center size-8 rounded-lg text-white transition-opacity disabled:opacity-40"
             style={{ backgroundColor: 'var(--color-primary)' }}
+            aria-label="Gửi tin nhắn"
           >
-            {sending ? 'Đang gửi...' : 'Gửi'}
+            <Send size={15} />
           </button>
         </div>
+        <p className="text-[10px] text-muted-foreground text-center pt-1.5">
+          Trợ lý mua hàng Shopio · Có thể gợi ý sản phẩm và hỗ trợ đặt hàng
+        </p>
       </div>
     </div>
   )

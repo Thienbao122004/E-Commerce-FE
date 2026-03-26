@@ -1,6 +1,7 @@
 import { getAccessToken } from "@/lib/auth"
 
 const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || "http://localhost:5001"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
 
 export interface AiChatMessage {
   id: number
@@ -49,6 +50,41 @@ export interface AiChatConfirmOrderResponse {
   message: string
 }
 
+export interface AiSessionSummary {
+  sessionId: string
+  status: string
+  createdAt?: string
+  updatedAt?: string
+  title: string
+  lastMessage?: {
+    role: string
+    content: string
+    createdAt?: string
+  } | null
+  messageCount: number
+}
+
+export interface AiSessionsResponse {
+  success: boolean
+  sessions: AiSessionSummary[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export interface AiSessionMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt?: string
+}
+
+export interface AiSessionMessagesResponse {
+  success: boolean
+  sessionId: string
+  messages: AiSessionMessage[]
+}
+
 async function aiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAccessToken()
   const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
@@ -68,7 +104,28 @@ async function aiRequest<T>(endpoint: string, options: RequestInit = {}): Promis
   return res.json() as Promise<T>
 }
 
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = await getAccessToken()
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    cache: "no-store",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? "Request failed")
+  }
+
+  return res.json() as Promise<T>
+}
+
 export const aiChatService = {
+  // ── Python AI service ──────────────────────────────────────────────────────
   getOrCreateSession: () =>
     aiRequest<AiChatSessionResponse>("/api/ai/chat/session", { method: "POST" }),
 
@@ -86,4 +143,11 @@ export const aiChatService = {
       method: "POST",
       body: JSON.stringify({ sessionId, cartId, shippingAddressId }),
     }),
+
+  // ── ECommerceAPI (đọc lịch sử từ DB) ──────────────────────────────────────
+  listSessions: (page = 1, pageSize = 20) =>
+    apiRequest<AiSessionsResponse>(`/api/ai/sessions?page=${page}&pageSize=${pageSize}`),
+
+  getSessionMessages: (sessionId: string) =>
+    apiRequest<AiSessionMessagesResponse>(`/api/ai/sessions/${sessionId}/messages`),
 }
