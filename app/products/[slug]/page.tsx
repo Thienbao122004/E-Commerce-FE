@@ -29,6 +29,11 @@ const CartDropdown = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
+const NotificationDropdown = dynamic(
+  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
 /* ─────────── helpers ─────────── */
 
 function formatPrice(price: number) {
@@ -423,6 +428,7 @@ export default function ProductDetailPage() {
 
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <HeaderUser />
+          <NotificationDropdown />
           <CartDropdown />
         </div>
       </div>
@@ -905,10 +911,9 @@ export default function ProductDetailPage() {
               <span className="w-1 h-5 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
               Mô tả sản phẩm
             </h2>
-            <div
-              className="text-sm leading-relaxed text-gray-600 whitespace-pre-line"
-              dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, "<br/>") }}
-            />
+            <div className="text-sm leading-relaxed text-gray-600 whitespace-pre-line">
+              {product.description}
+            </div>
           </section>
         )}
 

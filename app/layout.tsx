@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/auth-context"
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { ChatWidgetWrapper } from "@/components/chat/chat-widget-wrapper";
+import { ShopioAssistantWrapper } from "@/components/chat/shopio-assistant-wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               {children}
               <Toaster richColors position="top-right" />
               <ChatWidgetWrapper />
+              <ShopioAssistantWrapper />
             </ThemeProvider>
           </FavoritesProvider>
         </AuthProvider>

@@ -10,4 +10,7 @@ export interface CreatePaymentResponse {
 export const paymentsService = {
   createVNPayPayment: (orderId: string) =>
     api.post<CreatePaymentResponse>('/api/payments/vnpay/create', { orderId }),
+
+  createMoMoPayment: (orderId: string) =>
+    api.post<CreatePaymentResponse>('/api/payments/momo/create', { orderId }),
 }

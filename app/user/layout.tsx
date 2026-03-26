@@ -17,18 +17,29 @@ const CartDropdown = dynamic(
   { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
 )
 
+const NotificationDropdown = dynamic(
+  () => import('@/components/layout/notification-dropdown').then((m) => m.NotificationDropdown),
+  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
+)
+
 const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout']
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
-  const { session, isLoading } = useAuth()
+  const { session, isLoading, role } = useAuth()
   const pathname = usePathname()
   const isFullWidth = FULL_WIDTH_PATHS.some((p) => pathname.startsWith(p))
 
   useEffect(() => {
-    if (!isLoading && !session) {
-      window.location.href = '/login'
+    if (!isLoading) {
+      if (!session) {
+        window.location.href = '/login'
+      } else if (role === 'admin') {
+        window.location.href = '/admin/dashboard'
+      } else if (role === 'seller') {
+        window.location.href = '/seller/dashboard'
+      }
     }
-  }, [isLoading, session])
+  }, [isLoading, session, role])
 
   if (isLoading) {
     return (
@@ -77,14 +88,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <Link
-              href="/user/ai-chat"
-              className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4]"
-              style={{ color: 'var(--color-text-main)' }}
-              title="Chat với AI mua sắm"
-            >
-              <span className="material-symbols-outlined">smart_toy</span>
-            </Link>
+            <NotificationDropdown />
             <HeaderUser />
             <CartDropdown />
           </div>

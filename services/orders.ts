@@ -63,4 +63,7 @@ export const ordersService = {
 
   confirmOrder: (orderId: string) =>
     api.post<ConfirmOrderResponse>(`/api/orders/${orderId}/confirm`),
+
+  cancelPendingOrder: (orderId: string) =>
+    api.post<{ success: boolean; message: string }>(`/api/orders/${orderId}/cancel-pending`),
 }
