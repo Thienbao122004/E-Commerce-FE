@@ -115,18 +115,19 @@ function InsightsTab() {
     finally { setLoading(false) }
   }, [])
 
-  React.useEffect(() => { run() }, [run])
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {data ? <>Cập nhật lúc <strong>{fmtDateTime(data.generatedAt)}</strong></> : "Đang phân tích hệ thống..."}
-        </p>
-        <Button variant="outline" size="sm" onClick={run} disabled={loading}>
-          <IconRefresh className={`mr-1.5 size-4 ${loading ? "animate-spin" : ""}`} />Làm mới
-        </Button>
-      </div>
+      {data && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Cập nhật lúc <strong>{fmtDateTime(data.generatedAt)}</strong>
+          </p>
+          <Button variant="outline" size="sm" onClick={run} disabled={loading}>
+            <IconRefresh className={`mr-1.5 size-4 ${loading ? "animate-spin" : ""}`} />Làm mới
+          </Button>
+        </div>
+      )}
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-3">
@@ -168,8 +169,14 @@ function InsightsTab() {
           </div>
         </>
       ) : (
-        <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-          Nhấn "Làm mới" để tải AI insights
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16 text-center">
+          <div>
+            <p className="font-medium">Phân tích AI chưa được chạy</p>
+            <p className="mt-1 text-sm text-muted-foreground">Nhấn nút bên dưới để AI phân tích tình hình kinh doanh 7 ngày qua</p>
+          </div>
+          <Button onClick={run} disabled={loading} className="gap-2">
+            Phân tích ngay
+          </Button>
         </div>
       )}
     </div>
@@ -301,7 +308,6 @@ function TrendsTab() {
       <Card>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Chỉ số</Label>
             <div className="flex flex-wrap gap-4">
               {METRIC_OPTIONS.map(({ value, label }) => (
                 <label key={value} className="flex cursor-pointer items-center gap-2">

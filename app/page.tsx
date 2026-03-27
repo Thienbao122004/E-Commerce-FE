@@ -203,7 +203,7 @@ export default function LandingPage() {
 
     const [catsRes, flashRes, featuredRes] = await Promise.allSettled([
       getCategories({ pageSize: 6, level: 1 }),
-      getProducts({ pageSize: 12, sortBy: "newest" }),
+      getProducts({ pageSize: 12, sortBy: "best_seller" }),
       getProducts({ pageSize: 12, sortBy: "rating" }),
     ])
 
@@ -607,34 +607,22 @@ export default function LandingPage() {
           )}
         </section>
 
-        <section className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(224,122,95,0.2)" }}>
+        <section className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: "rgba(236,127,19,0.2)" }}>
           <div
-            className="border-b px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-            style={{ backgroundColor: "rgba(224,122,95,0.08)", borderColor: "rgba(224,122,95,0.1)" }}
+            className="border-b px-6 py-4 flex items-center justify-between gap-4"
+            style={{ backgroundColor: "rgba(236,127,19,0.06)", borderColor: "rgba(236,127,19,0.1)" }}
           >
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg text-white" style={{ backgroundColor: "#E07A5F" }}>
-                <span className="material-symbols-outlined">bolt</span>
-              </div>
-              <h2 className="text-2xl font-black uppercase tracking-tight" style={{ color: "#E07A5F" }}>
-                Flash Sale
+              <h2 className="text-2xl font-black tracking-tight" style={{ color: "var(--color-text-secondary)" }}>
+                Sản phẩm nổi bật
               </h2>
-              <span className="hidden md:block h-6 w-px mx-2" style={{ backgroundColor: "rgba(224,122,95,0.3)" }} />
-              <span className="text-sm font-semibold text-gray-500">Ưu đãi hôm nay</span>
+              <span className="hidden md:block h-6 w-px mx-2" style={{ backgroundColor: "rgba(236,127,19,0.3)" }} />
+              <span className="text-sm font-semibold text-gray-500">Được mua nhiều nhất</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Kết thúc sau</span>
-              <div className="flex gap-1 text-white font-bold">
-                {[countdown.h, countdown.m, countdown.s].map((unit, i) => (
-                  <span key={i} className="flex items-center gap-1">
-                    <span className="rounded px-2 py-1 min-w-[36px] text-center text-sm" style={{ backgroundColor: "#E07A5F" }}>
-                      {pad(unit)}
-                    </span>
-                    {i < 2 && <span className="text-sm" style={{ color: "#E07A5F" }}>:</span>}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <Link href="/search" className="text-sm font-bold flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+              Xem tất cả
+              <span className="material-symbols-outlined text-sm hover:underline">chevron_right</span>
+            </Link>
           </div>
 
           <div className="p-6">
@@ -644,8 +632,8 @@ export default function LandingPage() {
               </div>
             ) : flashProducts.length === 0 ? (
               <div className="py-12 text-center text-gray-400">
-                <span className="material-symbols-outlined text-4xl block mb-2">bolt</span>
-                <p>Chưa có sản phẩm Flash Sale</p>
+                <span className="material-symbols-outlined text-4xl block mb-2">star</span>
+                <p>Chưa có sản phẩm nổi bật</p>
               </div>
             ) : (
               <div className="relative mx-4">
@@ -666,9 +654,7 @@ export default function LandingPage() {
                 </button>
 
                 <div ref={flashScrollRef} className="flex gap-6 overflow-x-auto no-scrollbar pb-2 snap-x">
-                  {flashProducts.map((product, i) => {
-                    const discount = FLASH_DISCOUNTS[i % FLASH_DISCOUNTS.length]
-                    const originalPrice = Math.round(product.basePrice / (1 - discount / 100))
+                  {flashProducts.map((product) => {
                     const img = product.imageUrls?.[0]
 
                     return (
@@ -678,9 +664,6 @@ export default function LandingPage() {
                         className="min-w-[240px] md:min-w-[260px] snap-center group relative bg-white rounded-xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-md hover:border-[rgba(236,127,19,0.4)]"
                         style={{ backgroundColor: "var(--color-background-light)" }}
                       >
-                        <div className="absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: "#E07A5F" }}>
-                          -{discount}%
-                        </div>
                         <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                           {img ? (
                             <img
@@ -705,12 +688,9 @@ export default function LandingPage() {
                             {product.name}
                           </h3>
                           <div className="flex items-center justify-between mt-1">
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-400 line-through">{formatPrice(originalPrice)}</span>
-                              <span className="text-lg font-bold" style={{ color: "#E07A5F" }}>
-                                {formatPrice(product.basePrice)}
-                              </span>
-                            </div>
+                            <span className="text-lg font-bold" style={{ color: "var(--color-text-secondary)" }}>
+                              {formatPrice(product.basePrice)}
+                            </span>
                             <button
                               onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
                               className="size-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
@@ -731,7 +711,7 @@ export default function LandingPage() {
                           {product.soldCount > 0 && (
                             <span className="text-[10px] font-semibold text-gray-400">
                               Đã bán{" "}
-                              <span className="font-bold" style={{ color: "#E07A5F" }}>
+                              <span className="font-bold" style={{ color: "var(--color-text-secondary)" }}>
                                 {product.soldCount >= 1000
                                   ? `${(product.soldCount / 1000).toFixed(1)}k`
                                   : product.soldCount}
@@ -747,6 +727,7 @@ export default function LandingPage() {
             )}
           </div>
         </section>
+
 
         <section>
           <div className="flex items-center justify-between mb-6">
