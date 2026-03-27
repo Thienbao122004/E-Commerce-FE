@@ -66,7 +66,6 @@ export function useDashboard(): DashboardData {
       return
     }
 
-    // Fire all 4 fetches independently — each resolves and updates state on its own
     fetchStats(token)
       .then((res) => {
         if (!mountedRef.current) return

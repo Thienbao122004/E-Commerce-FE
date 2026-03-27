@@ -174,7 +174,7 @@ function SearchPageContent() {
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined)
   const [initialCategorySet, setInitialCategorySet] = useState(false)
 
-  const PAGE_SIZE = 24
+  const PAGE_SIZE = 110
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const mainRef = useRef<HTMLDivElement>(null)
 

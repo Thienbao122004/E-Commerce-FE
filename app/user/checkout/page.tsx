@@ -330,7 +330,7 @@ export default function CheckoutPage() {
 
   if (!cart || cart.items.length === 0 || checkoutItems.length === 0) {
     return (
-      <div className="rounded-2xl border bg-white p-10" style={{ borderColor: '#e5ded6' }}>
+      <div className="rounded border bg-white p-10" style={{ borderColor: '#e5ded6' }}>
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="grid size-16 place-items-center rounded-full bg-[rgba(236,127,19,0.1)]">
             <span className="material-symbols-outlined text-[34px]" style={{ color: 'var(--color-primary)' }}>
@@ -358,7 +358,7 @@ export default function CheckoutPage() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
       <div className="flex flex-col gap-4">
-        <div className="overflow-hidden rounded-2xl border bg-white" style={{ borderColor: '#e5ded6' }}>
+        <div className="overflow-hidden rounded border bg-white" style={{ borderColor: '#e5ded6' }}>
           <div className="flex items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: '#efe8de' }}>
             <div className="flex items-center gap-3">
               <div className="grid size-10 place-items-center rounded-full bg-[rgba(236,127,19,0.1)]">
@@ -402,7 +402,7 @@ export default function CheckoutPage() {
         {groupedByShop.map((group) => (
           <div
             key={group.key}
-            className="overflow-hidden rounded-2xl border bg-white"
+            className="overflow-hidden rounded border bg-white"
             style={{ borderColor: '#e5ded6' }}
           >
             <div className="flex items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: '#efe8de' }}>
@@ -515,15 +515,15 @@ export default function CheckoutPage() {
 
       </div>
 
-      <div className="h-fit rounded-2xl border bg-white p-5 lg:sticky lg:top-24" style={{ borderColor: '#e5ded6' }}>
+      <div className="h-fit rounded border bg-white p-5 lg:sticky lg:top-24" style={{ borderColor: '#e5ded6' }}>
         <div className="grid gap-4">
-          <div className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: '#e7e2db' }}>
-            <div className="border-b px-4 py-3" style={{ borderColor: '#e4ddd4' }}>
+          <div className="overflow-hidden bg-white" style={{ borderColor: '#e7e2db' }}>
+            <div className="border-b px-2 py-3" style={{ borderColor: '#e4ddd4' }}>
               <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-main)' }}>
                 Phương thức thanh toán
               </h3>
             </div>
-            <div className="grid gap-2 px-4 py-3">
+            <div className="grid gap-2 py-3">
               {PAYMENT_METHODS.map((method) => {
                 const active = paymentMethod === method.id
                 return (

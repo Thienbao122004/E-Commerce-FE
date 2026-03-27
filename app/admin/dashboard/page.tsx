@@ -2,13 +2,12 @@
 
 import * as React from "react"
 import {
-  IconBrain, IconChartBar, IconChartLine, IconAlertTriangle,
+  IconChartBar, IconChartLine, IconAlertTriangle,
   IconTrendingUp, IconGavel, IconRefresh, IconSparkles,
   IconArrowUpRight, IconArrowDownRight, IconAlertCircle,
   IconChecks, IconBulb, IconArrowRight, IconLayoutDashboard,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,7 +34,6 @@ import type {
   DetectAnomaliesResponse, PredictMetricsResponse, SummarizeDisputesResponse,
 } from "@/services/ai-admin"
 
-// ── Helpers ───────────────────────────────────────────────────────────────
 const fmtVND = (v: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
@@ -47,7 +45,6 @@ function daysAgo(n: number) {
   const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10)
 }
 
-// ── Shared AI sub-components ──────────────────────────────────────────────
 function AiText({ text, className = "" }: { text: string; className?: string }) {
   return (
     <p className={`text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed ${className}`}>{text}</p>
@@ -83,7 +80,6 @@ const METRIC_OPTIONS = [
   { value: "customers", label: "Khách hàng" },
 ]
 
-// ── Tab: Tổng quan ────────────────────────────────────────────────────────
 function OverviewTab() {
   const {
     stats, activities, shops, products,
@@ -103,7 +99,6 @@ function OverviewTab() {
   )
 }
 
-// ── Tab: AI Insights ──────────────────────────────────────────────────────
 function InsightsTab() {
   const [data, setData] = React.useState<DashboardInsightsResponse | null>(null)
   const [loading, setLoading] = React.useState(false)
@@ -114,7 +109,6 @@ function InsightsTab() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi tải AI insights") }
     finally { setLoading(false) }
   }, [])
-
 
   return (
     <div className="space-y-4">
@@ -183,7 +177,6 @@ function InsightsTab() {
   )
 }
 
-// ── Tab: Báo cáo AI ───────────────────────────────────────────────────────
 const reportTypeLabels: Record<string, string> = {
   sales: "Doanh thu", sellers: "Người bán", products: "Sản phẩm",
   customers: "Khách hàng", disputes: "Tranh chấp",
@@ -284,7 +277,6 @@ function ReportTab() {
   )
 }
 
-// ── Tab: Xu hướng ─────────────────────────────────────────────────────────
 function TrendsTab() {
   const [metrics, setMetrics] = React.useState<string[]>(["revenue", "orders"])
   const [fromDate, setFromDate] = React.useState(daysAgo(30))
@@ -523,7 +515,6 @@ function AnomaliesTab() {
   )
 }
 
-// ── Tab: Dự báo ───────────────────────────────────────────────────────────
 function PredictTab() {
   const [metric, setMetric] = React.useState<"revenue" | "orders" | "users">("revenue")
   const [forecastDays, setForecastDays] = React.useState(30)
@@ -632,7 +623,6 @@ function PredictTab() {
   )
 }
 
-// ── Tab: Tranh chấp AI ───────────────────────────────────────────────────
 function DisputesTab() {
   const [fromDate, setFromDate] = React.useState(daysAgo(30))
   const [toDate, setToDate] = React.useState(today())

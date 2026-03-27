@@ -42,7 +42,6 @@ import {
   IconChevronRight,
 } from "@tabler/icons-react"
 
-// ---------- Props ----------
 type Props = {
   products: TopProduct[]
   shops: TopShop[]
@@ -54,7 +53,6 @@ type Props = {
   statsLoading: boolean
 }
 
-// ---------- Formatters ----------
 const fmt = (v: number) =>
   new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(v)
 
@@ -76,7 +74,6 @@ const timeAgo = (ts: string) => {
   return `${days} ngày trước`
 }
 
-// ---------- Column defs ----------
 const productColumns: ColumnDef<TopProduct & { rank: number }>[] = [
   {
     accessorKey: "rank",
@@ -320,7 +317,6 @@ function PaginatedTable<T>({
   )
 }
 
-// ---------- Main component ----------
 export function DataTable({
   products,
   shops,

@@ -8,6 +8,7 @@ export interface StorefrontCategory {
   slug: string
   level: number
   productCount: number
+  image?: string
   subcategories: StorefrontCategory[]
 }
 

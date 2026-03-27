@@ -568,7 +568,7 @@ export default function LandingPage() {
               <span className="w-1 h-6 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
               Danh mục nổi bật
             </h2>
-            <Link href="/search" className="font-bold text-sm hover:underline flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+            <Link href="/categories" className="font-bold text-sm hover:underline flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
               Xem tất cả
               <span className="material-symbols-outlined text-sm">chevron_right</span>
             </Link>
@@ -589,18 +589,31 @@ export default function LandingPage() {
                 <Link
                   key={cat.id}
                   href={`/search?category=${cat.slug || cat.id}`}
-                  className="group flex flex-col items-center gap-2 p-6 rounded-xl bg-white border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-lg transition-all text-center"
+                  className="group flex flex-col items-center rounded-xl bg-white border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-lg transition-all text-center overflow-hidden"
                 >
-                  <div
-                    className="size-14 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform"
-                    style={{ backgroundColor: "#f5ede0", color: "var(--color-text-secondary)" }}
-                  >
-                    <span className="material-symbols-outlined text-3xl">{getCategoryIcon(cat.code)}</span>
+                  <div className="w-full aspect-square overflow-hidden bg-gray-100 relative">
+                    {cat.image ? (
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center group-hover:scale-105 transition-transform"
+                        style={{ backgroundColor: "#f5ede0", color: "var(--color-text-secondary)" }}
+                      >
+                        <span className="material-symbols-outlined text-4xl">{getCategoryIcon(cat.code)}</span>
+                      </div>
+                    )}
                   </div>
-                  <h3 className="font-bold text-sm" style={{ color: "var(--color-text-main)" }}>{cat.name}</h3>
-                  {cat.productCount > 0 && (
-                    <span className="text-xs text-gray-400">{cat.productCount} sản phẩm</span>
-                  )}
+                  {/* Label */}
+                  <div className="px-2 py-2.5 w-full">
+                    <h3 className="font-bold text-xs truncate" style={{ color: "var(--color-text-main)" }}>{cat.name}</h3>
+                    {cat.productCount > 0 && (
+                      <span className="text-[11px] text-gray-400">{cat.productCount} sản phẩm</span>
+                    )}
+                  </div>
                 </Link>
               ))}
             </div>

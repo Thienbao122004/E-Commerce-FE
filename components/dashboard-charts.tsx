@@ -222,7 +222,6 @@ export function DashboardCharts({ stats }: Props) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 lg:px-6">
-      {/* Line Chart - Doanh thu theo tháng */}
       <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Doanh thu</CardTitle>

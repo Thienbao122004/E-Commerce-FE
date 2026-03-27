@@ -31,12 +31,10 @@ async function fetchJson<T>(path: string, token: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-/** Fetch dashboard stats (may be slow) */
 export function fetchStats(token: string) {
   return fetchJson<DashboardStatsResponse>("/api/admin/dashboard/stats", token)
 }
 
-/** Fetch recent activities (fast) */
 export function fetchActivities(token: string) {
   return fetchJson<{ success: boolean; activities: RecentActivity[] }>(
     "/api/admin/dashboard/recent-activities?limit=10",
@@ -44,7 +42,6 @@ export function fetchActivities(token: string) {
   )
 }
 
-/** Fetch top shops (fast) */
 export function fetchTopShops(token: string) {
   return fetchJson<{ success: boolean; shops: TopShop[] }>(
     "/api/admin/dashboard/top-shops?limit=10",
@@ -52,7 +49,6 @@ export function fetchTopShops(token: string) {
   )
 }
 
-/** Fetch top products (fast) */
 export function fetchTopProducts(token: string) {
   return fetchJson<{ success: boolean; products: TopProduct[] }>(
     "/api/admin/dashboard/top-products?limit=10",
