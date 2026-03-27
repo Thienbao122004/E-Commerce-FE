@@ -532,7 +532,7 @@ export function ShopioAssistantWidget() {
             right: "8px",
             background: "linear-gradient(135deg, var(--color-primary) 0%, #f59c2a 100%)",
           }}
-          title="Trợ lý mua hàng Shopio"
+          title="Trợ lý mua hàng"
         >
           <ShoppingBag className="text-white" size={22} />
         </button>
@@ -572,7 +572,7 @@ export function ShopioAssistantWidget() {
               <ShopioAvatar size="sm" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold truncate" style={{ color: "var(--color-text-main)" }}>
-                  {view === "list" ? "Trợ lý Shopio" : "Trợ lý mua hàng Shopio"}
+                  {view === "list" ? "Trợ lý mua hàng" : "Trợ lý mua hàng"}
                 </p>
                 {view === "chat" && (
                   <div className="flex items-center gap-1">
@@ -701,7 +701,7 @@ export function ShopioAssistantWidget() {
                   <div className="flex flex-col items-center justify-center h-full gap-3 px-2">
                     <ShopioAvatar size="md" />
                     <p className="text-center text-sm font-medium" style={{ color: "var(--color-text-main)" }}>
-                      Xin chào! Mình là trợ lý mua hàng Shopio.
+                      Xin chào! Mình là trợ lý mua hàng.
                     </p>
                     <p className="text-center text-xs text-muted-foreground">
                       Mô tả món đồ bạn muốn, mình sẽ gợi ý sản phẩm phù hợp!

@@ -168,7 +168,6 @@ function SearchPageContent() {
   const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [categories, setCategories] = useState<StorefrontCategory[]>([])
   const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc" | "rating">("newest")
@@ -176,33 +175,30 @@ function SearchPageContent() {
   const [initialCategorySet, setInitialCategorySet] = useState(false)
 
   const PAGE_SIZE = 24
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const mainRef = useRef<HTMLDivElement>(null)
 
   const loadProducts = useCallback(async (
     q: string,
     p: number,
     sort: typeof sortBy,
     catId: number | undefined,
-    replace = false
   ) => {
-    if (p === 1) setLoading(true)
-    else setLoadingMore(true)
+    setLoading(true)
     try {
       const res = await getProducts({ search: q, page: p, pageSize: PAGE_SIZE, sortBy: sort, categoryId: catId })
       if (res.success) {
-        setProducts((prev) => replace || p === 1 ? res.products : [...prev, ...res.products])
+        setProducts(res.products)
         setTotalCount(res.totalCount)
       }
     } catch { }
-    finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
     setPage(1)
     setProducts([])
-    loadProducts(query, 1, sortBy, selectedCategory, true)
+    loadProducts(query, 1, sortBy, selectedCategory)
   }, [query, sortBy, selectedCategory, loadProducts])
 
   useEffect(() => {
@@ -223,14 +219,12 @@ function SearchPageContent() {
     }).catch(() => { })
   }, [categorySlug, initialCategorySet])
 
-  const handleLoadMore = () => {
-    if (loadingMore) return
-    const nextPage = page + 1
-    setPage(nextPage)
-    loadProducts(query, nextPage, sortBy, selectedCategory)
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return
+    setPage(newPage)
+    loadProducts(query, newPage, sortBy, selectedCategory)
+    mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
-
-  const hasMore = products.length < totalCount
 
   const SORT_OPTIONS: { value: typeof sortBy; label: string }[] = [
     { value: "newest", label: "Mới nhất" },
@@ -244,12 +238,11 @@ function SearchPageContent() {
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: "var(--color-background-light)", color: "var(--color-text-main)" }}
     >
-      {/* Header */}
       <header
         className="sticky top-0 z-50 w-full border-b backdrop-blur-sm"
         style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}
       >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center gap-4">
+        <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>
               local_florist
@@ -273,7 +266,7 @@ function SearchPageContent() {
         </div>
       </header>
 
-      <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6">
+      <main ref={mainRef} className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6">
         {/* Breadcrumb + title */}
         <div className="mb-6">
           <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-2">
@@ -327,13 +320,8 @@ function SearchPageContent() {
             </div>
           </aside>
 
-          {/* Results */}
           <div className="flex-1 min-w-0">
-            {/* Sort bar */}
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-500">
-                {loading ? "Đang tìm..." : `${totalCount} kết quả`}
-              </p>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 hidden sm:block">Sắp xếp:</span>
                 <div className="flex gap-1">
@@ -437,27 +425,63 @@ function SearchPageContent() {
                   })}
                 </div>
 
-                {hasMore && (
-                  <div className="flex justify-center mt-8">
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-8">
+                    {/* Prev */}
                     <button
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className="flex items-center gap-2 px-8 py-3 bg-white border border-gray-200 font-bold rounded-lg transition-all shadow-sm hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-60"
+                      onClick={() => handlePageChange(page - 1)}
+                      disabled={page === 1}
+                      className="flex items-center justify-center size-9 rounded-lg border border-gray-200 bg-white text-sm font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ color: "var(--color-text-main)" }}
                     >
-                      {loadingMore ? (
-                        <>
-                          <span className="size-4 border-2 border-gray-300 border-t-[var(--color-primary)] rounded-full animate-spin" />
-                          Đang tải...
-                        </>
-                      ) : (
-                        <>
-                          <span className="material-symbols-outlined text-base">expand_more</span>
-                          Xem thêm ({totalCount - products.length} sản phẩm)
-                        </>
+                      <span className="material-symbols-outlined text-base">chevron_left</span>
+                    </button>
+
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                      .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...")
+                        acc.push(p)
+                        return acc
+                      }, [])
+                      .map((item, idx) =>
+                        item === "..." ? (
+                          <span key={`ellipsis-${idx}`} className="flex items-center justify-center size-9 text-sm text-gray-400">…</span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => handlePageChange(item as number)}
+                            className="flex items-center justify-center size-9 rounded-lg border text-sm font-semibold transition-colors"
+                            style={
+                              page === item
+                                ? { backgroundColor: "var(--color-primary)", borderColor: "var(--color-primary)", color: "#fff" }
+                                : { backgroundColor: "#fff", borderColor: "#e5e7eb", color: "var(--color-text-main)" }
+                            }
+                          >
+                            {item}
+                          </button>
+                        )
                       )}
+
+                    {/* Next */}
+                    <button
+                      onClick={() => handlePageChange(page + 1)}
+                      disabled={page === totalPages}
+                      className="flex items-center justify-center size-9 rounded-lg border border-gray-200 bg-white text-sm font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{ color: "var(--color-text-main)" }}
+                    >
+                      <span className="material-symbols-outlined text-base">chevron_right</span>
                     </button>
                   </div>
+                )}
+
+                {/* Page info */}
+                {totalPages > 1 && (
+                  <p className="text-center text-xs text-gray-400 mt-2">
+                    Trang {page} / {totalPages} · {totalCount} sản phẩm
+                  </p>
                 )}
               </>
             )}

@@ -62,7 +62,6 @@ function isOrderRequestText(text: string) {
   return /tạo đơn|đặt đơn|checkout|thanh toán|mua luôn|chốt đơn/i.test(text)
 }
 
-/* ─── Shopio Assistant Avatar ─── */
 function ShopioAvatar({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const sizeClass = size === 'sm' ? 'size-7' : size === 'md' ? 'size-9' : 'size-12'
   const iconSize = size === 'sm' ? 14 : size === 'md' ? 18 : 24
@@ -109,7 +108,7 @@ function WelcomeScreen() {
         <ShopioAvatar size="lg" />
         <div className="text-center">
           <p className="font-semibold text-base" style={{ color: 'var(--color-text-main)' }}>
-            Trợ lý mua hàng Shopio
+            Trợ lý mua hàng
           </p>
           <p className="text-sm text-muted-foreground">
             Mô tả món đồ bạn muốn, mình sẽ tìm sản phẩm phù hợp nhất!
@@ -619,7 +618,7 @@ export default function UserAiChatPage() {
           <ShopioAvatar size="md" />
           <div className="min-w-0">
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-main)' }}>
-              Trợ lý mua hàng Shopio
+              Trợ lý mua hàng
             </p>
             <div className="flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-green-500 inline-block" />
@@ -1021,7 +1020,7 @@ export default function UserAiChatPage() {
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground text-center pt-1.5">
-          Trợ lý mua hàng Shopio · Có thể gợi ý sản phẩm và hỗ trợ đặt hàng
+          Trợ lý mua hàng · Có thể gợi ý sản phẩm và hỗ trợ đặt hàng
         </p>
       </div>
     </div>
