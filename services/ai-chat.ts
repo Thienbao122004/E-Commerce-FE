@@ -55,6 +55,8 @@ export interface AiSessionSummary {
   status: string
   createdAt?: string
   updatedAt?: string
+  isMuted?: boolean
+  unreadCount?: number
   title: string
   lastMessage?: {
     role: string
@@ -129,6 +131,9 @@ export const aiChatService = {
   getOrCreateSession: () =>
     aiRequest<AiChatSessionResponse>("/api/ai/chat/session", { method: "POST" }),
 
+  createNewSession: () =>
+    aiRequest<AiChatSessionResponse>("/api/ai/chat/session/new", { method: "POST" }),
+
   getHistory: (sessionId: string) =>
     aiRequest<AiChatSessionResponse>(`/api/ai/chat/history/${sessionId}`, { method: "GET" }),
 
@@ -150,4 +155,24 @@ export const aiChatService = {
 
   getSessionMessages: (sessionId: string) =>
     apiRequest<AiSessionMessagesResponse>(`/api/ai/sessions/${sessionId}/messages`),
+
+  markSessionRead: (sessionId: string) =>
+    apiRequest<{ success: boolean; sessionId: string; unreadCount: number }>(
+      `/api/ai/sessions/${sessionId}/read`,
+      { method: "POST" }
+    ),
+
+  setSessionMuted: (sessionId: string, isMuted: boolean) =>
+    apiRequest<{ success: boolean; sessionId: string; isMuted: boolean }>(
+      `/api/ai/sessions/${sessionId}/mute`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ isMuted }),
+      }
+    ),
+
+  deleteSession: (sessionId: string) =>
+    apiRequest<{ success: boolean; sessionId: string }>(`/api/ai/sessions/${sessionId}`, {
+      method: "DELETE",
+    }),
 }

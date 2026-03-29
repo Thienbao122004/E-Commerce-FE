@@ -185,7 +185,12 @@ export default function LandingPage() {
   const PAGE_SIZE = 12
 
   const [search, setSearch] = useState("")
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Array<{
+    id: string
+    name: string
+    shopName: string
+    imageUrl?: string
+  }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -308,8 +313,18 @@ export default function LandingPage() {
       try {
         const res = await getProducts({ search: search.trim(), pageSize: 8 })
         if (res.success) {
-          const names = [...new Set(res.products.map((p) => p.name))].slice(0, 6)
-          setSuggestions(names)
+          const dedupedByName = new Map<string, { id: string; name: string; shopName: string; imageUrl?: string }>()
+          for (const p of res.products) {
+            if (!dedupedByName.has(p.name)) {
+              dedupedByName.set(p.name, {
+                id: p.id,
+                name: p.name,
+                shopName: p.shopName,
+                imageUrl: p.imageUrls?.[0],
+              })
+            }
+          }
+          setSuggestions(Array.from(dedupedByName.values()).slice(0, 6))
         }
       } catch { }
       finally { setLoadingSuggestions(false) }
@@ -405,14 +420,25 @@ export default function LandingPage() {
                   </div>
                 ) : suggestions.length > 0 ? (
                   <>
-                    {suggestions.map((name) => (
+                    {suggestions.map((item, index) => (
                       <button
-                        key={name}
-                        onMouseDown={() => handleSearch(name)}
+                        key={`${item.id}-${item.name}-${index}`}
+                        onMouseDown={() => handleSearch(item.name)}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#f8f5f1] transition-colors text-left"
                       >
-                        <span className="material-symbols-outlined text-base text-gray-400 shrink-0">search</span>
-                        <span className="text-sm truncate" style={{ color: "var(--color-text-main)" }}>{name}</span>
+                        <div className="size-9 rounded-md bg-gray-100 overflow-hidden shrink-0">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="size-full object-cover" />
+                          ) : (
+                            <div className="size-full flex items-center justify-center">
+                              <span className="material-symbols-outlined text-base text-gray-400">search</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm truncate" style={{ color: "var(--color-text-main)" }}>{item.name}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{item.shopName}</p>
+                        </div>
                       </button>
                     ))}
                   </>

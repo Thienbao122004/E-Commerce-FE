@@ -55,6 +55,24 @@ export type SuggestMaterialsResponse = {
   logId: string | null
 }
 
+export type AnalyzeImageResponse = {
+  quality: {
+    score: number
+    rating: string
+    hasGoodLighting: boolean
+    hasCleanBackground: boolean
+    isProductCentered: boolean
+    hasHighResolution: boolean
+  }
+  suggestedCategories: CategorySuggestion[]
+  suggestedTags: TagSuggestion[]
+  suggestedMaterials: MaterialSuggestion[]
+  improvements: string[]
+  summary: string
+  success: boolean
+  errorMessage?: string
+}
+
 
 /** Gợi ý danh mục từ tên + mô tả + ảnh */
 export function aiSuggestCategory(params: {
@@ -113,5 +131,18 @@ export function aiSendFeedback(params: {
     chosenTagIds: params.chosenTagIds ?? [],
     chosenMaterialIds: params.chosenMaterialIds ?? [],
     action: params.action,
+  })
+}
+
+/** Phan tich anh san pham bang AI vision */
+export function aiAnalyzeImage(params: {
+  imageUrls: string[]
+  productTitle?: string
+  productDescription?: string
+}) {
+  return aiPost<AnalyzeImageResponse>("/api/ai/seller/analyze-image", {
+    imageUrls: params.imageUrls,
+    productTitle: params.productTitle ?? null,
+    productDescription: params.productDescription ?? null,
   })
 }

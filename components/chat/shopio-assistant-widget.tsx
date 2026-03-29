@@ -6,9 +6,7 @@ import { toast } from "sonner"
 import {
   ShoppingBag,
   X,
-  Minus,
   Send,
-  RotateCcw,
   MapPin,
   Check,
   CircleCheck,
@@ -16,6 +14,15 @@ import {
   ChevronLeft,
   Plus,
   MessageSquare,
+  Loader2,
+  Search,
+  MoreVertical,
+  BellOff,
+  Trash2,
+  CheckCheck,
+  Filter,
+  List,
+  Mail,
 } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -24,7 +31,19 @@ import { cartService } from "@/services/cart"
 import { profileService } from "@/services/profile"
 import { paymentsService } from "@/services/payments"
 import { ordersService } from "@/services/orders"
-import type { AddressResponse } from "@/types/profile"
+import type { AddressResponse, AddAddressRequest } from "@/types/profile"
+import {
+  vietnamProvincesService,
+  type Province,
+  type District,
+  type Ward,
+} from "@/services/vietnam-provinces"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type PaymentMethod = "vnpay" | "momo"
 
@@ -64,6 +83,8 @@ type ConfirmTargetState = {
   previews?: ConfirmPreview[]
 }
 
+type SessionFilter = "all" | "unread" | "muted"
+
 function formatPrice(price: number) {
   return price.toLocaleString("vi-VN") + "đ"
 }
@@ -83,6 +104,17 @@ function formatSessionTime(dateStr?: string) {
   if (diffDays === 1) return "Hôm qua"
   if (diffDays < 7) return `${diffDays} ngày trước`
   return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+}
+
+function truncateText(text: string, maxLength: number) {
+  if (!text) return ""
+  return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text
+}
+
+function getSessionFilterLabel(filter: SessionFilter) {
+  if (filter === "unread") return "Chưa đọc"
+  if (filter === "muted") return "Đã tắt thông báo"
+  return "Tất cả"
 }
 
 function isOrderRequestText(text: string) {
@@ -107,6 +139,267 @@ function TypingDots() {
   )
 }
 
+/* ─── Inline Address Form Modal ────────────────────────────────────────────── */
+function AddressFormModal({
+  onSuccess,
+  onClose,
+}: {
+  onSuccess: (address: AddressResponse) => void
+  onClose: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [provinces, setProvinces] = useState<Province[]>([])
+  const [districts, setDistricts] = useState<District[]>([])
+  const [wards, setWards] = useState<Ward[]>([])
+  const [loadingProvinces, setLoadingProvinces] = useState(false)
+  const [loadingDistricts, setLoadingDistricts] = useState(false)
+  const [loadingWards, setLoadingWards] = useState(false)
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState<number | "">("")
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<number | "">("")
+  const [selectedWardCode, setSelectedWardCode] = useState<number | "">("")
+
+  const [form, setForm] = useState<AddAddressRequest>({
+    fullName: "",
+    phone: "",
+    addressLine1: "",
+    ward: "",
+    district: "",
+    city: "",
+    isDefault: true,
+  })
+
+  const handleChange = (field: keyof AddAddressRequest, value: string | boolean) =>
+    setForm((prev) => ({ ...prev, [field]: value }))
+
+  useEffect(() => {
+    let mounted = true
+    const loadProvinces = async () => {
+      setLoadingProvinces(true)
+      try {
+        const list = await vietnamProvincesService.getProvinces()
+        if (mounted) setProvinces(list)
+      } catch {
+        toast.error("Không thể tải danh sách tỉnh/thành phố")
+      } finally {
+        if (mounted) setLoadingProvinces(false)
+      }
+    }
+    void loadProvinces()
+    return () => { mounted = false }
+  }, [])
+
+  const handleSelectProvince = useCallback(async (value: string) => {
+    const provinceCode = Number(value)
+    if (!Number.isFinite(provinceCode)) return
+
+    const selectedProvince = provinces.find((p) => p.code === provinceCode)
+    setSelectedProvinceCode(provinceCode)
+    setSelectedDistrictCode("")
+    setSelectedWardCode("")
+    setDistricts([])
+    setWards([])
+    setForm((prev) => ({
+      ...prev,
+      city: selectedProvince?.name ?? "",
+      province: selectedProvince?.name ?? "",
+      district: "",
+      ward: "",
+    }))
+
+    setLoadingDistricts(true)
+    try {
+      const list = await vietnamProvincesService.getDistricts(provinceCode)
+      setDistricts(list)
+    } catch {
+      toast.error("Không thể tải danh sách quận/huyện")
+    } finally {
+      setLoadingDistricts(false)
+    }
+  }, [provinces])
+
+  const handleSelectDistrict = useCallback(async (value: string) => {
+    const districtCode = Number(value)
+    if (!Number.isFinite(districtCode)) return
+
+    const selectedDistrict = districts.find((d) => d.code === districtCode)
+    setSelectedDistrictCode(districtCode)
+    setSelectedWardCode("")
+    setWards([])
+    setForm((prev) => ({
+      ...prev,
+      district: selectedDistrict?.name ?? "",
+      ward: "",
+    }))
+
+    setLoadingWards(true)
+    try {
+      const list = await vietnamProvincesService.getWards(districtCode)
+      setWards(list)
+    } catch {
+      toast.error("Không thể tải danh sách phường/xã")
+    } finally {
+      setLoadingWards(false)
+    }
+  }, [districts])
+
+  const handleSelectWard = useCallback((value: string) => {
+    const wardCode = Number(value)
+    if (!Number.isFinite(wardCode)) return
+    const selectedWard = wards.find((w) => w.code === wardCode)
+    setSelectedWardCode(wardCode)
+    setForm((prev) => ({ ...prev, ward: selectedWard?.name ?? "" }))
+  }, [wards])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.fullName?.trim() || !form.addressLine1.trim() || !form.city.trim()) {
+      toast.error("Vui lòng nhập đầy đủ họ tên, địa chỉ và tỉnh/thành phố")
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await profileService.addAddress(form)
+      if (res.success && res.data) {
+        toast.success("Đã thêm địa chỉ thành công")
+        onSuccess(res.data as AddressResponse)
+      } else {
+        toast.error(res.message ?? "Không thể thêm địa chỉ")
+      }
+    } catch {
+      toast.error("Không thể thêm địa chỉ. Vui lòng thử lại.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = "w-full h-8 rounded-lg border px-2.5 text-[11px] bg-white focus:outline-none"
+  const inputStyle = { borderColor: "#e3d3b7", color: "var(--color-text-main)" }
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+      <div
+        className="fixed inset-0 bg-black/30"
+        onClick={onClose}
+      />
+      <div
+        className="relative z-[10001] flex flex-col rounded-2xl bg-white border shadow-2xl overflow-hidden"
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          maxHeight: "85vh",
+          borderColor: "#e5ded6",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ borderColor: "#e5ded6" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text-main)" }}>Thêm địa chỉ giao hàng</p>
+          <button type="button" onClick={onClose} className="flex items-center justify-center size-7 rounded-lg hover:bg-gray-100">
+            <X size={14} style={{ color: "var(--color-text-secondary)" }} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form id="address-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Họ tên người nhận *</label>
+            <input
+              className={inputCls} style={inputStyle}
+              placeholder="Nguyễn Văn A"
+              value={form.fullName ?? ""} onChange={(e) => handleChange("fullName", e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Số điện thoại</label>
+            <input
+              className={inputCls} style={inputStyle} type="tel"
+              placeholder="0901234567"
+              value={form.phone ?? ""} onChange={(e) => handleChange("phone", e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Địa chỉ (số nhà, đường) *</label>
+            <input
+              className={inputCls} style={inputStyle}
+              placeholder="123 Đường Lê Lợi"
+              value={form.addressLine1} onChange={(e) => handleChange("addressLine1", e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Tỉnh/Thành phố *</label>
+            <select
+              className={inputCls}
+              style={inputStyle}
+              value={selectedProvinceCode}
+              onChange={(e) => void handleSelectProvince(e.target.value)}
+              disabled={loadingProvinces}
+            >
+              <option value="">{loadingProvinces ? "Đang tải..." : "Chọn tỉnh/thành"}</option>
+              {provinces.map((p) => (
+                <option key={p.code} value={p.code}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Quận/Huyện</label>
+              <select
+                className={inputCls}
+                style={inputStyle}
+                value={selectedDistrictCode}
+                onChange={(e) => void handleSelectDistrict(e.target.value)}
+                disabled={!selectedProvinceCode || loadingDistricts}
+              >
+                <option value="">{loadingDistricts ? "Đang tải..." : "Chọn quận/huyện"}</option>
+                {districts.map((d) => (
+                  <option key={d.code} value={d.code}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium" style={{ color: "#7a5b29" }}>Phường/Xã</label>
+              <select
+                className={inputCls}
+                style={inputStyle}
+                value={selectedWardCode}
+                onChange={(e) => handleSelectWard(e.target.value)}
+                disabled={!selectedDistrictCode || loadingWards}
+              >
+                <option value="">{loadingWards ? "Đang tải..." : "Chọn phường/xã"}</option>
+                {wards.map((w) => (
+                  <option key={w.code} value={w.code}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="size-3.5 rounded accent-orange-500"
+              checked={form.isDefault ?? false}
+              onChange={(e) => handleChange("isDefault", e.target.checked)}
+            />
+            <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>Đặt làm địa chỉ mặc định</span>
+          </label>
+        </form>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t flex gap-2 shrink-0" style={{ borderColor: "#e5ded6" }}>
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2 rounded-xl border text-xs font-medium"
+            style={{ borderColor: "#d9cdc0", color: "var(--color-text-secondary)" }}>
+            Huỷ
+          </button>
+          <button type="submit" form="address-form" disabled={saving}
+            className="flex-1 py-2 rounded-xl text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+            style={{ backgroundColor: "var(--color-primary)" }}>
+            {saving ? <><Loader2 size={12} className="animate-spin" /> Đang lưu...</> : "Lưu địa chỉ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ShopioAvatar({ size = "sm" }: { size?: "xs" | "sm" | "md" }) {
   const sizeClass = size === "xs" ? "size-6" : size === "sm" ? "size-8" : "size-10"
   const iconSize = size === "xs" ? 12 : size === "sm" ? 16 : 20
@@ -125,12 +418,13 @@ export function ShopioAssistantWidget() {
   const token = session?.access_token
 
   const [open, setOpen] = useState(false)
-  const [minimized, setMinimized] = useState(false)
   const [view, setView] = useState<"list" | "chat">("list")
 
   // Sessions list state
   const [sessions, setSessions] = useState<AiSessionSummary[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionSearch, setSessionSearch] = useState("")
+  const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all")
 
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<UiMessage[]>([])
@@ -143,6 +437,7 @@ export function ShopioAssistantWidget() {
   const [selectedAddressId, setSelectedAddressId] = useState("")
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("vnpay")
+  const [showAddressModal, setShowAddressModal] = useState(false)
   const [selectedProductsByMessageId, setSelectedProductsByMessageId] = useState<
     Record<string, Record<string, ProductSelection>>
   >({})
@@ -160,6 +455,22 @@ export function ShopioAssistantWidget() {
     () => addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress,
     [addresses, selectedAddressId, defaultAddress]
   )
+
+  const visibleSessions = useMemo(() => {
+    const keyword = sessionSearch.trim().toLowerCase()
+    return sessions
+      .filter((s) => {
+        if (!keyword) return true
+        const title = s.title?.toLowerCase() ?? ""
+        const preview = s.lastMessage?.content?.toLowerCase() ?? ""
+        return title.includes(keyword) || preview.includes(keyword)
+      })
+      .filter((s) => {
+        if (sessionFilter === "unread") return (s.unreadCount ?? 0) > 0
+        if (sessionFilter === "muted") return !!s.isMuted
+        return true
+      })
+  }, [sessions, sessionSearch, sessionFilter])
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -385,12 +696,24 @@ export function ShopioAssistantWidget() {
   const handleConfirmOrder = useCallback(async () => {
     if (!sessionId) { toast.message("Phiên chưa sẵn sàng."); return }
     setOrderLoading(true)
+    let didComplete = false
     try {
+      // Re-fetch địa chỉ mới nhất (quan trọng: user có thể vừa thêm)
       const latestRes = await profileService.getAddresses().catch(() => null)
       const latest = latestRes?.success ? (latestRes.data ?? []) : []
       if (latest.length) setAddresses(latest)
-      const resolved = latest.find((a) => a.id === selectedAddressId) ?? latest.find((a) => a.isDefault) ?? latest[0] ?? effectiveAddress
-      if (!resolved) { toast.message("Bạn chưa có địa chỉ giao hàng."); return }
+
+      const resolved =
+        latest.find((a) => a.id === selectedAddressId) ??
+        latest.find((a) => a.isDefault) ??
+        latest[0] ??
+        effectiveAddress
+
+      if (!resolved) {
+        toast.message("Bạn chưa có địa chỉ giao hàng. Vui lòng thêm địa chỉ.")
+        setShowAddressModal(true)
+        return
+      }
       if (resolved.id !== selectedAddressId) setSelectedAddressId(resolved.id)
 
       let cartId = confirmTarget?.cartId
@@ -398,6 +721,7 @@ export function ShopioAssistantWidget() {
       if (!cartId) { toast.message("Giỏ hàng đang trống."); return }
 
       const res = await aiChatService.confirmOrder(sessionId, cartId, resolved.id)
+
       if (res.success && res.orderId) {
         const providerLabel = paymentMethod === "momo" ? "MoMo" : "VNPay"
         const payFn = paymentMethod === "momo"
@@ -407,41 +731,36 @@ export function ShopioAssistantWidget() {
         const payRes = await payFn(res.orderId).catch(() => null)
 
         if (payRes?.success && payRes.paymentUrl) {
-          //  Tạo đơn + payment thành công → redirect
           setMessages((prev) => [...prev, {
             id: `a-confirm-${Date.now()}`, role: "assistant",
             content: `Đơn hàng đã được tạo! Đang chuyển bạn đến trang thanh toán ${providerLabel}...`,
             createdAt: new Date().toISOString(),
           }])
           toast.success(`Đơn hàng đã tạo — đang chuyển đến ${providerLabel}`)
+          didComplete = true
           setTimeout(() => { window.location.href = payRes.paymentUrl! }, 800)
         } else {
-          //  Tạo đơn xong nhưng payment thất bại → cancel đơn tự động
           await ordersService.cancelPendingOrder(res.orderId).catch(() => null)
           toast.error(`Không thể khởi tạo thanh toán ${providerLabel}. Đơn hàng đã bị huỷ. Vui lòng thử lại.`)
-          // Giữ nguyên confirmTarget để user retry với phương thức khác
-          setOrderLoading(false)
-          return
+          // Không set didComplete → confirmTarget giữ nguyên để retry
         }
-      } else if (res.success && !res.orderId) {
+      } else if (res.success) {
         setMessages((prev) => [...prev, {
           id: `a-confirm-${Date.now()}`, role: "assistant",
           content: res.message,
           createdAt: new Date().toISOString(),
         }])
         toast.success("Tạo đơn hàng thành công")
+        didComplete = true
       } else {
         toast.error(res.message || "Không thể tạo đơn hàng")
-        setOrderLoading(false)
-        return
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không thể xác nhận đơn hàng")
+    } finally {
       setOrderLoading(false)
-      return
+      if (didComplete) setConfirmTarget(null)
     }
-    setOrderLoading(false)
-    setConfirmTarget(null)
   }, [sessionId, confirmTarget, effectiveAddress, selectedAddressId, paymentMethod])
 
   const handleRejectOrder = useCallback(async () => {
@@ -460,19 +779,36 @@ export function ShopioAssistantWidget() {
   }, [sessionId])
 
   const handleNewConversation = useCallback(async () => {
-    // Reset UI → boot lại session mới từ BE
+    // Xoá cache session cũ
     if (sessionId) sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sessionId}`)
+
+    // Reset UI ngay lập tức
     setMessages([])
     setConfirmTarget(null)
     setSelectedProductsByMessageId({})
     setInput("")
-    setSessionId(null)
-    setBooted(false)
     setView("chat")
-  }, [sessionId])
+
+    // Gọi BE tạo session mới thật sự
+    setBootLoading(true)
+    try {
+      const newSession = await aiChatService.createNewSession()
+      setSessionId(newSession.sessionId)
+      setBooted(true)
+      // Refresh danh sách sessions
+      void loadSessions()
+    } catch {
+      toast.error("Không thể tạo cuộc trò chuyện mới")
+      setBooted(false)
+    } finally {
+      setBootLoading(false)
+    }
+  }, [sessionId, loadSessions])
 
   const openSession = useCallback(async (sid: string) => {
     setView("chat")
+    setSessions((prev) => prev.map((s) => s.sessionId === sid ? { ...s, unreadCount: 0 } : s))
+    void aiChatService.markSessionRead(sid).catch(() => null)
     // Nếu đây là session hiện tại, không fetch lại
     if (sid === sessionId) return
 
@@ -515,14 +851,93 @@ export function ShopioAssistantWidget() {
     finally { setBootLoading(false) }
   }, [sessionId])
 
+  const handleMarkSessionRead = useCallback(async (sid: string) => {
+    try {
+      await aiChatService.markSessionRead(sid)
+      setSessions((prev) => prev.map((s) => s.sessionId === sid ? { ...s, unreadCount: 0 } : s))
+      toast.success("Đã đánh dấu đã đọc")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể đánh dấu đã đọc")
+    }
+  }, [])
+
+  const handleToggleMuteSession = useCallback(async (sid: string) => {
+    const current = sessions.find((s) => s.sessionId === sid)
+    const nextMuted = !current?.isMuted
+    try {
+      await aiChatService.setSessionMuted(sid, nextMuted)
+      setSessions((prev) => prev.map((s) => s.sessionId === sid ? { ...s, isMuted: nextMuted } : s))
+      toast.success(nextMuted ? "Đã tắt thông báo cuộc trò chuyện" : "Đã bật lại thông báo")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể cập nhật thông báo")
+    }
+  }, [sessions])
+
+  const handleDeleteSession = useCallback(async (sid: string) => {
+    const shouldDelete = window.confirm("Bạn có chắc muốn xóa cuộc trò chuyện này không?")
+    if (!shouldDelete) return
+
+    try {
+      await aiChatService.deleteSession(sid)
+      setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
+
+      if (sid === sessionId) {
+        sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sid}`)
+        setSessionId(null)
+        setMessages([])
+        setConfirmTarget(null)
+        setSelectedProductsByMessageId({})
+        setView("list")
+        setBooted(false)
+      }
+
+      toast.success("Đã xóa cuộc trò chuyện")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể xóa cuộc trò chuyện")
+    }
+  }, [sessionId])
+
   useEffect(() => {
     if (confirmTarget) setShowAddressPicker(false)
   }, [confirmTarget])
+
+  // Reload địa chỉ khi user quay lại tab/trang (ví dụ sau khi thêm địa chỉ)
+  useEffect(() => {
+    if (!open) return
+    const handler = () => {
+      if (!document.hidden) void loadAddresses()
+    }
+    document.addEventListener("visibilitychange", handler)
+    window.addEventListener("focus", handler)
+    return () => {
+      document.removeEventListener("visibilitychange", handler)
+      window.removeEventListener("focus", handler)
+    }
+  }, [open, loadAddresses])
+
+  const handleAddressAdded = useCallback((newAddr: AddressResponse) => {
+    setAddresses((prev) => {
+      const updated = newAddr.isDefault
+        ? prev.map((a) => ({ ...a, isDefault: false }))
+        : [...prev]
+      return [newAddr, ...updated.filter((a) => a.id !== newAddr.id)]
+    })
+    setSelectedAddressId(newAddr.id)
+    setShowAddressModal(false)
+  }, [])
 
   if (authLoading || !token) return null
 
   return (
     <>
+      {/* Address form modal (renders outside widget panel) */}
+      {showAddressModal && (
+        <AddressFormModal
+          onSuccess={handleAddressAdded}
+          onClose={() => setShowAddressModal(false)}
+        />
+      )}
+
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -597,23 +1012,14 @@ export function ShopioAssistantWidget() {
               {view === "chat" && (
                 <button
                   type="button"
-                  onClick={() => void handleNewConversation()}
-                  title="Cuộc trò chuyện mới"
-                  className="flex items-center justify-center size-7 rounded-lg hover:bg-gray-100 transition-colors"
-                  style={{ color: "var(--color-text-secondary)" }}
+                  onClick={() => { setView("list"); void loadSessions() }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] border transition-colors hover:bg-[#f5f1ec]"
+                  style={{ borderColor: "#e0d2c2", color: "var(--color-text-secondary)" }}
+                  title="Thu nhỏ"
                 >
-                  <RotateCcw size={13} />
+                  <ChevronDown size={12} /> Thu nhỏ
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setMinimized((v) => !v)}
-                className="flex items-center justify-center size-7 rounded-lg hover:bg-gray-100 transition-colors"
-                style={{ color: "var(--color-text-secondary)" }}
-                title={minimized ? "Mở rộng" : "Thu nhỏ"}
-              >
-                <Minus size={13} />
-              </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -626,20 +1032,66 @@ export function ShopioAssistantWidget() {
             </div>
           </div>
 
-          {!minimized && (
-            <>
+          <>
               {/* ── Sessions list view ── */}
               {view === "list" && (
                 <div className="flex-1 overflow-y-auto" style={{ background: "#faf8f6" }}>
+                  <div className="sticky top-0 z-10 border-b px-3 py-2.5 flex items-center gap-2" style={{ background: "#faf8f6", borderColor: "#f0e8de" }}>
+                    <div className="flex items-center gap-1.5 rounded-xl border px-2.5 h-10 flex-1 bg-white" style={{ borderColor: "#e5ded6" }}>
+                      <Search size={13} className="text-gray-400 shrink-0" />
+                      <input
+                        value={sessionSearch}
+                        onChange={(e) => setSessionSearch(e.target.value)}
+                        placeholder="Tìm theo tiêu đề hoặc nội dung"
+                        className="w-full bg-transparent text-xs focus:outline-none placeholder:text-gray-400"
+                      />
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="h-10 min-w-32 rounded-xl border bg-white px-2.5 flex items-center gap-1.5"
+                          style={{ borderColor: "#e5ded6", color: "var(--color-text-main)" }}
+                          aria-label="Lọc cuộc trò chuyện"
+                        >
+                          <Filter size={13} className="text-gray-400 shrink-0" />
+                          <span className="text-xs font-medium truncate flex-1 text-left">{getSessionFilterLabel(sessionFilter)}</span>
+                          <ChevronDown size={13} className="text-gray-400 shrink-0" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        side="bottom"
+                        sideOffset={6}
+                        className="w-44"
+                        style={{ zIndex: 10020 }}
+                      >
+                        <DropdownMenuItem onSelect={() => setSessionFilter("all")} className="text-xs">
+                          <List size={14} />
+                          Tất cả
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSessionFilter("unread")} className="text-xs">
+                          <Mail size={14} />
+                          Chưa đọc
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSessionFilter("muted")} className="text-xs">
+                          <BellOff size={14} />
+                          Đã tắt thông báo
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   {sessionsLoading ? (
                     <div className="flex items-center justify-center h-32 gap-2">
                       <div className="size-5 rounded-full border-2 animate-spin" style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }} />
                       <span className="text-xs text-muted-foreground">Đang tải...</span>
                     </div>
-                  ) : sessions.length === 0 ? (
+                  ) : visibleSessions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-48 gap-3 px-4">
                       <MessageSquare size={32} className="text-gray-300" />
-                      <p className="text-sm text-muted-foreground text-center">Chưa có cuộc trò chuyện nào</p>
+                      <p className="text-sm text-muted-foreground text-center">
+                        {sessions.length === 0 ? "Chưa có cuộc trò chuyện nào" : "Không có cuộc trò chuyện phù hợp bộ lọc"}
+                      </p>
                       <button
                         type="button"
                         onClick={() => void handleNewConversation()}
@@ -651,33 +1103,106 @@ export function ShopioAssistantWidget() {
                     </div>
                   ) : (
                     <div className="flex flex-col">
-                      {sessions.map((s) => (
-                        <button
+                      {visibleSessions.map((s) => {
+                        const unreadCount = Math.max(0, s.unreadCount ?? 0)
+                        const isUnread = unreadCount > 0
+                        const isMuted = !!s.isMuted
+                        return (
+                        <div
                           key={s.sessionId}
-                          type="button"
-                          onClick={() => void openSession(s.sessionId)}
                           className={`flex items-start gap-3 px-3 py-3 text-left border-b hover:bg-white transition-colors ${
                             s.sessionId === sessionId ? "bg-[#fdf6ee]" : ""
                           }`}
                           style={{ borderColor: "#f0e8de" }}
                         >
                           <ShopioAvatar size="xs" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold truncate leading-snug" style={{ color: "var(--color-text-main)" }}>
-                              {s.title}
+                          <button
+                            type="button"
+                            onClick={() => void openSession(s.sessionId)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <p className="text-xs font-semibold leading-snug truncate" style={{ color: "var(--color-text-main)" }}>
+                              {truncateText(s.title, 28)}
                             </p>
                             {s.lastMessage && (
                               <p className="text-[11px] truncate mt-0.5 text-muted-foreground">
                                 {s.lastMessage.role === "user" ? "Bạn: " : "Trợ lý: "}
-                                {s.lastMessage.content}
+                                {truncateText(s.lastMessage.content, 38)}
                               </p>
                             )}
+                          </button>
+                          <div className="w-24 shrink-0 flex items-center justify-end gap-1">
+                            {isMuted && (
+                              <BellOff size={11} style={{ color: "#9e8f7f" }} />
+                            )}
+                            <span className="inline-flex size-4 items-center justify-center">
+                              {isUnread && (
+                                <span className="size-4 rounded-full bg-red-500 text-white text-[9px] font-semibold flex items-center justify-center">
+                                  {unreadCount > 9 ? "9+" : unreadCount}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground w-14 text-right">
+                              {formatSessionTime(s.updatedAt ?? s.createdAt)}
+                            </span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="size-6 rounded-md flex items-center justify-center hover:bg-[#f3ebe2]"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label="Tùy chọn cuộc trò chuyện"
+                                >
+                                  <MoreVertical size={16} strokeWidth={2.5} style={{ color: "#8f7d6a" }} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                side="bottom"
+                                sideOffset={6}
+                                className="w-52"
+                                style={{ zIndex: 10020 }}
+                              >
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleMarkSessionRead(s.sessionId)
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <CheckCheck size={14} />
+                                  Đánh dấu đã đọc
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleToggleMuteSession(s.sessionId)
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <BellOff size={14} />
+                                  {isMuted ? "Bật thông báo" : "Tắt thông báo"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleDeleteSession(s.sessionId)
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <Trash2 size={14} />
+                                  Xóa trò chuyện
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
-                            {formatSessionTime(s.updatedAt ?? s.createdAt)}
-                          </span>
-                        </button>
-                      ))}
+                        </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -898,7 +1423,9 @@ export function ShopioAssistantWidget() {
                                 {!effectiveAddress && (
                                   <p className="text-[10px]" style={{ color: "#9b6a20" }}>
                                     Chưa có địa chỉ.{" "}
-                                    <Link href="/user/profile/addresses" className="underline">Thêm ngay</Link>
+                                    <button type="button" onClick={() => setShowAddressModal(true)} className="underline font-medium" style={{ color: "var(--color-primary)" }}>
+                                      Thêm ngay
+                                    </button>
                                   </p>
                                 )}
                                 {showAddressPicker && addresses.length > 0 && (
@@ -1015,7 +1542,6 @@ export function ShopioAssistantWidget() {
               </>
               )}
             </>
-          )}
         </div>
       )}
     </>

@@ -44,7 +44,12 @@ function ProductCardSkeleton() {
 function SearchBox({ initialValue }: { initialValue: string }) {
   const router = useRouter()
   const [value, setValue] = useState(initialValue)
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Array<{
+    id: string
+    name: string
+    shopName: string
+    imageUrl?: string
+  }>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -65,8 +70,18 @@ function SearchBox({ initialValue }: { initialValue: string }) {
       try {
         const res = await getProducts({ search: value.trim(), pageSize: 8 })
         if (res.success) {
-          const names = [...new Set(res.products.map((p) => p.name))].slice(0, 6)
-          setSuggestions(names)
+          const dedupedByName = new Map<string, { id: string; name: string; shopName: string; imageUrl?: string }>()
+          for (const p of res.products) {
+            if (!dedupedByName.has(p.name)) {
+              dedupedByName.set(p.name, {
+                id: p.id,
+                name: p.name,
+                shopName: p.shopName,
+                imageUrl: p.imageUrls?.[0],
+              })
+            }
+          }
+          setSuggestions(Array.from(dedupedByName.values()).slice(0, 6))
         }
       } catch { }
       finally { setLoadingSuggestions(false) }
@@ -130,21 +145,33 @@ function SearchBox({ initialValue }: { initialValue: string }) {
 
       {showSuggestions && (value.trim().length >= 2) && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden">
-          {loadingSuggestions ? (
+            {loadingSuggestions ? (
             <div className="flex items-center gap-2 px-4 py-3 text-sm text-gray-400">
               <span className="size-3.5 border-2 border-gray-200 border-t-[var(--color-primary)] rounded-full animate-spin" />
               Đang tìm...
             </div>
           ) : suggestions.length > 0 ? (
             <>
-              {suggestions.map((name) => (
+              {suggestions.map((item) => (
                 <button
-                  key={name}
-                  onMouseDown={() => handleSearch(name)}
+                  key={`${item.id}-${item.name}`}
+                  onMouseDown={() => handleSearch(item.name)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#f8f5f1] transition-colors text-left"
                 >
-                  <span className="material-symbols-outlined text-base text-gray-400 shrink-0">search</span>
-                  <span className="text-sm truncate" style={{ color: "var(--color-text-main)" }}>{name}</span>
+                  <div className="size-9 rounded-md bg-gray-100 overflow-hidden shrink-0">
+                    {item.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.imageUrl} alt={item.name} className="size-full object-cover" />
+                    ) : (
+                      <div className="size-full flex items-center justify-center">
+                        <span className="material-symbols-outlined text-base text-gray-400">search</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm truncate" style={{ color: "var(--color-text-main)" }}>{item.name}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{item.shopName}</p>
+                  </div>
                 </button>
               ))}
             </>

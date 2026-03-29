@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Check,
   CircleCheck,
+  Plus,
 } from 'lucide-react'
 import { aiChatService, type AiChatSendResponse } from '@/services/ai-chat'
 import { cartService } from '@/services/cart'
@@ -642,7 +643,7 @@ export default function UserAiChatPage() {
             style={{ borderColor: '#e0d2c2', color: 'var(--color-text-secondary)' }}
             title="Cuộc trò chuyện mới"
           >
-            <RotateCcw size={12} />
+            <Plus size={12} /> Mới
             Mới
           </button>
         </div>

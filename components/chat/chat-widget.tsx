@@ -500,9 +500,9 @@ function ChatWidgetInner({
         <div className="flex items-center gap-2 px-3 py-2 border-b bg-white shrink-0">
           <IconMessage2 className="size-5 text-orange-500" />
           <span className="font-semibold text-sm flex-1 text-gray-800">Chat</span>
-          <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Thu gọn">
+          {/* <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Thu gọn">
             <IconMinus className="size-4" />
-          </button>
+          </button> */}
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Đóng">
             <IconX className="size-4" />
           </button>
@@ -812,9 +812,9 @@ function ChatWidgetInner({
             {totalUnread}
           </span>
         )}
-        <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors" title="Thu gọn">
+        {/* <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors" title="Thu gọn">
           <IconMinus className="size-4" />
-        </button>
+        </button> */}
         <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors" title="Đóng">
           <IconX className="size-4" />
         </button>

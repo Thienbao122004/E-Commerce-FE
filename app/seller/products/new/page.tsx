@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 "use client"
 
 import * as React from "react"
@@ -32,10 +33,12 @@ import {
   aiSuggestCategory,
   aiSuggestTags,
   aiSuggestMaterials,
+  aiAnalyzeImage,
   aiSendFeedback,
 } from "@/services/ai-seller"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
 import type {
+  AnalyzeImageResponse,
   CategorySuggestion,
   TagSuggestion,
   MaterialSuggestion,
@@ -106,7 +109,9 @@ export default function CreateProductPage() {
   // AI state
   const [catLoading, setCatLoading] = React.useState(false)
   const [tagLoading, setTagLoading] = React.useState(false)
+  const [imageAnalyzeLoading, setImageAnalyzeLoading] = React.useState(false)
   const [catError, setCatError] = React.useState(false)
+  const [imageAnalyzeResult, setImageAnalyzeResult] = React.useState<AnalyzeImageResponse | null>(null)
 
   const [catSuggestions, setCatSuggestions] = React.useState<CategorySuggestion[]>([])
   const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
@@ -132,6 +137,7 @@ export default function CreateProductPage() {
   )
   const categoryReqRef = React.useRef(0)
   const tagMatReqRef = React.useRef(0)
+  const imageAnalyzeReqRef = React.useRef(0)
 
   const manualCategoryOptions = React.useMemo(() => {
     const q = manualCatQuery.trim().toLowerCase()
@@ -232,6 +238,102 @@ export default function CreateProductPage() {
     }, 700)
     return () => clearTimeout(aiTagTimer.current)
   }, [aiKeyword, selCategory, fetchTagsAndMaterials, hasInput])
+
+  const blobUrlToDataUrl = React.useCallback(async (blobUrl: string) => {
+    const res = await fetch(blobUrl)
+    const blob = await res.blob()
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(String(reader.result ?? ""))
+      reader.onerror = () => reject(new Error("Không thể đọc ảnh local"))
+      reader.readAsDataURL(blob)
+    })
+    return dataUrl
+  }, [])
+
+  const normalizeAiImageUrls = React.useCallback(async () => {
+    const normalized: string[] = []
+    for (const u of imageUrls.slice(0, 3)) {
+      if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("data:image/")) {
+        normalized.push(u)
+        continue
+      }
+      if (u.startsWith("blob:")) {
+        try {
+          const dataUrl = await blobUrlToDataUrl(u)
+          if (dataUrl.startsWith("data:image/")) normalized.push(dataUrl)
+        } catch {
+          // ignore broken local preview url
+        }
+      }
+    }
+    return normalized
+  }, [imageUrls, blobUrlToDataUrl])
+
+  React.useEffect(() => {
+    if (imageUrls.length === 0) {
+      setImageAnalyzeResult(null)
+      return
+    }
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const reqId = ++imageAnalyzeReqRef.current
+      setImageAnalyzeLoading(true)
+      try {
+        const aiImageUrls = await normalizeAiImageUrls()
+        if (!aiImageUrls.length) return
+
+        const res = await aiAnalyzeImage({
+          imageUrls: aiImageUrls,
+          productTitle: name.trim() || undefined,
+          productDescription: description.trim() || undefined,
+        })
+
+        if (cancelled || reqId !== imageAnalyzeReqRef.current) return
+        if (!res.success) {
+          setImageAnalyzeResult(null)
+          return
+        }
+
+        setImageAnalyzeResult(res)
+
+        if (res.suggestedCategories?.length) {
+          setCatSuggestions(res.suggestedCategories)
+          if (!selCategory || !res.suggestedCategories.some((c) => c.categoryId === selCategory.categoryId)) {
+            setSelCategory(res.suggestedCategories[0])
+          }
+        }
+
+        if (res.suggestedTags?.length) {
+          setTagSuggestions(res.suggestedTags)
+          const ids = res.suggestedTags
+            .map((t) => t.tagId)
+            .filter((id): id is number => typeof id === "number")
+          setSelTagIds(ids)
+        }
+
+        if (res.suggestedMaterials?.length) {
+          setMatSuggestions(res.suggestedMaterials)
+          const ids = res.suggestedMaterials
+            .map((m) => m.materialId)
+            .filter((id): id is string => typeof id === "string" && id.length > 0)
+          setSelMatIds(ids)
+        }
+      } catch {
+        if (!cancelled) setImageAnalyzeResult(null)
+      } finally {
+        if (!cancelled && reqId === imageAnalyzeReqRef.current) {
+          setImageAnalyzeLoading(false)
+        }
+      }
+    }, 450)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [imageUrls, name, description, normalizeAiImageUrls, selCategory])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
     setSelCategory(cat)
@@ -520,13 +622,18 @@ export default function CreateProductPage() {
                         : "Nhập tên hoặc mô tả để AI phân tích và gợi ý tự động"}
                     </p>
                   </div>
-                  {(catLoading || tagLoading) && (
+                  {(catLoading || tagLoading || imageAnalyzeLoading) && (
                     <IconLoader2 className="mt-1 size-3.5 shrink-0 animate-spin text-[#738f5b]" />
                   )}
                 </div>
               </CardHeader>
 
               <CardContent className="grid gap-4">
+                {imageAnalyzeResult?.summary && (
+                  <div className="rounded-xl border border-[#d4deca] bg-white p-2.5 text-[11px] leading-relaxed text-[#647759]">
+                    <span className="font-semibold text-[#44553a]">Phân tích ảnh:</span> {imageAnalyzeResult.summary}
+                  </div>
+                )}
                 <div>
                   <SectionLabel
                     icon={IconCategory}
