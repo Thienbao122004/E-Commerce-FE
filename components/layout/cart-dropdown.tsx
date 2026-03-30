@@ -15,9 +15,10 @@ export function CartDropdown() {
   const { session } = useAuth()
   const [cart, setCart] = useState<Cart | null>(null)
   const [open, setOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const fetchCart = useCallback(async () => {
@@ -47,13 +48,19 @@ export function CartDropdown() {
   }, [fetchCart])
 
   const handleMouseEnter = () => {
-    clearTimeout(timerRef.current)
+    if (animTimerRef.current) clearTimeout(animTimerRef.current)
+    setClosing(false)
     setOpen(true)
     if (!fetched) fetchCart()
   }
 
   const handleMouseLeave = () => {
-    timerRef.current = setTimeout(() => setOpen(false), 200)
+    if (animTimerRef.current) clearTimeout(animTimerRef.current)
+    setClosing(true)
+    animTimerRef.current = setTimeout(() => {
+      setOpen(false)
+      setClosing(false)
+    }, 150)
   }
 
   const items = cart?.items ?? []
@@ -72,12 +79,25 @@ export function CartDropdown() {
   const totalItems = uniqueItems.length
 
   return (
-    <div
-      ref={containerRef}
-      className="relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <>
+      <style>{`
+        @keyframes notif-enter {
+          from { opacity: 0; transform: scale(0.95) translateY(-6px); }
+          to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        @keyframes notif-leave {
+          from { opacity: 1; transform: scale(1)    translateY(0); }
+          to   { opacity: 0; transform: scale(0.95) translateY(-6px); }
+        }
+        .notif-enter { animation: notif-enter 150ms ease forwards; transform-origin: top right; }
+        .notif-leave { animation: notif-leave 150ms ease forwards; transform-origin: top right; }
+      `}</style>
+      <div
+        ref={containerRef}
+        className="relative"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
       {/* Cart icon + badge */}
       <Link
         href="/user/cart"
@@ -98,7 +118,7 @@ export function CartDropdown() {
       {/* Dropdown */}
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 w-[380px] bg-white rounded-lg shadow-xl border z-50"
+          className={`absolute right-0 top-full mt-1 w-[380px] bg-white rounded-lg shadow-xl border z-50 ${closing ? 'notif-leave' : 'notif-enter'}`}
           style={{ borderColor: '#e5ded6' }}
         >
           {/* Header */}
@@ -190,5 +210,6 @@ export function CartDropdown() {
         </div>
       )}
     </div>
+    </>
   )
 }
