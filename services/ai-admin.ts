@@ -1,6 +1,6 @@
 import { getAccessToken } from "@/lib/auth"
 
-const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL
+const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
 
 async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
   const token = await getAccessToken()

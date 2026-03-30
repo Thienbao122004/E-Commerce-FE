@@ -167,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             try {
                 if (mounted) setIsProfileLoading(true)
-                const profileData = await fetchProfile(user.id, user.app_metadata)
+                const profileData = await fetchProfile(user.id, user.user_metadata)
                 if (mounted) setProfile(profileData)
             } catch (error) {
 
