@@ -72,7 +72,7 @@ export default function ProductsPage() {
     try {
       const res = await fetchProductById(token, id)
       if (res.success && res.product) setSelectedProduct(res.product)
-    } catch { /* ignore */ }
+    } catch {  }
     finally { setDetailLoading(false) }
   }, [])
 

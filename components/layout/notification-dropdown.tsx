@@ -163,7 +163,7 @@ export function NotificationDropdown() {
         {/* Dropdown panel */}
         {open && (
           <div
-            className={`absolute right-0 top-full mt-1 w-95 z-50 rounded-md border bg-popover shadow-md outline-none ${closing ? 'notif-leave' : 'notif-enter'}`}
+            className={`absolute right-0 top-full mt-1 w-95 z-50 rounded-md border bg-popover shadow-md outline-none before:absolute before:-top-4 before:right-0 before:w-full before:h-4 before:bg-transparent ${closing ? 'notif-leave' : 'notif-enter'}`}
             style={{ borderColor: '#ece7e1' }}
           >
             {!session ? (

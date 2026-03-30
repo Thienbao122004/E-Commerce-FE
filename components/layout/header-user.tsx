@@ -24,7 +24,7 @@ export function HeaderUser() {
   }
 
   if (session) {
-    const displayName = profile?.full_name ?? user?.email?.split("@")[0] ?? ""
+    const displayName = profile?.full_name || user?.email?.split("@")[0] || ""
     const initials = displayName
       ? displayName.split(" ").map((w) => w[0]).slice(-2).join("").toUpperCase()
       : "U"

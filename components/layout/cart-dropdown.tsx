@@ -118,7 +118,7 @@ export function CartDropdown() {
       {/* Dropdown */}
       {open && (
         <div
-          className={`absolute right-0 top-full mt-1 w-[380px] bg-white rounded-lg shadow-xl border z-50 ${closing ? 'notif-leave' : 'notif-enter'}`}
+          className={`absolute right-0 top-full mt-1 w-[380px] bg-white rounded-lg shadow-xl border z-50 before:absolute before:-top-4 before:right-0 before:w-full before:h-4 before:bg-transparent ${closing ? 'notif-leave' : 'notif-enter'}`}
           style={{ borderColor: '#e5ded6' }}
         >
           {/* Header */}

@@ -32,7 +32,7 @@ function maskEmail(email: string): string {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, refreshProfile } = useAuth()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,6 +44,7 @@ export default function ProfilePage() {
   // Avatar
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Email change
@@ -99,11 +100,30 @@ export default function ProfilePage() {
   const handleSave = async () => {
     try {
       setSaving(true)
+      
+      if (avatarFile && user) {
+        const ext = avatarFile.type === 'image/png' ? 'png' : 'jpg'
+        const storagePath = `avatars/${user.id}/avatar-${Date.now()}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('image')
+          .upload(storagePath, avatarFile, { upsert: true, cacheControl: '0' })
+        if (uploadError) throw uploadError
+
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { avatar_storage_path: storagePath },
+        })
+        if (updateError) throw updateError
+        
+        setAvatarFile(null)
+      }
+
       const res = await profileService.updateProfile({
         fullName: fullName || null,
         phone: phone || null,
       })
       if (res.success) {
+        await refreshProfile()
         toast.success('Cập nhật hồ sơ thành công')
       } else {
         toast.error(res.message ?? 'Cập nhật thất bại')
@@ -131,33 +151,11 @@ export default function ProfilePage() {
       return
     }
 
-    try {
-      setUploadingAvatar(true)
-      const ext = file.type === 'image/png' ? 'png' : 'jpg'
-      const storagePath = `avatars/${user.id}/avatar-${Date.now()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('image')
-        .upload(storagePath, file, { upsert: true, cacheControl: '0' })
-      if (uploadError) throw uploadError
-
-      // Save storage path to user metadata (not public URL)
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_storage_path: storagePath },
-      })
-      if (updateError) throw updateError
-
-      // Immediate preview from file blob
-      setAvatarUrl(URL.createObjectURL(file))
-      toast.success('Cập nhật ảnh đại diện thành công')
-    } catch (err: any) {
-      toast.error(err.message || 'Không thể tải ảnh lên')
-    } finally {
-      setUploadingAvatar(false)
-    }
+    setAvatarFile(file)
+    setAvatarUrl(URL.createObjectURL(file))
+    toast.success('Đã chọn ảnh. Bấm "Lưu" để hoàn tất cập nhật.')
   }
 
-  // --- Email change ---
   const openEmailDialog = () => {
     setNewEmail('')
     setOtpValue('')
@@ -202,14 +200,6 @@ export default function ProfilePage() {
     }
   }
 
-  const username = user?.email?.split('@')[0] ?? ''
-  const initials =
-    (fullName || username)
-      .split(' ')
-      .map((w) => w[0])
-      .slice(-2)
-      .join('')
-      .toUpperCase() || 'U'
 
   if (loading) {
     return (
@@ -234,7 +224,6 @@ export default function ProfilePage() {
   return (
     <>
       <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
-        {/* Header */}
         <div className="px-6 pt-6 pb-4">
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-main)' }}>
             Hồ Sơ Của Tôi
@@ -246,20 +235,8 @@ export default function ProfilePage() {
         <Separator />
 
         <div className="flex flex-col md:flex-row">
-          {/* Form Section */}
           <div className="flex-1 px-6 py-6">
             <div className="space-y-5 max-w-lg">
-              {/* Username (readonly) */}
-              <div className="flex items-center">
-                <Label className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm">
-                  Tên đăng nhập
-                </Label>
-                <p className="text-sm" style={{ color: 'var(--color-text-main)' }}>
-                  {username}
-                </p>
-              </div>
-
-              {/* Full Name */}
               <div className="flex items-center">
                 <Label
                   htmlFor="fullName"
@@ -276,7 +253,6 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {/* Email */}
               <div className="flex items-center">
                 <Label className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm">
                   Email
@@ -314,7 +290,6 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {/* Shop */}
               {profile?.shop && (
                 <div className="flex items-center">
                   <Label className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm">
@@ -357,7 +332,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Avatar Section */}
           <div
             className="w-full md:w-[280px] border-t md:border-t-0 md:border-l flex flex-col items-center justify-start py-8 px-6"
             style={{ borderColor: '#e5ded6' }}
@@ -371,10 +345,10 @@ export default function ProfilePage() {
                 />
               ) : (
                 <span
-                  className="size-24 rounded-full flex items-center justify-center text-2xl font-bold text-white"
+                  className="size-24 rounded-full flex items-center justify-center text-white"
                   style={{ backgroundColor: 'var(--color-primary)' }}
                 >
-                  {initials}
+                  <span className="material-symbols-outlined">person</span>
                 </span>
               )}
               {uploadingAvatar && (

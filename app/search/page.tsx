@@ -8,27 +8,7 @@ import { getCategories, type StorefrontCategory } from "@/services/storefront-ca
 import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
-import dynamic from "next/dynamic"
-
-const HeaderUser = dynamic(
-  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const CartDropdown = dynamic(
-  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const NotificationDropdown = dynamic(
-  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const SearchBox = dynamic(
-  () => import("@/components/layout/search-box").then((m) => m.SearchBox),
-  { ssr: false, loading: () => <div className="flex-1 max-w-2xl mx-4 h-10 rounded-lg bg-[#f0ebe4] animate-pulse" /> }
-)
+import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -71,6 +51,11 @@ function SearchPageContent() {
   const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc" | "rating">("newest")
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined)
   const [initialCategorySet, setInitialCategorySet] = useState(false)
+  const [showMoreCategories, setShowMoreCategories] = useState(false)
+  const [priceMinInput, setPriceMinInput] = useState("")
+  const [priceMaxInput, setPriceMaxInput] = useState("")
+  const [appliedMinPrice, setAppliedMinPrice] = useState<number | undefined>(undefined)
+  const [appliedMaxPrice, setAppliedMaxPrice] = useState<number | undefined>(undefined)
 
   const PAGE_SIZE = 110
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -81,10 +66,12 @@ function SearchPageContent() {
     p: number,
     sort: typeof sortBy,
     catId: number | undefined,
+    minPrice?: number,
+    maxPrice?: number,
   ) => {
     setLoading(true)
     try {
-      const res = await getProducts({ search: q, page: p, pageSize: PAGE_SIZE, sortBy: sort, categoryId: catId })
+      const res = await getProducts({ search: q, page: p, pageSize: PAGE_SIZE, sortBy: sort, categoryId: catId, minPrice, maxPrice })
       if (res.success) {
         setProducts(res.products)
         setTotalCount(res.totalCount)
@@ -94,18 +81,17 @@ function SearchPageContent() {
   }, [])
 
   useEffect(() => {
-    // Nếu có categorySlug nhưng chưa resolve xong → chờ, tránh flash "tất cả sản phẩm"
     if (categorySlug && !initialCategorySet) return
     setPage(1)
     setProducts([])
-    loadProducts(query, 1, sortBy, selectedCategory)
-  }, [query, sortBy, selectedCategory, loadProducts, categorySlug, initialCategorySet])
+    loadProducts(query, 1, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice)
+  }, [query, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice, loadProducts, categorySlug, initialCategorySet])
 
   useEffect(() => {
     getCategories({ pageSize: 20, level: 1 }).then((res) => {
       if (res.success) {
         setCategories(res.categories)
-        
+
         if (categorySlug && !initialCategorySet) {
           const matchedCategory = res.categories.find(
             (cat) => cat.slug === categorySlug || cat.code === categorySlug || String(cat.id) === categorySlug
@@ -122,9 +108,38 @@ function SearchPageContent() {
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
     setPage(newPage)
-    loadProducts(query, newPage, sortBy, selectedCategory)
+    loadProducts(query, newPage, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice)
     mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
+
+  const formatThousands = (raw: string) =>
+    raw ? raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''
+
+  const handleApplyPrice = () => {
+    setAppliedMinPrice(priceMinInput ? Number(priceMinInput) : undefined)
+    setAppliedMaxPrice(priceMaxInput ? Number(priceMaxInput) : undefined)
+  }
+
+  const handleCategoryChange = (cat: StorefrontCategory | undefined) => {
+    setSelectedCategory(cat?.id)
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    if (cat?.slug) params.set('category', cat.slug)
+    router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
+  }
+
+  const handleClearAll = () => {
+    setSelectedCategory(undefined)
+    setPriceMinInput("")
+    setPriceMaxInput("")
+    setAppliedMinPrice(undefined)
+    setAppliedMaxPrice(undefined)
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
+  }
+
+  const hasActiveFilters = selectedCategory !== undefined || appliedMinPrice !== undefined || appliedMaxPrice !== undefined
 
   const SORT_OPTIONS: { value: typeof sortBy; label: string }[] = [
     { value: "newest", label: "Mới nhất" },
@@ -140,30 +155,7 @@ function SearchPageContent() {
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: "var(--color-background-light)", color: "var(--color-text-main)" }}
     >
-      <header
-        className="sticky top-0 z-50 w-full border-b backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}
-      >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>
-              local_florist
-            </span>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight hidden sm:block" style={{ color: "var(--color-text-main)" }}>
-              EcomViet
-            </h1>
-          </Link>
-
-          <SearchBox initialValue={searchBoxValue} />
-
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <HeaderUser />
-            <NotificationDropdown />
-            <CartDropdown />
-          </div>
-        </div>
-      </header>
-
+      <MainStorefrontHeader />
       <main ref={mainRef} className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6">
         {/* Breadcrumb + title */}
         <div className="mb-6">
@@ -183,38 +175,118 @@ function SearchPageContent() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar filter */}
           <aside className="w-full lg:w-56 shrink-0">
-            <div className="bg-white rounded-xl border border-gray-100 p-4">
-              <h3 className="font-bold text-sm mb-3" style={{ color: "var(--color-text-main)" }}>Danh mục</h3>
-              <ul className="space-y-1">
-                <li>
-                  <button
-                    onClick={() => setSelectedCategory(undefined)}
-                    className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
-                      selectedCategory === undefined
-                        ? "font-bold text-[var(--color-primary)] bg-[#fdf6ee]"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                </li>
-                {categories.map((cat) => (
-                  <li key={cat.id}>
+            <div className="bg-white rounded border border-gray-100 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+                <span className="material-symbols-outlined text-base" style={{ color: "var(--color-text-secondary)" }}>filter_list</span>
+                <h3 className="text-sm font-black tracking-wide uppercase" style={{ color: "var(--color-text-main)" }}>Bộ lọc tìm kiếm</h3>
+              </div>
+
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>Theo Danh Mục</p>
+                <ul className="space-y-0.5">
+                  <li>
                     <button
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors ${
-                        selectedCategory === cat.id
-                          ? "font-bold text-[var(--color-primary)] bg-[#fdf6ee]"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
+                      onClick={() => handleCategoryChange(undefined)}
+                      className="w-full flex items-center gap-2 text-left text-xs py-1.5 transition-colors hover:text-[var(--color-primary)]"
+                      style={{ color: selectedCategory === undefined ? "var(--color-primary)" : "var(--color-text-main)" }}
                     >
-                      {cat.name}
+                      <span
+                        className="size-3.5 rounded-sm border flex items-center justify-center shrink-0"
+                        style={{
+                          borderColor: selectedCategory === undefined ? "var(--color-primary)" : "#d1d5db",
+                          backgroundColor: selectedCategory === undefined ? "var(--color-primary)" : "white",
+                        }}
+                      >
+                        {selectedCategory === undefined && <span className="material-symbols-outlined text-white" style={{ fontSize: 10 }}>check</span>}
+                      </span>
+                      Tất cả
                     </button>
                   </li>
-                ))}
-              </ul>
+                  {(showMoreCategories ? categories : categories.slice(0, 5)).map((cat) => (
+                    <li key={cat.id}>
+                      <button
+                        onClick={() => handleCategoryChange(cat)}
+                        className="w-full flex items-center gap-2 text-left text-xs py-1.5 transition-colors hover:text-[var(--color-primary)]"
+                        style={{ color: selectedCategory === cat.id ? "var(--color-primary)" : "var(--color-text-main)" }}
+                      >
+                        <span
+                          className="size-3.5 rounded-sm border flex items-center justify-center shrink-0"
+                          style={{
+                            borderColor: selectedCategory === cat.id ? "var(--color-primary)" : "#d1d5db",
+                            backgroundColor: selectedCategory === cat.id ? "var(--color-primary)" : "white",
+                          }}
+                        >
+                          {selectedCategory === cat.id && <span className="material-symbols-outlined text-white" style={{ fontSize: 10 }}>check</span>}
+                        </span>
+                        {cat.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {categories.length > 5 && (
+                  <button
+                    onClick={() => setShowMoreCategories((p) => !p)}
+                    className="mt-1 flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--color-primary)]"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    {showMoreCategories ? "Thu gọn" : "Thêm"}
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                      {showMoreCategories ? "expand_less" : "expand_more"}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>Khoảng Giá</p>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="flex items-center flex-1 rounded border border-gray-200 overflow-hidden">
+                    <span className="text-[10px] text-gray-400 pl-1.5">₫</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="TỪ"
+                      value={formatThousands(priceMinInput)}
+                      onChange={(e) => setPriceMinInput(e.target.value.replace(/[^\d]/g, ""))}
+                      className="w-full bg-transparent text-xs py-1.5 px-1 focus:outline-none placeholder:text-gray-300"
+                    />
+                  </div>
+                  <span className="text-gray-300 text-xs">—</span>
+                  <div className="flex items-center flex-1 rounded border border-gray-200 overflow-hidden">
+                    <span className="text-[10px] text-gray-400 pl-1.5">₫</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="ĐẾN"
+                      value={formatThousands(priceMaxInput)}
+                      onChange={(e) => setPriceMaxInput(e.target.value.replace(/[^\d]/g, ""))}
+                      onKeyDown={(e) => e.key === "Enter" && handleApplyPrice()}
+                      className="w-full bg-transparent text-xs py-1.5 px-1 focus:outline-none placeholder:text-gray-300"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleApplyPrice}
+                  className="w-full py-1.5 rounded text-xs font-bold text-white transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "var(--color-primary)" }}
+                >
+                  ÁP DỤNG
+                </button>
+              </div>
+
+              {/* Clear all */}
+              {hasActiveFilters && (
+                <div className="px-4 py-3">
+                  <button
+                    onClick={handleClearAll}
+                    className="w-full py-1.5 rounded border text-xs font-bold transition-colors hover:border-red-400 hover:text-red-500"
+                    style={{ borderColor: "#d1d5db", color: "var(--color-text-secondary)" }}
+                  >
+                    XÓA TẤT CẢ
+                  </button>
+                </div>
+              )}
             </div>
           </aside>
 
@@ -227,11 +299,10 @@ function SearchPageContent() {
                     <button
                       key={opt.value}
                       onClick={() => setSortBy(opt.value)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                        sortBy === opt.value
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${sortBy === opt.value
                           ? "text-white"
                           : "bg-white border border-gray-200 text-gray-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-                      }`}
+                        }`}
                       style={sortBy === opt.value ? { backgroundColor: "var(--color-primary)" } : {}}
                     >
                       {opt.label}

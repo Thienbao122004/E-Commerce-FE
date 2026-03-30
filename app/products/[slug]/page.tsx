@@ -19,20 +19,7 @@ import dynamic from "next/dynamic"
 import { useAuth } from "@/contexts/auth-context"
 const CART_UPDATED_EVENT = "cart:updated"
 
-const HeaderUser = dynamic(
-  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const CartDropdown = dynamic(
-  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const NotificationDropdown = dynamic(
-  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
+import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 
 /* ─────────── helpers ─────────── */
 
@@ -391,51 +378,8 @@ export default function ProductDetailPage() {
     })
   }, [product, selectedVariant?.id, currentStock])
 
-  /* ─── header ─── */
-  const header = (
-    <header
-      className="sticky top-0 z-50 w-full border-b backdrop-blur-sm"
-      style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}
-    >
-      <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>
-            local_florist
-          </span>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight hidden sm:block" style={{ color: "var(--color-text-main)" }}>
-            EcomViet
-          </h1>
-        </Link>
+  const header = <MainStorefrontHeader />
 
-        <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 max-w-xl mx-4">
-          <div
-            className="flex w-full items-center rounded-lg overflow-hidden border border-transparent transition-colors focus-within:border-[var(--color-primary)]"
-            style={{ backgroundColor: "#f0ebe4" }}
-          >
-            <div className="flex items-center pl-3" style={{ color: "var(--color-text-secondary)" }}>
-              <span className="material-symbols-outlined">search</span>
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm kiếm sản phẩm, shop, thương hiệu..."
-              className="w-full bg-transparent border-none py-2.5 px-3 text-sm focus:ring-0 focus:outline-none placeholder:text-gray-400"
-              style={{ color: "var(--color-text-main)" }}
-            />
-          </div>
-        </form>
-
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          <HeaderUser />
-          <NotificationDropdown />
-          <CartDropdown />
-        </div>
-      </div>
-    </header>
-  )
-
-  /* ─── footer ─── */
   const footer = (
     <>
       <Separator className="bg-gray-200 mt-12" />
@@ -491,7 +435,6 @@ export default function ProductDetailPage() {
     </>
   )
 
-  /* ─── error / not found ─── */
   if (!loading && error) {
     return (
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-background-light)", color: "var(--color-text-main)" }}>

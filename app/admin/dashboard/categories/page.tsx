@@ -381,7 +381,6 @@ export default function CategoriesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirm dialog */}
       <Dialog open={deleteCat !== null} onOpenChange={(v) => { if (!v) setDeleteCat(null) }}>
         <DialogContent>
           <DialogHeader>

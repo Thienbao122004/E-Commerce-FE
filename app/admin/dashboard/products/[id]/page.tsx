@@ -150,9 +150,7 @@ export default function ProductDetailPage() {
             <ProductDetailSkeleton />
           ) : product ? (
             <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-              {/* Left: Images */}
               <div className="flex flex-col gap-4">
-
                 <div className="relative aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
                   {product.imageUrls.length > 0 ? (
                     <Image

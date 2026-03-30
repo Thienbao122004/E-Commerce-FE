@@ -30,6 +30,7 @@ interface AuthContextValue {
     isAdmin: boolean
     isSeller: boolean
     signOut: () => Promise<void>
+    refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -183,6 +184,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [user?.id])
 
+    const refreshProfile = async () => {
+        if (!user) return
+        try {
+            const profileData = await fetchProfile(user.id, user.app_metadata)
+            setProfile(profileData)
+        } catch (error) {
+            console.error('Failed to refresh profile', error)
+        }
+    }
+
     const signOut = async () => {
         try {
             await supabase.auth.signOut()
@@ -209,6 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: role === 'admin',
         isSeller: role === 'seller',
         signOut,
+        refreshProfile,
     }
 
     return (

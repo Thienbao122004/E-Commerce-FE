@@ -4,12 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
 import { Separator } from "@/components/ui/separator"
-import dynamic from "next/dynamic"
-
-const HeaderUser = dynamic(
-  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
+import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 
 const ICON_MAP: Record<string, string> = {
   fashion: "checkroom", thoi_trang: "checkroom",
@@ -58,39 +53,9 @@ export default function CategoriesPage() {
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: "var(--color-background-light)", color: "var(--color-text-main)" }}
     >
-      {/* Header */}
-      <header
-        className="sticky top-0 z-50 w-full border-b backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}
-      >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
-              <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>
-                local_florist
-              </span>
-              <span className="text-xl md:text-2xl font-bold tracking-tight hidden sm:block" style={{ color: "var(--color-text-main)" }}>
-                EcomViet
-              </span>
-            </Link>
+      <MainStorefrontHeader />
 
-            {/* Breadcrumb */}
-            <div className="hidden md:flex items-center gap-1.5 text-sm text-gray-400">
-              <Link href="/" className="hover:text-[var(--color-primary)] transition-colors">Trang chủ</Link>
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
-              <span style={{ color: "var(--color-text-main)" }}>Tất cả danh mục</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <HeaderUser />
-          </div>
-        </div>
-      </header>
-
-      {/* Main */}
       <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-8">
-        {/* Page title */}
         <div className="mb-8">
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3" style={{ color: "var(--color-text-main)" }}>
             <span className="w-1.5 h-8 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />

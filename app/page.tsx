@@ -8,29 +8,7 @@ import { getCategories, type StorefrontCategory } from "@/services/storefront-ca
 import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
-import dynamic from "next/dynamic"
-
-const HeaderUser = dynamic(
-  () => import("@/components/layout/header-user").then((m) => m.HeaderUser),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const CartDropdown = dynamic(
-  () => import("@/components/layout/cart-dropdown").then((m) => m.CartDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const NotificationDropdown = dynamic(
-  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
-  { ssr: false, loading: () => <div className="size-10 shrink-0" /> }
-)
-
-const SearchBox = dynamic(
-  () => import("@/components/layout/search-box").then((m) => m.SearchBox),
-  { ssr: false, loading: () => <div className="hidden md:flex flex-1 max-w-xl mx-4 h-10 rounded-lg bg-[#f0ebe4] animate-pulse" /> }
-)
-
-/* ─────────────────── helpers ─────────────────── */
+import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -39,9 +17,6 @@ function formatPrice(price: number) {
     maximumFractionDigits: 0,
   }).format(price)
 }
-
-
-/* ─────────────────── icon map ─────────────────── */
 
 const ICON_MAP: Record<string, string> = {
   fashion: "checkroom", thoi_trang: "checkroom",
@@ -61,8 +36,6 @@ function getCategoryIcon(code: string): string {
   }
   return ICON_MAP.default
 }
-
-/* ─────────────── skeleton ─────────────── */
 
 function CategorySkeleton() {
   return (
@@ -107,9 +80,6 @@ function ProductCardSkeleton() {
     </div>
   )
 }
-
-
-const FLASH_DISCOUNTS = [30, 15, 25, 20, 40, 35, 10, 45, 18, 28]
 
 const HERO_SLIDES = [
   {
@@ -194,7 +164,6 @@ export default function LandingPage() {
   const [flashScroll, setFlashScroll] = useState({ canPrev: false, canNext: true })
   const flashScrollRef = useRef<HTMLDivElement>(null)
 
-  /* ── fetch ── */
   const loadAll = useCallback(async () => {
     setLoadingCats(true)
     setLoadingFlash(true)
@@ -306,28 +275,8 @@ export default function LandingPage() {
       className="min-h-screen flex flex-col"
       style={{ backgroundColor: "var(--color-background-light)", color: "var(--color-text-main)" }}
     >
-      <header
-        className="sticky top-0 z-50 w-full border-b backdrop-blur-sm"
-        style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}
-      >
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="material-symbols-outlined text-4xl" style={{ color: "var(--color-primary)" }}>
-              local_florist
-            </span>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-main)" }}>
-              EcomViet
-            </h1>
-          </Link>
-
-          <SearchBox />
-
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
-            <HeaderUser />
-            <NotificationDropdown />
-            <CartDropdown />
-          </div>
-        </div>
+      <header>
+        <MainStorefrontHeader />
 
         <nav className="border-t bg-white" style={{ borderColor: "#e5ded6" }}>
           <div className="max-w-[1440px] mx-auto px-10">
@@ -506,7 +455,6 @@ export default function LandingPage() {
                       </div>
                     )}
                   </div>
-                  {/* Label */}
                   <div className="px-2 py-2.5 w-full">
                     <h3 className="font-bold text-xs truncate" style={{ color: "var(--color-text-main)" }}>{cat.name}</h3>
                     {cat.productCount > 0 && (
@@ -645,7 +593,7 @@ export default function LandingPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
               <span className="w-1 h-6 rounded-full" style={{ backgroundColor: "var(--color-text-secondary)" }} />
-              Sản phẩm nổi bật
+              Tất cả sản phẩm
             </h2>
           </div>
 
