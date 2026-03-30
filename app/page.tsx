@@ -340,7 +340,7 @@ export default function LandingPage() {
               {categories.slice(0, 5).map((cat) => (
                 <li key={cat.id}>
                   <Link
-                    href={`/search?category=${cat.slug || cat.id}`}
+                    href={`/search?category=${cat.slug}`}
                     className="text-sm font-medium whitespace-nowrap transition-colors hover:text-[var(--color-primary)]"
                     style={{ color: "var(--color-text-main)" }}
                   >

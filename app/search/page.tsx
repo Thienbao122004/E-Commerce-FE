@@ -94,10 +94,12 @@ function SearchPageContent() {
   }, [])
 
   useEffect(() => {
+    // Nếu có categorySlug nhưng chưa resolve xong → chờ, tránh flash "tất cả sản phẩm"
+    if (categorySlug && !initialCategorySet) return
     setPage(1)
     setProducts([])
     loadProducts(query, 1, sortBy, selectedCategory)
-  }, [query, sortBy, selectedCategory, loadProducts])
+  }, [query, sortBy, selectedCategory, loadProducts, categorySlug, initialCategorySet])
 
   useEffect(() => {
     getCategories({ pageSize: 20, level: 1 }).then((res) => {
@@ -131,6 +133,8 @@ function SearchPageContent() {
     { value: "price_desc", label: "Giá giảm dần" },
   ]
 
+  const searchBoxValue = query || categories.find((c) => c.id === selectedCategory)?.name || ''
+
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -150,7 +154,7 @@ function SearchPageContent() {
             </h1>
           </Link>
 
-          <SearchBox initialValue={query} />
+          <SearchBox initialValue={searchBoxValue} />
 
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <HeaderUser />

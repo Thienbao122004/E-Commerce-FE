@@ -99,7 +99,7 @@ export function SearchBox({ initialValue = '' }: SearchBoxProps) {
         {value && (
           <button
             onClick={() => { setValue(''); setSuggestions([]); setShowSuggestions(false) }}
-            className="pr-2 text-gray-400 hover:text-gray-600"
+            className="px-2 pt-1.5 text-gray-400 hover:text-gray-600"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>

@@ -873,28 +873,37 @@ export function ShopioAssistantWidget() {
     }
   }, [sessions])
 
-  const handleDeleteSession = useCallback(async (sid: string) => {
-    const shouldDelete = window.confirm("Bạn có chắc muốn xóa cuộc trò chuyện này không?")
-    if (!shouldDelete) return
+  const handleDeleteSession = useCallback((sid: string) => {
+    toast('Xóa cuộc trò chuyện này?', {
+      description: 'Hành động này không thể hoàn tác.',
+      action: {
+        label: 'Xóa',
+        onClick: async () => {
+          try {
+            await aiChatService.deleteSession(sid)
+            setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
 
-    try {
-      await aiChatService.deleteSession(sid)
-      setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
+            if (sid === sessionId) {
+              sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sid}`)
+              setSessionId(null)
+              setMessages([])
+              setConfirmTarget(null)
+              setSelectedProductsByMessageId({})
+              setView('list')
+              setBooted(false)
+            }
 
-      if (sid === sessionId) {
-        sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sid}`)
-        setSessionId(null)
-        setMessages([])
-        setConfirmTarget(null)
-        setSelectedProductsByMessageId({})
-        setView("list")
-        setBooted(false)
-      }
-
-      toast.success("Đã xóa cuộc trò chuyện")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không thể xóa cuộc trò chuyện")
-    }
+            toast.success('Đã xóa cuộc trò chuyện')
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Không thể xóa cuộc trò chuyện')
+          }
+        },
+      },
+      cancel: {
+        label: 'Hủy',
+        onClick: () => {},
+      },
+    })
   }, [sessionId])
 
   useEffect(() => {
