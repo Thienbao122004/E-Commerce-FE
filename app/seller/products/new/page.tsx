@@ -67,8 +67,15 @@ function SectionLabel({
   )
 }
 
+/** Model có thể trả 0–1 hoặc 0–100 */
+function confidenceToPercent(score: number | undefined | null): number {
+  if (score == null || !Number.isFinite(score)) return 0
+  if (score > 1) return Math.min(100, Math.round(score))
+  return Math.round(score * 100)
+}
+
 function ConfidenceDot({ score }: { score: number }) {
-  const pct = Math.round(score * 100)
+  const pct = confidenceToPercent(score)
   const color =
     pct >= 70
       ? "bg-emerald-500"
@@ -666,11 +673,11 @@ export default function CreateProductPage() {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {catSuggestions.map((cat) => {
+                      {catSuggestions.map((cat, idx) => {
                         const active = selCategory?.categoryId === cat.categoryId
                         return (
                           <button
-                            key={cat.categoryId}
+                            key={`cat-ai-${idx}-${String(cat.categoryId)}-${cat.categoryPath ?? cat.categoryName ?? ""}`}
                             type="button"
                             onClick={() => handleSelectCategory(cat)}
                             className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
@@ -703,11 +710,11 @@ export default function CreateProductPage() {
                           className="h-8 text-xs bg-white"
                         />
                         <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
-                          {manualCategoryOptions.map((c) => {
+                          {manualCategoryOptions.map((c, idx) => {
                             const active = selCategory?.categoryId === c.id
                             return (
                               <button
-                                key={c.id}
+                                key={`cat-manual-${idx}-${String(c.id)}-${c.name ?? ""}`}
                                 type="button"
                                 onClick={() =>
                                   handleSelectCategory({
@@ -754,11 +761,11 @@ export default function CreateProductPage() {
                     <p className="text-[11px] italic text-[#8a9a80]">Không có gợi ý</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {matSuggestions.map((m) => {
+                      {matSuggestions.map((m, idx) => {
                         const active = selMatIds.includes(m.materialId)
                         return (
                           <button
-                            key={m.materialId}
+                            key={`mat-${idx}-${String(m.materialId)}-${m.materialName ?? ""}`}
                             type="button"
                             onClick={() => toggleMat(m.materialId)}
                             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
@@ -797,11 +804,11 @@ export default function CreateProductPage() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {tagSuggestions.map((tag) => {
+                      {tagSuggestions.map((tag, idx) => {
                         const active = selTagIds.includes(tag.tagId)
                         return (
                           <button
-                            key={tag.tagId}
+                            key={`tag-${idx}-${String(tag.tagId)}-${tag.tagName ?? ""}`}
                             type="button"
                             onClick={() => toggleTag(tag.tagId)}
                             className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
