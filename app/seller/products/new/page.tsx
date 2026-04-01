@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
@@ -34,6 +35,7 @@ import {
   aiSendFeedback,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
+import { supabase } from "@/lib/supabase"
 import type {
   AnalyzeImageResponse,
   CategorySuggestion,
@@ -129,6 +131,48 @@ function materialSelectionKey(m: MaterialSuggestion, idx: number): string {
   return `__idx__:${idx}`
 }
 
+type VariantDraftRow = {
+  id: string
+  variantName: string
+  sku: string
+  price: string
+  quantity: string
+  attributes: string
+}
+
+function newVariantDraftRow(): VariantDraftRow {
+  return {
+    id: Math.random().toString(36).slice(2),
+    variantName: "",
+    sku: "",
+    price: "",
+    quantity: "0",
+    attributes: "",
+  }
+}
+
+/** Ảnh dán URL https — giữ nguyên; ảnh chọn từ máy (blob:) — upload lên bucket product-images. */
+async function resolveImageUrlForProduct(u: string): Promise<string> {
+  const trimmed = u.trim()
+  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) return trimmed
+  if (!trimmed.startsWith("blob:")) {
+    throw new Error(`Không hỗ trợ định dạng ảnh: ${trimmed.slice(0, 24)}…`)
+  }
+  const res = await fetch(trimmed)
+  const blob = await res.blob()
+  if (!blob.type.startsWith("image/")) {
+    throw new Error("File đã chọn không phải ảnh hợp lệ")
+  }
+  const sub = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg"
+  const path = `products/${Date.now()}-${Math.random().toString(36).slice(2)}.${sub}`
+  const { data, error } = await supabase.storage
+    .from("product-images")
+    .upload(path, blob, { cacheControl: "3600", upsert: false })
+  if (error) throw error
+  const { data: pub } = supabase.storage.from("product-images").getPublicUrl(data.path)
+  return pub.publicUrl
+}
+
 export default function CreateProductPage() {
   const router = useRouter()
   const { create, actionLoading } = useSellerProducts()
@@ -136,11 +180,15 @@ export default function CreateProductPage() {
   const [name, setName] = React.useState("")
   const [price, setPrice] = React.useState("")
   const [sku, setSku] = React.useState("")
+  const [baseStock, setBaseStock] = React.useState("0")
+  const [useVariants, setUseVariants] = React.useState(false)
+  const [variantRows, setVariantRows] = React.useState<VariantDraftRow[]>(() => [newVariantDraftRow()])
   const [description, setDescription] = React.useState("")
   const [imageUrls, setImageUrls] = React.useState<string[]>([])
   const [imageInput, setImageInput] = React.useState("")
   const [isDragging, setIsDragging] = React.useState(false)
   const [brokenUrls, setBrokenUrls] = React.useState<Set<string>>(new Set())
+  const [uploadingImages, setUploadingImages] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [catLoading, setCatLoading] = React.useState(false)
@@ -415,16 +463,55 @@ export default function CreateProductPage() {
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
     await sendFeedback()
-    const ok = await create({
+
+    setUploadingImages(true)
+    let persistedImageUrls: string[] | undefined
+    try {
+      if (imageUrls.length > 0) {
+        persistedImageUrls = []
+        for (const u of imageUrls) {
+          const pub = await resolveImageUrlForProduct(u)
+          persistedImageUrls.push(pub)
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được ảnh lên storage")
+      return
+    } finally {
+      setUploadingImages(false)
+    }
+
+    const basePayload = {
       name: name.trim(),
       basePrice: Number(price),
       description: description.trim() || undefined,
       currency: "VND",
-      imageUrls: imageUrls.filter((u) => u.startsWith("http")).length > 0
-        ? imageUrls.filter((u) => u.startsWith("http"))
-        : undefined,
+      imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
       categoryId: selCategory?.categoryId ?? undefined,
-    })
+    }
+
+    const ok = useVariants
+      ? await create({
+          ...basePayload,
+          variants: variantRows
+            .filter((r) => r.variantName.trim().length > 0)
+            .map((r) => {
+              const priceStr = r.price.trim()
+              const rowPrice = priceStr ? Number(priceStr) : undefined
+              return {
+                variantName: r.variantName.trim(),
+                sku: r.sku.trim() || undefined,
+                price: rowPrice !== undefined && Number.isFinite(rowPrice) && rowPrice > 0 ? rowPrice : undefined,
+                quantity: Math.max(0, Math.floor(Number(r.quantity) || 0)),
+                attributes: r.attributes.trim() || undefined,
+              }
+            }),
+        })
+      : await create({
+          ...basePayload,
+          quantity: Math.max(0, Math.floor(Number(baseStock) || 0)),
+        })
+
     if (ok) {
       toast.success("Tạo sản phẩm thành công!")
       router.push("/seller/products")
@@ -470,7 +557,18 @@ export default function CreateProductPage() {
   const mainImage = imageUrls[0]
   const hasMainPreview = Boolean(mainImage && !brokenUrls.has(mainImage))
   const extraSlots = Array.from({ length: 5 })
-  const canSubmit = name.trim().length > 0 && Number(price) > 0
+  const variantRowsValid = React.useMemo(() => {
+    if (!useVariants) return true
+    const filled = variantRows.filter((r) => r.variantName.trim().length > 0)
+    if (filled.length === 0) return false
+    return filled.every((r) => {
+      const q = Math.floor(Number(r.quantity))
+      return Number.isFinite(q) && q >= 0
+    })
+  }, [useVariants, variantRows])
+
+  const canSubmit =
+    name.trim().length > 0 && Number(price) > 0 && variantRowsValid && !uploadingImages
   const confidenceBadge = selCategory?.confidenceScore ?? catSuggestions[0]?.confidenceScore
 
   // ── Tag & material toggles ───────────────────────────
@@ -516,35 +614,172 @@ export default function CreateProductPage() {
                     className="h-9 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="price" className="text-xs">
-                      Giá bán (VND) <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">₫</span>
-                      <Input
-                        id="price"
-                        type="number"
-                        min="0"
-                        placeholder="299,000"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="h-9 pl-7 text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="sku" className="text-xs">Mã SKU</Label>
+                <div className="grid gap-2">
+                  <Label htmlFor="price" className="text-xs">
+                    Giá bán (VND) <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">₫</span>
                     <Input
-                      id="sku"
-                      placeholder="Tự động tạo nếu để trống"
-                      value={sku}
-                      onChange={(e) => setSku(e.target.value)}
-                      className="h-9 text-sm"
+                      id="price"
+                      type="number"
+                      min="0"
+                      placeholder="299,000"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="h-9 pl-7 text-sm"
                     />
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-muted-foreground/15 bg-muted/20 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground">Nhiều phân loại (màu, size…)</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Bật để tạo nhiều SKU cùng lúc; tắt để một mặt hàng với tồn kho chung.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={useVariants}
+                    onCheckedChange={(checked) => {
+                      setUseVariants(checked)
+                      if (checked && variantRows.length === 0) {
+                        setVariantRows([newVariantDraftRow()])
+                      }
+                    }}
+                    className="shrink-0"
+                  />
+                </div>
+
+                {!useVariants ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="sku" className="text-xs">Mã SKU</Label>
+                      <Input
+                        id="sku"
+                        placeholder="Tùy chọn"
+                        value={sku}
+                        onChange={(e) => setSku(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="baseStock" className="text-xs">Tồn kho</Label>
+                      <Input
+                        id="baseStock"
+                        type="number"
+                        min="0"
+                        value={baseStock}
+                        onChange={(e) => setBaseStock(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 rounded-xl border border-muted-foreground/15 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-xs font-semibold">Danh sách biến thể</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 text-xs"
+                        onClick={() => setVariantRows((p) => [...p, newVariantDraftRow()])}
+                      >
+                        <IconPlus className="size-3.5" />
+                        Thêm dòng
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      {variantRows.map((row, idx) => (
+                        <div
+                          key={row.id}
+                          className="grid gap-2 rounded-lg border bg-background/80 p-2.5 sm:grid-cols-12 sm:items-end"
+                        >
+                          <div className="sm:col-span-4 grid gap-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tên *</span>
+                            <Input
+                              value={row.variantName}
+                              onChange={(e) =>
+                                setVariantRows((p) =>
+                                  p.map((r) => (r.id === row.id ? { ...r, variantName: e.target.value } : r))
+                                )
+                              }
+                              placeholder={`Loại ${idx + 1}`}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 grid gap-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">SKU</span>
+                            <Input
+                              value={row.sku}
+                              onChange={(e) =>
+                                setVariantRows((p) =>
+                                  p.map((r) => (r.id === row.id ? { ...r, sku: e.target.value } : r))
+                                )
+                              }
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 grid gap-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Giá</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={row.price}
+                              onChange={(e) =>
+                                setVariantRows((p) =>
+                                  p.map((r) => (r.id === row.id ? { ...r, price: e.target.value } : r))
+                                )
+                              }
+                              placeholder="Trống = giá gốc"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 grid gap-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tồn *</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={row.quantity}
+                              onChange={(e) =>
+                                setVariantRows((p) =>
+                                  p.map((r) => (r.id === row.id ? { ...r, quantity: e.target.value } : r))
+                                )
+                              }
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="sm:col-span-2 flex justify-end pb-0.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-muted-foreground"
+                              disabled={variantRows.length <= 1}
+                              onClick={() => setVariantRows((p) => p.filter((r) => r.id !== row.id))}
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                          <div className="sm:col-span-12 grid gap-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Thuộc tính</span>
+                            <Input
+                              value={row.attributes}
+                              onChange={(e) =>
+                                setVariantRows((p) =>
+                                  p.map((r) => (r.id === row.id ? { ...r, attributes: e.target.value } : r))
+                                )
+                              }
+                              placeholder="Tùy chọn"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label htmlFor="description" className="text-xs">Mô tả sản phẩm</Label>
                   <Textarea
@@ -988,10 +1223,12 @@ export default function CreateProductPage() {
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={actionLoading || !canSubmit}
+                disabled={actionLoading || uploadingImages || !canSubmit}
                 className="h-10"
               >
-                {actionLoading ? (
+                {uploadingImages ? (
+                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tải ảnh...</>
+                ) : actionLoading ? (
                   <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tạo...</>
                 ) : (
                   "Đăng bán →"

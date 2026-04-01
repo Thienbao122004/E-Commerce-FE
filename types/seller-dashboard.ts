@@ -216,10 +216,18 @@ export type CreateSellerProductPayload = {
   description?: string
   basePrice: number
   currency?: string
+  /** Tồn kho khi không gửi `variants` (một SKU duy nhất). */
+  quantity?: number
   variants?: SellerProductVariantPayload[]
   imageUrls?: string[]
   tagIds?: number[]
   materialIds?: number[]
+}
+
+export type AddProductVariantResponse = {
+  success: boolean
+  message?: string
+  data?: SellerProductVariant
 }
 
 export type UpdateSellerProductPayload = {

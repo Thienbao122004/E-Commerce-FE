@@ -52,9 +52,10 @@ import {
   fetchMyProductById,
   updateMyProduct,
   deleteMyProduct,
+  addMyProductVariant,
 } from "@/services/seller-dashboard"
 import { ProductStatus } from "@/types/seller-dashboard"
-import type { SellerProductDetail } from "@/types/seller-dashboard"
+import type { SellerProductDetail, SellerProductVariantPayload } from "@/types/seller-dashboard"
 import { supabase } from "@/lib/supabase"
 
 const currency = (v: number) =>
@@ -138,6 +139,13 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [saving, setSaving] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [addVariantOpen, setAddVariantOpen] = React.useState(false)
+  const [addVariantLoading, setAddVariantLoading] = React.useState(false)
+  const [vName, setVName] = React.useState("")
+  const [vSku, setVSku] = React.useState("")
+  const [vPrice, setVPrice] = React.useState("")
+  const [vQty, setVQty] = React.useState("0")
+  const [vAttrs, setVAttrs] = React.useState("")
   const [selectedImg, setSelectedImg] = React.useState(0)
 
   const [editName, setEditName] = React.useState("")
@@ -184,6 +192,62 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   React.useEffect(() => {
     load()
   }, [load])
+
+  React.useEffect(() => {
+    if (!addVariantOpen) return
+    setVName("")
+    setVSku("")
+    setVPrice("")
+    setVQty("0")
+    setVAttrs("")
+  }, [addVariantOpen])
+
+  const handleAddVariant = async () => {
+    if (!product) return
+    const name = vName.trim()
+    if (!name) {
+      toast.error("Nhập tên biến thể")
+      return
+    }
+    const qty = Math.floor(Number(vQty))
+    if (!Number.isFinite(qty) || qty < 0) {
+      toast.error("Số lượng tồn không hợp lệ")
+      return
+    }
+    const priceStr = vPrice.trim()
+    let priceNum: number | undefined
+    if (priceStr) {
+      priceNum = Number(priceStr)
+      if (!Number.isFinite(priceNum) || priceNum <= 0) {
+        toast.error("Giá biến thể phải lớn hơn 0")
+        return
+      }
+    }
+
+    const payload: SellerProductVariantPayload = {
+      variantName: name,
+      quantity: qty,
+      sku: vSku.trim() || undefined,
+      attributes: vAttrs.trim() || undefined,
+    }
+    if (priceNum !== undefined) payload.price = priceNum
+
+    setAddVariantLoading(true)
+    try {
+      const res = await addMyProductVariant(product.id, payload)
+      if (res.success) {
+        toast.success(res.message ?? "Đã thêm biến thể")
+        setAddVariantOpen(false)
+        await load()
+      } else {
+        toast.error(res.message ?? "Không thêm được biến thể")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi thêm biến thể")
+    } finally {
+      setAddVariantLoading(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!product) return
@@ -640,16 +704,28 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
 
               {(product.variants?.length ?? 0) > 0 ? (
                 <Card className="rounded shadow-sm overflow-hidden">
-                  <CardHeader className="py-3 px-5 bg-muted/20 border-b flex flex-row items-center justify-between">
+                  <CardHeader className="py-3 px-5 bg-muted/20 border-b flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
                       <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                         <IconClipboard className="size-3.5" />
                       </div>
                       Phân loại sản phẩm
                     </CardTitle>
-                    <Badge variant="secondary" className="rounded-lg tabular-nums text-[11px] font-semibold">
-                      {product.variants!.length} loại
-                    </Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 rounded-lg text-xs"
+                        onClick={() => setAddVariantOpen(true)}
+                      >
+                        <IconPlus className="size-3.5" />
+                        Thêm biến thể
+                      </Button>
+                      <Badge variant="secondary" className="rounded-lg tabular-nums text-[11px] font-semibold">
+                        {product.variants!.length} loại
+                      </Badge>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="overflow-x-auto max-h-[320px]">
@@ -697,11 +773,22 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                 </Card>
               ) : (
                 <Card className="shadow-sm border-dashed rounded">
-                  <CardContent className="py-10 flex flex-col items-center gap-3 text-muted-foreground">
+                  <CardContent className="py-10 flex flex-col items-center gap-4 text-muted-foreground">
                     <div className="size-12 rounded-2xl bg-muted/50 flex items-center justify-center">
                       <IconClipboard className="size-6 opacity-30" />
                     </div>
-                    <p className="text-sm font-medium opacity-50">Sản phẩm không có phân loại</p>
+                    <p className="text-sm font-medium opacity-50 text-center px-4">
+                      Sản phẩm không có phân loại
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gap-1.5 rounded-xl"
+                      onClick={() => setAddVariantOpen(true)}
+                    >
+                      <IconPlus className="size-4" />
+                      Thêm biến thể
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -780,6 +867,105 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           </div>
         </div>
       )}
+
+      <Dialog open={addVariantOpen} onOpenChange={setAddVariantOpen}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle>Thêm biến thể</DialogTitle>
+            <DialogDescription className="text-left space-y-2">
+              <span>
+                Nhập tên phân loại (ví dụ: Đỏ — M), SKU tùy chọn, giá riêng (để trống nếu dùng giá gốc), và số lượng tồn.
+              </span>
+              {!(product?.variants?.length) && (
+                <span className="block text-amber-600 dark:text-amber-400 text-xs font-medium">
+                  Lưu ý: khi thêm biến thể đầu tiên, tồn kho &quot;không phân loại&quot; trên hệ thống sẽ bị gỡ — hãy nhập đủ số lượng cho từng loại.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-v-name" className="text-xs">Tên biến thể *</Label>
+              <Input
+                id="add-v-name"
+                value={vName}
+                onChange={(e) => setVName(e.target.value)}
+                placeholder="Ví dụ: Xanh — L"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="add-v-sku" className="text-xs">SKU</Label>
+                <Input
+                  id="add-v-sku"
+                  value={vSku}
+                  onChange={(e) => setVSku(e.target.value)}
+                  className="rounded-xl font-mono text-xs"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="add-v-price" className="text-xs">Giá (VND)</Label>
+                <Input
+                  id="add-v-price"
+                  type="number"
+                  min={0}
+                  value={vPrice}
+                  onChange={(e) => setVPrice(e.target.value)}
+                  placeholder="Để trống"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-v-qty" className="text-xs">Tồn kho *</Label>
+              <Input
+                id="add-v-qty"
+                type="number"
+                min={0}
+                value={vQty}
+                onChange={(e) => setVQty(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-v-attrs" className="text-xs">Thuộc tính (tùy chọn)</Label>
+              <Textarea
+                id="add-v-attrs"
+                value={vAttrs}
+                onChange={(e) => setVAttrs(e.target.value)}
+                placeholder="JSON hoặc mô tả ngắn…"
+                rows={2}
+                className="rounded-xl resize-none text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setAddVariantOpen(false)}
+              disabled={addVariantLoading}
+            >
+              Hủy
+            </Button>
+            <Button type="button" className="rounded-xl gap-1.5" onClick={handleAddVariant} disabled={addVariantLoading}>
+              {addVariantLoading ? (
+                <>
+                  <div className="size-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+                  Đang lưu…
+                </>
+              ) : (
+                <>
+                  <IconCheck className="size-3.5" />
+                  Thêm
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDeleteDialog} onOpenChange={(v) => { if (!v) setShowDeleteDialog(false) }}>
         <DialogContent className="rounded-2xl max-w-md">

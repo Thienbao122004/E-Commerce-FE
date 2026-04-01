@@ -9,6 +9,8 @@ import type {
   SellerOrderDetailResponse,
   UpdateShopPayload,
   CreateSellerProductPayload,
+  SellerProductVariantPayload,
+  AddProductVariantResponse,
   UpdateSellerProductPayload,
   UpdateInventoryPayload,
   UpdateSellerOrderStatusPayload,
@@ -78,6 +80,13 @@ export function updateMyProduct(productId: string, dto: UpdateSellerProductPaylo
 export function deleteMyProduct(productId: string) {
   return api.delete<{ success: boolean; message?: string }>(
     `/api/seller/products/${productId}`
+  )
+}
+
+export function addMyProductVariant(productId: string, dto: SellerProductVariantPayload) {
+  return api.post<AddProductVariantResponse>(
+    `/api/seller/products/${productId}/variants`,
+    dto
   )
 }
 
