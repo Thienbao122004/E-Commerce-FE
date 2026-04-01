@@ -7,6 +7,7 @@ import {
   IconAlertTriangle,
   IconBuildingStore,
   IconPackage,
+  IconPercentage,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -58,7 +59,7 @@ export function SectionCards({ stats, loading }: Props) {
   if (loading || !stats) {
     return (
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 7 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
@@ -67,6 +68,14 @@ export function SectionCards({ stats, loading }: Props) {
 
   const growth = stats.revenue.growthPercentage
   const isGrowthPositive = growth >= 0
+
+  const pf = stats.platformFees ?? {
+    totalFees: 0,
+    todayFees: 0,
+    thisMonthFees: 0,
+    lastMonthFees: 0,
+    settledOrdersCount: 0,
+  }
 
   const cards = [
     {
@@ -122,6 +131,15 @@ export function SectionCards({ stats, loading }: Props) {
       badgePositive: true,
       footer: `Đăng bán: ${fmt(stats.products.active)} · Hết hàng: ${fmt(stats.products.outOfStock)}`,
       sub: `Bản nháp: ${fmt(stats.products.draft)} · Đã ẩn: ${fmt(stats.products.hidden)}`,
+    },
+    {
+      icon: IconPercentage,
+      label: "Phí sàn (tích lũy)",
+      value: currency(pf.totalFees),
+      badge: `${fmt(pf.settledOrdersCount)} đơn quyết toán`,
+      badgePositive: true,
+      footer: `Tháng này: ${currency(pf.thisMonthFees)}`,
+      sub: `Hôm nay: ${currency(pf.todayFees)} · Tháng trước: ${currency(pf.lastMonthFees)}`,
     },
   ]
 

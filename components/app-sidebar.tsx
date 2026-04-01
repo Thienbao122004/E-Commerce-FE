@@ -14,6 +14,7 @@ import {
   IconListDetails,
   IconMessage2,
   IconPackage,
+  IconPercentage,
   IconPlus,
   IconReport,
   IconSearch,
@@ -154,6 +155,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 const SELLERS_ITEMS = [
   { name: "Quản lý người bán", url: "/admin/dashboard/sellers", icon: IconDatabase },
   { name: "Yêu cầu rút tiền", url: "/admin/dashboard/withdrawals", icon: IconReport },
+  { name: "Phí sàn & báo cáo", url: "/admin/dashboard/platform-fees", icon: IconPercentage },
 ]
 
 const NAV_SECONDARY = [
