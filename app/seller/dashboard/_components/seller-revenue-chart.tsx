@@ -45,13 +45,15 @@ export function SellerRevenueChart({ wallet, products, loading }: Props) {
     if (!wallet) return []
     const total = wallet.totalEarnings
     const available = wallet.availableBalance
+    const held = wallet.heldBalance ?? 0
     const pending = wallet.pendingBalance
     const withdrawn = wallet.totalWithdrawn
 
     return [
       { name: "Tổng thu nhập", revenue: total },
       { name: "Khả dụng", revenue: available },
-      { name: "Đang chờ", revenue: pending },
+      { name: "Tạm giữ", revenue: held },
+      { name: "Chờ duyệt rút", revenue: pending },
       { name: "Đã rút", revenue: withdrawn },
     ]
   }, [wallet])

@@ -10,6 +10,7 @@ import {
   IconArrowDownRight,
   IconCategory,
   IconCircleCheck,
+  IconLock,
 } from "@tabler/icons-react"
 import type { SellerDashboardStats, SellerWallet } from "@/types/seller-dashboard"
 import { StatsCard, StatsGrid } from "@/components/common/stats-card"
@@ -51,10 +52,14 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
               <IconWallet className="size-3.5" />
               Khả dụng: {wallet ? currency(wallet.availableBalance) : "—"}
             </div>
-            <div className="text-muted-foreground flex items-center gap-3">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="flex items-center gap-1">
+                <IconLock className="size-3.5 opacity-70" />
+                Tạm giữ: {wallet ? currency(wallet.heldBalance ?? 0) : "—"}
+              </span>
               <span className="flex items-center gap-1">
                 <IconClock className="size-3.5" />
-                Chờ: {wallet ? currency(wallet.pendingBalance) : "—"}
+                Chờ rút: {wallet ? currency(wallet.pendingBalance) : "—"}
               </span>
               <span className="text-muted-foreground/40">|</span>
               <span className="flex items-center gap-1">

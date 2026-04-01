@@ -27,6 +27,9 @@ export type UpdateShopPayload = {
 export type SellerWallet = {
   id: string
   availableBalance: number
+  /** Tiền tạm giữ sau thanh toán; giải ngân khi đơn hoàn thành */
+  heldBalance?: number
+  /** Yêu cầu rút đang chờ admin duyệt */
   pendingBalance: number
   totalEarnings: number
   totalWithdrawn: number
