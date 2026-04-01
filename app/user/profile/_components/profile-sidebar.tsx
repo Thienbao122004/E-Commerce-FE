@@ -14,7 +14,6 @@ const accountLinks = [
 
 const orderLinks = [
   { href: '/user/purchase', label: 'Đơn Mua', icon: 'receipt_long' },
-  { href: '/user/ai-chat', label: 'Trợ lý AI', icon: 'smart_toy' },
 ]
 
 export function ProfileSidebar() {
