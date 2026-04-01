@@ -43,6 +43,7 @@ export function WalletSummary({ wallet, loading }: Props) {
   const pending = wallet?.pendingBalance ?? 0
   const earnings = wallet?.totalEarnings ?? 0
   const withdrawn = wallet?.totalWithdrawn ?? 0
+  const refunded = wallet?.totalRefunded ?? 0
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -92,6 +93,27 @@ export function WalletSummary({ wallet, loading }: Props) {
                 {currency(earnings)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5">Tất cả thời gian</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
+              <IconArrowDownRight className="size-5 text-slate-600 dark:text-slate-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Đã rút</p>
+              <p className="text-xl font-bold tabular-nums mt-1">{currency(withdrawn)}</p>
+              {refunded > 0 ? (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Hoàn tác đơn: {currency(refunded)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1.5">Sau khi admin duyệt</p>
+              )}
             </div>
           </div>
         </CardContent>

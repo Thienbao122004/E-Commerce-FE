@@ -18,6 +18,7 @@ const NAV_LABELS: { url: string; title: string }[] = [
   { url: "/admin/dashboard/settings", title: "Cài đặt" },
   { url: "/admin/dashboard/sellers", title: "Quản lý người bán" },
   { url: "/admin/dashboard/withdrawals", title: "Quản lý rút tiền" },
+  { url: "/admin/dashboard/platform-fees", title: "Phí sàn & báo cáo" },
 
   { url: "/seller/dashboard", title: "Tổng quan" },
   { url: "/seller/products/featured", title: "Sản phẩm nổi bật" },

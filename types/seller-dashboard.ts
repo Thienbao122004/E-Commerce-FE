@@ -30,6 +30,8 @@ export type SellerWallet = {
   pendingBalance: number
   totalEarnings: number
   totalWithdrawn: number
+  /** Hoàn tác do hủy/hoàn đơn (sau khi đã quyết toán) */
+  totalRefunded?: number
   updatedAt: string
 }
 

@@ -45,6 +45,14 @@ export type DashboardStats = {
     resolved: number
     refunded: number
   }
+  /** Phí sàn từ đơn đã quyết toán ví (API có thể chưa gửi — dùng mặc định 0) */
+  platformFees?: {
+    totalFees: number
+    todayFees: number
+    thisMonthFees: number
+    lastMonthFees: number
+    settledOrdersCount: number
+  }
 }
 
 export type DashboardStatsResponse = {

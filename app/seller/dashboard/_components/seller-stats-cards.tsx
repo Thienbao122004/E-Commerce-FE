@@ -62,6 +62,11 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
                 Rút: {wallet ? currency(wallet.totalWithdrawn) : "—"}
               </span>
             </div>
+            {wallet && (wallet.totalRefunded ?? 0) > 0 && (
+              <div className="text-xs text-amber-700 dark:text-amber-400">
+                Hoàn tác đơn: {currency(wallet.totalRefunded ?? 0)}
+              </div>
+            )}
           </div>
         }
       />

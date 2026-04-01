@@ -57,7 +57,9 @@ export function DashboardCharts({ stats }: Props) {
       maximumFractionDigits: 0,
     }).format(value)
 
-  // ── Chart 1: Doanh thu — dữ liệu thực từ API ──
+  const pf = stats.platformFees
+
+  // ── Chart 1: Doanh thu (+ phí sàn nếu có) ──
   const revenueChartData: ChartData<"line"> = {
     labels: ["Tháng trước", "Tháng này", "Hôm nay"],
     datasets: [
@@ -79,6 +81,24 @@ export function DashboardCharts({ stats }: Props) {
         borderWidth: 3,
         fill: true,
       },
+      ...(pf
+        ? [
+            {
+              label: "Phí sàn (₫)",
+              data: [pf.lastMonthFees, pf.thisMonthFees, pf.todayFees],
+              borderColor: "#b45309",
+              backgroundColor: "rgba(180,83,9,0.06)",
+              pointBackgroundColor: "#b45309",
+              pointBorderColor: "#fff",
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.4,
+              borderWidth: 2,
+              fill: true,
+            },
+          ]
+        : []),
     ],
   }
 
@@ -226,7 +246,7 @@ export function DashboardCharts({ stats }: Props) {
         <CardHeader>
           <CardTitle>Doanh thu</CardTitle>
           <CardDescription>
-            So sánh doanh thu tháng trước, tháng này và hôm nay
+            Doanh thu đơn hoàn thành; phí sàn từ đơn đã quyết toán ví (nếu có dữ liệu)
           </CardDescription>
         </CardHeader>
         <CardContent>
