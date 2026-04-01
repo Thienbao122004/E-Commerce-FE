@@ -48,6 +48,7 @@ const STATUS_COLORS: Record<number, string> = {
 }
 
 const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
+const PAGE_SIZE = 10
 
 function formatPrice(value: number) {
   return value.toLocaleString('vi-VN') + 'đ'
@@ -60,17 +61,34 @@ function formatDate(value: string) {
 export default function PurchasePage() {
   const router = useRouter()
   const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders()
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null)
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
 
-  const filtered = searchTerm
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value)
+    if (debounceTimer) clearTimeout(debounceTimer)
+    const timer = setTimeout(() => {
+      setDebouncedSearch(value)
+      setCurrentPage(1)
+    }, 300)
+    setDebounceTimer(timer)
+  }
+
+  const filtered = debouncedSearch
     ? orders.filter(
         (o) =>
-          o.shopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          o.items.some((i) => i.productName.toLowerCase().includes(searchTerm.toLowerCase()))
+          o.shopName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          o.items.some((i) => i.productName.toLowerCase().includes(debouncedSearch.toLowerCase()))
       )
     : orders
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   return (
     <div className="bg-white rounded-[5px] shadow-sm border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
@@ -81,9 +99,22 @@ export default function PurchasePage() {
           placeholder="Tìm kiếm theo tên Shop hoặc tên Sản phẩm"
           className="flex-1 bg-transparent outline-none text-sm"
           style={{ color: 'var(--color-text-main)' }}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={searchInput}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
+        {searchInput && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchInput('')
+              setDebouncedSearch('')
+              setCurrentPage(1)
+            }}
+            className="text-muted-foreground hover:text-gray-600 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        )}
       </div>
 
       <div className="flex justify-between overflow-x-auto">
@@ -94,7 +125,9 @@ export default function PurchasePage() {
               key={String(tab.value)}
               onClick={() => {
                 setActiveStatus(tab.value)
-                setSearchTerm('')
+                setSearchInput('')
+                setDebouncedSearch('')
+                setCurrentPage(1)
               }}
               className="flex-shrink-0 px-4 py-3 text-sm transition-colors border-b-2"
               style={{
@@ -123,61 +156,141 @@ export default function PurchasePage() {
           <p className="text-muted-foreground mt-3">Chưa có đơn hàng nào</p>
         </div>
       ) : (
-        <div className="space-y-4 p-4">
-          {filtered.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              reorderingOrderId={reorderingOrderId}
-              payingOrderId={payingOrderId}
-              onRefresh={invalidateAndRefresh}
-              onReorder={async (targetOrder) => {
-                setReorderingOrderId(targetOrder.id)
-                let successCount = 0
-                let failedCount = 0
+        <>
+          <div className="space-y-4 p-4">
+            {paginated.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                reorderingOrderId={reorderingOrderId}
+                payingOrderId={payingOrderId}
+                onRefresh={invalidateAndRefresh}
+                onReorder={async (targetOrder) => {
+                  setReorderingOrderId(targetOrder.id)
+                  let successCount = 0
+                  let failedCount = 0
 
-                for (const item of targetOrder.items) {
+                  for (const item of targetOrder.items) {
+                    try {
+                      await cartService.addItem({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                      })
+                      successCount += 1
+                    } catch {
+                      failedCount += 1
+                    }
+                  }
+
+                  if (successCount > 0) {
+                    toast.success(`Đã thêm ${successCount} sản phẩm vào giỏ hàng`)
+                    router.push('/user/cart')
+                  }
+                  if (failedCount > 0) {
+                    toast.error(`${failedCount} sản phẩm mua lại thất bại`)
+                  }
+                  setReorderingOrderId(null)
+                }}
+                onPayNow={async (targetOrder) => {
+                  setPayingOrderId(targetOrder.id)
                   try {
-                    await cartService.addItem({
-                      productId: item.productId,
-                      quantity: item.quantity,
-                    })
-                    successCount += 1
+                    const paymentRes = await paymentsService.createVNPayPayment(targetOrder.id)
+                    if (!paymentRes.success || !paymentRes.paymentUrl) {
+                      toast.error(paymentRes.message || 'Không thể tạo giao dịch VNPay')
+                      return
+                    }
+                    window.location.href = paymentRes.paymentUrl
                   } catch {
-                    failedCount += 1
+                    toast.error('Không thể thanh toán đơn hàng này')
+                  } finally {
+                    setPayingOrderId(null)
                   }
-                }
+                }}
+                onChatShop={(shopName) => {
+                  toast.message(`Chat trực tiếp với shop "${shopName}"`)
+                }}
+              />
+            ))}
+          </div>
 
-                if (successCount > 0) {
-                  toast.success(`Đã thêm ${successCount} sản phẩm vào giỏ hàng`)
-                  router.push('/user/cart')
-                }
-                if (failedCount > 0) {
-                  toast.error(`${failedCount} sản phẩm mua lại thất bại`)
-                }
-                setReorderingOrderId(null)
-              }}
-              onPayNow={async (targetOrder) => {
-                setPayingOrderId(targetOrder.id)
-                try {
-                  const paymentRes = await paymentsService.createVNPayPayment(targetOrder.id)
-                  if (!paymentRes.success || !paymentRes.paymentUrl) {
-                    toast.error(paymentRes.message || 'Không thể tạo giao dịch VNPay')
-                    return
-                  }
-                  window.location.href = paymentRes.paymentUrl
-                } catch {
-                  toast.error('Không thể thanh toán đơn hàng này')
-                } finally {
-                  setPayingOrderId(null)
-                }
-              }}
-              onChatShop={(shopName) => {
-                toast.message(`Chat trực tiếp với shop "${shopName}"`)
-              }}
-            />
-          ))}
-        </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t" style={{ borderColor: '#e5ded6' }}>
+              <p className="text-xs text-muted-foreground">
+                Hiển thị {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} trong{' '}
+                <span className="font-medium" style={{ color: 'var(--color-text-main)' }}>{filtered.length}</span> đơn hàng
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={safePage === 1}
+                  className="size-8 flex items-center justify-center rounded border text-xs transition-colors disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#d9cec2' }}
+                  title="Trang đầu"
+                >
+                  <span className="material-symbols-outlined text-[16px]">first_page</span>
+                </button>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="size-8 flex items-center justify-center rounded border text-xs transition-colors disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#d9cec2' }}
+                  title="Trang trước"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || (p >= safePage - 1 && p <= safePage + 1))
+                  .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && typeof arr[idx - 1] === 'number' && (p as number) - (arr[idx - 1] as number) > 1) {
+                      acc.push('...')
+                    }
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((item, idx) =>
+                    item === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="size-8 flex items-center justify-center text-xs text-muted-foreground">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setCurrentPage(item as number)}
+                        className="size-8 flex items-center justify-center rounded border text-xs font-medium transition-colors"
+                        style={
+                          safePage === item
+                            ? { backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)', color: '#fff' }
+                            : { borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }
+                        }
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="size-8 flex items-center justify-center rounded border text-xs transition-colors disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#d9cec2' }}
+                  title="Trang tiếp"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={safePage === totalPages}
+                  className="size-8 flex items-center justify-center rounded border text-xs transition-colors disabled:opacity-40 hover:bg-gray-50 disabled:cursor-not-allowed"
+                  style={{ borderColor: '#d9cec2' }}
+                  title="Trang cuối"
+                >
+                  <span className="material-symbols-outlined text-[16px]">last_page</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

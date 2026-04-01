@@ -70,6 +70,7 @@ export function getProducts(params: {
   search?: string
   minPrice?: number
   maxPrice?: number
+  minRating?: number
   sortBy?: "newest" | "price_asc" | "price_desc" | "rating" | "best_seller"
 } = {}): Promise<StorefrontProductsResponse> {
   const qs = new URLSearchParams()
@@ -79,6 +80,7 @@ export function getProducts(params: {
   if (params.search) qs.set("search", params.search)
   if (params.minPrice !== undefined) qs.set("minPrice", String(params.minPrice))
   if (params.maxPrice !== undefined) qs.set("maxPrice", String(params.maxPrice))
+  if (params.minRating !== undefined) qs.set("minRating", String(params.minRating))
   if (params.sortBy) qs.set("sortBy", params.sortBy)
   const query = qs.toString()
   return fetchJson<StorefrontProductsResponse>(

@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unescaped-entities */
 "use client"
 
 import * as React from "react"
@@ -15,19 +14,17 @@ import {
   IconPhoto,
   IconTag,
   IconCategory,
-  IconBoxSeam,
   IconPalette,
   IconAlertCircle,
   IconPencil,
 } from "@tabler/icons-react"
-import { toast } from "sonner"
 
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
   aiSuggestCategory,
@@ -36,7 +33,7 @@ import {
   aiAnalyzeImage,
   aiSendFeedback,
 } from "@/services/ai-seller"
-import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
+import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import type {
   AnalyzeImageResponse,
   CategorySuggestion,
@@ -44,7 +41,26 @@ import type {
   MaterialSuggestion,
 } from "@/services/ai-seller"
 
-// ── Helpers ─────────────────────────────────────────────
+/** Danh mục làm phẳng từ cây — hiển thị đường dẫn cha › con (cấp 2, 3…). */
+type ManualCategoryRow = {
+  id: number
+  name: string
+  pathLabel: string
+  level: number
+}
+
+function flattenCategoryTree(nodes: StorefrontCategory[], prefix = ""): ManualCategoryRow[] {
+  const out: ManualCategoryRow[] = []
+  for (const n of nodes) {
+    const pathLabel = prefix ? `${prefix} › ${n.name}` : n.name
+    out.push({ id: n.id, name: n.name, pathLabel, level: n.level })
+    if (n.subcategories?.length) {
+      out.push(...flattenCategoryTree(n.subcategories, pathLabel))
+    }
+  }
+  return out
+}
+
 function SectionLabel({
   icon: Icon,
   children,
@@ -97,12 +113,26 @@ function confidenceText(score?: number) {
   return `${Math.round(score * 100)}%`
 }
 
-// ── Main ────────────────────────────────────────────────
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isPersistableMaterialId(id: string): boolean {
+  return UUID_RE.test(id)
+}
+
+/** Chọn được cả khi AI chỉ trả tên, không trả UUID */
+function materialSelectionKey(m: MaterialSuggestion, idx: number): string {
+  const id = m.materialId
+  if (typeof id === "string" && id.trim().length > 0) return id.trim()
+  const n = m.materialName?.trim()
+  if (n) return `__name__:${n.toLowerCase()}`
+  return `__idx__:${idx}`
+}
+
 export default function CreateProductPage() {
   const router = useRouter()
   const { create, actionLoading } = useSellerProducts()
 
-  // Form state
   const [name, setName] = React.useState("")
   const [price, setPrice] = React.useState("")
   const [sku, setSku] = React.useState("")
@@ -113,7 +143,6 @@ export default function CreateProductPage() {
   const [brokenUrls, setBrokenUrls] = React.useState<Set<string>>(new Set())
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  // AI state
   const [catLoading, setCatLoading] = React.useState(false)
   const [tagLoading, setTagLoading] = React.useState(false)
   const [imageAnalyzeLoading, setImageAnalyzeLoading] = React.useState(false)
@@ -123,13 +152,12 @@ export default function CreateProductPage() {
   const [catSuggestions, setCatSuggestions] = React.useState<CategorySuggestion[]>([])
   const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
   const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
-  const [allCategories, setAllCategories] = React.useState<StorefrontCategory[]>([])
+  const [manualCategoryRows, setManualCategoryRows] = React.useState<ManualCategoryRow[]>([])
   const [manualCatQuery, setManualCatQuery] = React.useState("")
 
   const [catLogId, setCatLogId] = React.useState<string | null>(null)
   const [tagLogId, setTagLogId] = React.useState<string | null>(null)
 
-  // Selections
   const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
   const [selTagIds, setSelTagIds] = React.useState<number[]>([])
   const [selMatIds, setSelMatIds] = React.useState<string[]>([])
@@ -138,31 +166,30 @@ export default function CreateProductPage() {
   const [showCustomTag, setShowCustomTag] = React.useState(false)
 
   const hasInput = name.trim().length > 0 || description.trim().length > 0
-  const aiKeyword = React.useMemo(
-    () => `${name.trim()}|${description.trim()}`,
-    [name, description]
-  )
   const categoryReqRef = React.useRef(0)
   const tagMatReqRef = React.useRef(0)
   const imageAnalyzeReqRef = React.useRef(0)
 
   const manualCategoryOptions = React.useMemo(() => {
     const q = manualCatQuery.trim().toLowerCase()
-    if (!q) return allCategories.slice(0, 8)
-    return allCategories
-      .filter((c) => c.name.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [allCategories, manualCatQuery])
+    if (!q) return manualCategoryRows.slice(0, 12)
+    return manualCategoryRows
+      .filter(
+        (c) =>
+          c.pathLabel.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+      )
+      .slice(0, 24)
+  }, [manualCategoryRows, manualCatQuery])
 
   React.useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const res = await getCategories({ page: 1, pageSize: 300 })
+        const res = await getCategoryTree()
         if (!mounted || !res.success) return
-        setAllCategories(res.categories ?? [])
+        setManualCategoryRows(flattenCategoryTree(res.tree ?? []))
       } catch {
-        // non-blocking
+        /* non-blocking */
       }
     })()
     return () => {
@@ -170,7 +197,6 @@ export default function CreateProductPage() {
     }
   }, [])
 
-  // ── 2. suggest-tags + suggest-materials when category changes ──
   const fetchTagsAndMaterials = React.useCallback(
     async (categoryId: number) => {
       if (!name.trim() && !description.trim()) return
@@ -186,7 +212,6 @@ export default function CreateProductPage() {
         setMatSuggestions(matsRes.suggestions ?? [])
         if (tagsRes.logId) setTagLogId(tagsRes.logId)
       } catch {
-        // silent fail for tags/materials
       } finally {
         if (reqId !== tagMatReqRef.current) return
         setTagLoading(false)
@@ -194,57 +219,6 @@ export default function CreateProductPage() {
     },
     [name, description]
   )
-
-  // ── 1. suggest-category (debounced on name/description change) ──
-  const aiCatTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  React.useEffect(() => {
-    if (!name.trim() && !description.trim()) {
-      setCatSuggestions([])
-      setCatLogId(null)
-      setCatError(false)
-      return
-    }
-    clearTimeout(aiCatTimer.current)
-    aiCatTimer.current = setTimeout(async () => {
-      const reqId = ++categoryReqRef.current
-      setCatLoading(true)
-      setCatError(false)
-      try {
-        const res = await aiSuggestCategory({
-          title: name.trim(),
-          description: description.trim(),
-          imageUrls: imageUrls.filter((u) => u.startsWith("http")),
-        })
-        if (reqId !== categoryReqRef.current) return
-        setCatSuggestions(res.suggestions ?? [])
-        setCatLogId(res.logId ?? null)
-        // Auto-select top suggestion if nothing chosen yet
-        if (!selCategory && res.suggestions.length > 0) {
-          setSelCategory(res.suggestions[0])
-          fetchTagsAndMaterials(res.suggestions[0].categoryId)
-        }
-      } catch {
-        if (reqId !== categoryReqRef.current) return
-        setCatError(true)
-      } finally {
-        if (reqId !== categoryReqRef.current) return
-        setCatLoading(false)
-      }
-    }, 900)
-
-    return () => clearTimeout(aiCatTimer.current)
-  }, [aiKeyword, imageUrls, selCategory, name, description, fetchTagsAndMaterials])
-
-  const aiTagTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  React.useEffect(() => {
-    if (!selCategory || !hasInput) return
-    clearTimeout(aiTagTimer.current)
-    aiTagTimer.current = setTimeout(() => {
-      fetchTagsAndMaterials(selCategory.categoryId)
-    }, 700)
-    return () => clearTimeout(aiTagTimer.current)
-  }, [aiKeyword, selCategory, fetchTagsAndMaterials, hasInput])
 
   const blobUrlToDataUrl = React.useCallback(async (blobUrl: string) => {
     const res = await fetch(blobUrl)
@@ -270,77 +244,148 @@ export default function CreateProductPage() {
           const dataUrl = await blobUrlToDataUrl(u)
           if (dataUrl.startsWith("data:image/")) normalized.push(dataUrl)
         } catch {
-          // ignore broken local preview url
         }
       }
     }
     return normalized
   }, [imageUrls, blobUrlToDataUrl])
 
-  React.useEffect(() => {
-    if (imageUrls.length === 0) {
-      setImageAnalyzeResult(null)
+  const runAiAnalysis = React.useCallback(async () => {
+    if (!hasInput && imageUrls.length === 0) {
+      toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích AI")
       return
     }
 
-    let cancelled = false
-    const timer = setTimeout(async () => {
-      const reqId = ++imageAnalyzeReqRef.current
-      setImageAnalyzeLoading(true)
-      try {
-        const aiImageUrls = await normalizeAiImageUrls()
-        if (!aiImageUrls.length) return
+    const catReqId = ++categoryReqRef.current
+    const tagReqId = ++tagMatReqRef.current
+    const imgReqId = ++imageAnalyzeReqRef.current
 
-        const res = await aiAnalyzeImage({
+    setCatLoading(true)
+    setTagLoading(true)
+    setImageAnalyzeLoading(true)
+    setCatError(false)
+
+    try {
+      const categoryResPromise = hasInput
+        ? aiSuggestCategory({
+            title: name.trim(),
+            description: description.trim(),
+            imageUrls: imageUrls.filter((u) => u.startsWith("http")),
+          })
+        : Promise.resolve(null)
+
+      const [categoryRes, aiImageUrls] = await Promise.all([
+        categoryResPromise,
+        normalizeAiImageUrls(),
+      ])
+
+      if (
+        catReqId !== categoryReqRef.current ||
+        tagReqId !== tagMatReqRef.current ||
+        imgReqId !== imageAnalyzeReqRef.current
+      ) {
+        return
+      }
+
+      let nextCategories = categoryRes?.suggestions ?? []
+      if (categoryRes?.logId) setCatLogId(categoryRes.logId)
+
+      if (aiImageUrls.length > 0) {
+        const imageRes = await aiAnalyzeImage({
           imageUrls: aiImageUrls,
           productTitle: name.trim() || undefined,
           productDescription: description.trim() || undefined,
         })
 
-        if (cancelled || reqId !== imageAnalyzeReqRef.current) return
-        if (!res.success) {
-          setImageAnalyzeResult(null)
+        if (
+          catReqId !== categoryReqRef.current ||
+          tagReqId !== tagMatReqRef.current ||
+          imgReqId !== imageAnalyzeReqRef.current
+        ) {
           return
         }
 
-        setImageAnalyzeResult(res)
+        if (imageRes.success) {
+          setImageAnalyzeResult(imageRes)
 
-        if (res.suggestedCategories?.length) {
-          setCatSuggestions(res.suggestedCategories)
-          if (!selCategory || !res.suggestedCategories.some((c) => c.categoryId === selCategory.categoryId)) {
-            setSelCategory(res.suggestedCategories[0])
+          if (imageRes.suggestedCategories?.length) {
+            nextCategories = imageRes.suggestedCategories
           }
-        }
 
-        if (res.suggestedTags?.length) {
-          setTagSuggestions(res.suggestedTags)
-          const ids = res.suggestedTags
-            .map((t) => t.tagId)
-            .filter((id): id is number => typeof id === "number")
-          setSelTagIds(ids)
-        }
+          if (imageRes.suggestedTags?.length) {
+            setTagSuggestions(imageRes.suggestedTags)
+            const ids = imageRes.suggestedTags
+              .map((t) => t.tagId)
+              .filter((id): id is number => typeof id === "number")
+            setSelTagIds(ids)
+          }
 
-        if (res.suggestedMaterials?.length) {
-          setMatSuggestions(res.suggestedMaterials)
-          const ids = res.suggestedMaterials
-            .map((m) => m.materialId)
-            .filter((id): id is string => typeof id === "string" && id.length > 0)
-          setSelMatIds(ids)
+          if (imageRes.suggestedMaterials?.length) {
+            setMatSuggestions(imageRes.suggestedMaterials)
+            const ids = imageRes.suggestedMaterials
+              .map((m) => m.materialId)
+              .filter((id): id is string => typeof id === "string" && id.length > 0)
+            setSelMatIds(ids)
+          }
+        } else {
+          setImageAnalyzeResult(null)
         }
-      } catch {
-        if (!cancelled) setImageAnalyzeResult(null)
-      } finally {
-        if (!cancelled && reqId === imageAnalyzeReqRef.current) {
-          setImageAnalyzeLoading(false)
-        }
+      } else {
+        setImageAnalyzeResult(null)
       }
-    }, 450)
 
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
+      setCatSuggestions(nextCategories)
+
+      let nextSelected = selCategory
+      if (
+        !nextSelected ||
+        !nextCategories.some((c) => c.categoryId === nextSelected?.categoryId)
+      ) {
+        nextSelected = nextCategories[0] ?? null
+        setSelCategory(nextSelected)
+      }
+
+      if (nextSelected) {
+        const [tagsRes, matsRes] = await Promise.all([
+          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId: nextSelected.categoryId }),
+          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId: nextSelected.categoryId }),
+        ])
+
+        if (
+          catReqId !== categoryReqRef.current ||
+          tagReqId !== tagMatReqRef.current ||
+          imgReqId !== imageAnalyzeReqRef.current
+        ) {
+          return
+        }
+
+        setTagSuggestions(tagsRes.suggestions ?? [])
+        setMatSuggestions(matsRes.suggestions ?? [])
+        if (tagsRes.logId) setTagLogId(tagsRes.logId)
+      }
+    } catch {
+      if (
+        catReqId !== categoryReqRef.current ||
+        tagReqId !== tagMatReqRef.current ||
+        imgReqId !== imageAnalyzeReqRef.current
+      ) {
+        return
+      }
+      setCatError(true)
+      toast.error("Không thể phân tích AI. Vui lòng thử lại")
+    } finally {
+      if (
+        catReqId !== categoryReqRef.current ||
+        tagReqId !== tagMatReqRef.current ||
+        imgReqId !== imageAnalyzeReqRef.current
+      ) {
+        return
+      }
+      setCatLoading(false)
+      setTagLoading(false)
+      setImageAnalyzeLoading(false)
     }
-  }, [imageUrls, name, description, normalizeAiImageUrls, selCategory])
+  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, selCategory])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
     setSelCategory(cat)
@@ -358,7 +403,7 @@ export default function CreateProductPage() {
         logId,
         chosenCategoryId: selCategory?.categoryId,
         chosenTagIds: selTagIds,
-        chosenMaterialIds: selMatIds,
+        chosenMaterialIds: selMatIds.filter(isPersistableMaterialId),
         action: selCategory ? "accepted" : "skipped",
       })
     } catch {
@@ -459,7 +504,7 @@ export default function CreateProductPage() {
           <div className="lg:col-span-2 flex flex-col gap-4 lg:h-full">
             <Card className="!rounded">
               <CardContent className="grid gap-3">
-                <div className="grid gap-1">
+                <div className="grid gap-2">
                   <Label htmlFor="name" className="text-xs">
                     Tên sản phẩm <span className="text-red-500">*</span>
                   </Label>
@@ -472,7 +517,7 @@ export default function CreateProductPage() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1">
+                  <div className="grid gap-2">
                     <Label htmlFor="price" className="text-xs">
                       Giá bán (VND) <span className="text-red-500">*</span>
                     </Label>
@@ -489,7 +534,7 @@ export default function CreateProductPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid gap-1">
+                  <div className="grid gap-2">
                     <Label htmlFor="sku" className="text-xs">Mã SKU</Label>
                     <Input
                       id="sku"
@@ -500,7 +545,7 @@ export default function CreateProductPage() {
                     />
                   </div>
                 </div>
-                <div className="grid gap-1">
+                <div className="grid gap-2">
                   <Label htmlFor="description" className="text-xs">Mô tả sản phẩm</Label>
                   <Textarea
                     id="description"
@@ -523,8 +568,7 @@ export default function CreateProductPage() {
                       : isDragging
                         ? "border-primary"
                         : "border-muted-foreground/25 hover:border-primary/50"
-                  } ${hasMainPreview ? "overflow-hidden p-0" : "p-6"}`}
-                  style={{ minHeight: 180 }}
+                  } ${hasMainPreview ? "aspect-[4/3] overflow-hidden p-0" : "min-h-[180px] p-6"}`}
                   onClick={() => { if (imageUrls.length < 6) fileInputRef.current?.click() }}
                   onDragOver={(e) => { e.preventDefault(); if (imageUrls.length < 6) setIsDragging(true) }}
                   onDragLeave={() => setIsDragging(false)}
@@ -533,8 +577,8 @@ export default function CreateProductPage() {
                   <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden"
                     onChange={(e) => handleFilesSelected(e.target.files)} />
                   {hasMainPreview ? (
-                    <div className="relative h-[180px] w-full">
-                      <img src={mainImage} alt="Ảnh chính" className="absolute inset-0 h-full w-full object-cover"
+                    <div className="relative h-full w-full bg-muted/30">
+                      <img src={mainImage} alt="Ảnh chính" className="absolute inset-0 h-full w-full object-contain"
                         onError={() => setBrokenUrls((p) => new Set(p).add(mainImage))} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
                       <div className="absolute left-3 top-3 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -623,11 +667,6 @@ export default function CreateProductPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <CardTitle className="text-sm flex items-center gap-2 text-foreground">Trợ lý thông minh</CardTitle>
-                    <p className="mt-1 text-xs leading-relaxed text-[#607157]">
-                      {name.trim()
-                        ? <>Dựa trên hình ảnh <span className="font-semibold text-[#2f3f27]">{name}</span> bạn vừa tải lên, hệ thống gợi ý các thông tin sau:</>
-                        : "Nhập tên hoặc mô tả để AI phân tích và gợi ý tự động"}
-                    </p>
                   </div>
                   {(catLoading || tagLoading || imageAnalyzeLoading) && (
                     <IconLoader2 className="mt-1 size-3.5 shrink-0 animate-spin text-[#738f5b]" />
@@ -636,6 +675,31 @@ export default function CreateProductPage() {
               </CardHeader>
 
               <CardContent className="grid gap-4">
+                <div className="rounded-xl border border-[#d4deca] bg-[#f8fbf5] p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-[#617457]">Hoàn tất thông tin rồi bấm để AI phân tích một lần.</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 shrink-0 px-3 text-[11px]"
+                      onClick={runAiAnalysis}
+                      disabled={catLoading || tagLoading || imageAnalyzeLoading}
+                    >
+                      {catLoading || tagLoading || imageAnalyzeLoading ? (
+                        <>
+                          <IconLoader2 className="mr-1 size-3 animate-spin" />
+                          Đang phân tích...
+                        </>
+                      ) : (
+                        <>
+                          <IconSparkles className="mr-1 size-3" />
+                          Bắt đầu phân tích
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
                 {imageAnalyzeResult?.summary && (
                   <div className="rounded-xl border border-[#d4deca] bg-white p-2.5 text-[11px] leading-relaxed text-[#647759]">
                     <span className="font-semibold text-[#44553a]">Phân tích ảnh:</span> {imageAnalyzeResult.summary}
@@ -677,7 +741,7 @@ export default function CreateProductPage() {
                         const active = selCategory?.categoryId === cat.categoryId
                         return (
                           <button
-                            key={`cat-ai-${idx}-${String(cat.categoryId)}-${cat.categoryPath ?? cat.categoryName ?? ""}`}
+                            key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
                             type="button"
                             onClick={() => handleSelectCategory(cat)}
                             className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
@@ -720,7 +784,7 @@ export default function CreateProductPage() {
                                   handleSelectCategory({
                                     categoryId: c.id,
                                     categoryName: c.name,
-                                    categoryPath: c.name,
+                                    categoryPath: c.pathLabel,
                                     confidenceScore: 1,
                                   })
                                 }
@@ -730,7 +794,12 @@ export default function CreateProductPage() {
                                     : "hover:bg-[#f2f6ee] text-[#5f7253]"
                                 }`}
                               >
-                                {c.name}
+                                <span className="block truncate">{c.pathLabel}</span>
+                                {c.level > 1 && (
+                                  <span className="mt-0.5 block text-[10px] font-normal text-[#8a9a80]">
+                                    Cấp {c.level}
+                                  </span>
+                                )}
                               </button>
                             )
                           })}
@@ -762,12 +831,13 @@ export default function CreateProductPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {matSuggestions.map((m, idx) => {
-                        const active = selMatIds.includes(m.materialId)
+                        const selectKey = materialSelectionKey(m, idx)
+                        const active = selMatIds.includes(selectKey)
                         return (
                           <button
-                            key={`mat-${idx}-${String(m.materialId)}-${m.materialName ?? ""}`}
+                            key={`${selectKey}-${idx}`}
                             type="button"
-                            onClick={() => toggleMat(m.materialId)}
+                            onClick={() => toggleMat(selectKey)}
                             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
                               active
                                 ? "border-[#8ea27a] bg-white text-[#415337]"
@@ -789,7 +859,6 @@ export default function CreateProductPage() {
                   )}
                 </div>
 
-                {/* ── TAGS ── */}
                 <div className="border-t border-[#dce3d5] pt-3">
                   <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
                   {!selCategory ? (
@@ -805,12 +874,17 @@ export default function CreateProductPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {tagSuggestions.map((tag, idx) => {
-                        const active = selTagIds.includes(tag.tagId)
+                        const tagId = typeof tag.tagId === "number" ? tag.tagId : null
+                        const active = tagId !== null ? selTagIds.includes(tagId) : false
                         return (
                           <button
-                            key={`tag-${idx}-${String(tag.tagId)}-${tag.tagName ?? ""}`}
+                            key={`${tagId ?? "unknown"}-${tag.tagName}-${idx}`}
                             type="button"
-                            onClick={() => toggleTag(tag.tagId)}
+                            onClick={() => {
+                              if (tagId === null) return
+                              toggleTag(tagId)
+                            }}
+                            disabled={tagId === null}
                             className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
                               active
                                 ? "border-[#e8b37f] bg-white text-[#b06017]"
@@ -881,7 +955,7 @@ export default function CreateProductPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="!rounded">
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2 text-foreground">
                   <span className="flex size-6 items-center justify-center rounded-md bg-primary/10">
@@ -926,7 +1000,6 @@ export default function CreateProductPage() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   )

@@ -35,7 +35,8 @@ export type TagSuggestion = {
 }
 
 export type MaterialSuggestion = {
-  materialId: string
+  /** UUID trong DB; AI đôi khi bỏ trống — UI vẫn chọn được theo tên */
+  materialId?: string | null
   materialName: string
   confidence?: number
 }

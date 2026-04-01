@@ -24,7 +24,7 @@ function formatRelativeTime(input: string) {
   return createdAt.toLocaleDateString('vi-VN')
 }
 
-const ANIM_DURATION = 150 // ms — must match CSS animation duration
+const ANIM_DURATION = 150
 const STALE_MS = 30_000
 
 export function NotificationDropdown() {
