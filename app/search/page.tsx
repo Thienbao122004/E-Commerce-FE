@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
 import { getCategories, getCategoryById, type StorefrontCategory } from "@/services/storefront-categories"
-import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
@@ -45,6 +44,7 @@ function SearchPageContent() {
 
   const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [baseCategories, setBaseCategories] = useState<StorefrontCategory[]>([])
+  const [activeParentCategory, setActiveParentCategory] = useState<StorefrontCategory | null>(null)
   const [subCategories, setSubCategories] = useState<StorefrontCategory[]>([])
   const [searchCategories, setSearchCategories] = useState<StorefrontCategory[]>([])
   const [loading, setLoading] = useState(false)
@@ -58,10 +58,12 @@ function SearchPageContent() {
   const [priceMaxInput, setPriceMaxInput] = useState("")
   const [appliedMinPrice, setAppliedMinPrice] = useState<number | undefined>(undefined)
   const [appliedMaxPrice, setAppliedMaxPrice] = useState<number | undefined>(undefined)
+  const [appliedMinRating, setAppliedMinRating] = useState<number | undefined>(undefined)
 
   const PAGE_SIZE = 110
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const mainRef = useRef<HTMLDivElement>(null)
+  const effectiveCategoryId = selectedCategory ?? activeParentCategory?.id
 
   const loadProducts = useCallback(async (
     q: string,
@@ -70,10 +72,11 @@ function SearchPageContent() {
     catId: number | undefined,
     minPrice?: number,
     maxPrice?: number,
+    minRating?: number,
   ) => {
     setLoading(true)
     try {
-      const res = await getProducts({ search: q, page: p, pageSize: PAGE_SIZE, sortBy: sort, categoryId: catId, minPrice, maxPrice })
+      const res = await getProducts({ search: q, page: p, pageSize: PAGE_SIZE, sortBy: sort, categoryId: catId, minPrice, maxPrice, minRating })
       if (res.success) {
         setProducts(res.products)
         setTotalCount(res.totalCount)
@@ -86,8 +89,8 @@ function SearchPageContent() {
     if (categorySlug && !initialCategorySet) return
     setPage(1)
     setProducts([])
-    loadProducts(query, 1, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice)
-  }, [query, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice, loadProducts, categorySlug, initialCategorySet])
+    loadProducts(query, 1, sortBy, effectiveCategoryId, appliedMinPrice, appliedMaxPrice, appliedMinRating)
+  }, [query, sortBy, effectiveCategoryId, appliedMinPrice, appliedMaxPrice, appliedMinRating, loadProducts, categorySlug, initialCategorySet])
 
   useEffect(() => {
     getCategories({ pageSize: 100, level: 1 }).then((res) => {
@@ -99,10 +102,32 @@ function SearchPageContent() {
             (cat) => cat.slug === categorySlug || cat.code === categorySlug || String(cat.id) === categorySlug
           )
           if (matchedCategory) {
-            setSelectedCategory(matchedCategory.id)
+            setActiveParentCategory(matchedCategory)
+            setSelectedCategory(undefined)
           } else {
             const id = parseInt(categorySlug, 10)
-            if (!isNaN(id)) setSelectedCategory(id)
+            if (!isNaN(id)) {
+              getCategoryById(id)
+                .then((detailRes) => {
+                  if (!detailRes.success || !detailRes.category) return
+                  const category = detailRes.category
+
+                  if (category.parentId) {
+                    setSelectedCategory(category.id)
+                    getCategoryById(category.parentId)
+                      .then((parentRes) => {
+                        if (parentRes.success && parentRes.category) {
+                          setActiveParentCategory(parentRes.category)
+                        }
+                      })
+                      .catch(() => { })
+                  } else {
+                    setActiveParentCategory(category)
+                    setSelectedCategory(undefined)
+                  }
+                })
+                .catch(() => { })
+            }
           }
           setInitialCategorySet(true)
         }
@@ -111,28 +136,20 @@ function SearchPageContent() {
   }, [categorySlug, initialCategorySet])
 
   useEffect(() => {
-    if (selectedCategory) {
-      getCategoryById(selectedCategory).then(res => {
-        if (res.success && res.category) {
-          if (res.category.subcategories && res.category.subcategories.length > 0) {
+    if (activeParentCategory) {
+      getCategoryById(activeParentCategory.id)
+        .then((res) => {
+          if (res.success && res.category?.subcategories) {
             setSubCategories(res.category.subcategories)
-          } else if (res.category.parentId) {
-            getCategoryById(res.category.parentId).then(parentRes => {
-              if (parentRes.success && parentRes.category?.subcategories) {
-                setSubCategories(parentRes.category.subcategories)
-              }
-            }).catch(() => {})
           } else {
-            setSubCategories([res.category])
+            setSubCategories([])
           }
-        } else {
-          setSubCategories([])
-        }
-      }).catch(() => setSubCategories([]))
+        })
+        .catch(() => setSubCategories([]))
     } else {
       setSubCategories([])
     }
-  }, [selectedCategory])
+  }, [activeParentCategory])
 
   useEffect(() => {
     if (query && !selectedCategory && products.length > 0) {
@@ -153,15 +170,15 @@ function SearchPageContent() {
   }, [products, query, selectedCategory])
 
   const displayCategories = useMemo(() => {
+    if (activeParentCategory) return subCategories
     if (query && searchCategories.length > 0) return searchCategories
-    if (selectedCategory && subCategories.length > 0) return subCategories
     return baseCategories
-  }, [query, searchCategories, selectedCategory, subCategories, baseCategories])
+  }, [activeParentCategory, query, searchCategories, subCategories, baseCategories])
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
     setPage(newPage)
-    loadProducts(query, newPage, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice)
+    loadProducts(query, newPage, sortBy, effectiveCategoryId, appliedMinPrice, appliedMaxPrice, appliedMinRating)
     mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
@@ -174,26 +191,45 @@ function SearchPageContent() {
   }
 
   const handleCategoryChange = (cat: StorefrontCategory | undefined) => {
-    setSelectedCategory(cat?.id)
+    if (!cat) {
+      setSelectedCategory(undefined)
+    } else if (activeParentCategory) {
+      setSelectedCategory(cat.id)
+    } else {
+      setActiveParentCategory(cat)
+      setSelectedCategory(undefined)
+      setShowMoreCategories(false)
+    }
+
     const params = new URLSearchParams()
     if (query) params.set('q', query)
-    if (cat?.slug) params.set('category', cat.slug)
+    if (cat?.slug) {
+      params.set('category', cat.slug)
+    } else if (activeParentCategory?.slug) {
+      params.set('category', activeParentCategory.slug)
+    }
+
     router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
   }
 
   const handleClearAll = () => {
+    setActiveParentCategory(null)
     setSelectedCategory(undefined)
+    setSubCategories([])
     setPriceMinInput("")
     setPriceMaxInput("")
     setAppliedMinPrice(undefined)
     setAppliedMaxPrice(undefined)
+    setAppliedMinRating(undefined)
     if (query) setSearchCategories([])
     const params = new URLSearchParams()
     if (query) params.set('q', query)
     router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
   }
 
-  const hasActiveFilters = selectedCategory !== undefined || appliedMinPrice !== undefined || appliedMaxPrice !== undefined
+  const hasActiveFilters = activeParentCategory !== null || selectedCategory !== undefined || appliedMinPrice !== undefined || appliedMaxPrice !== undefined || appliedMinRating !== undefined
+
+  const RATING_FILTER_OPTIONS = [5, 4, 3, 2, 1]
 
   const SORT_OPTIONS: { value: typeof sortBy; label: string }[] = [
     { value: "newest", label: "Mới nhất" },
@@ -202,8 +238,6 @@ function SearchPageContent() {
     { value: "price_desc", label: "Giá giảm dần" },
   ]
 
-  const searchBoxValue = query || displayCategories.find((c) => c.id === selectedCategory)?.name || ''
-
   return (
     <div
       className="min-h-screen flex flex-col"
@@ -211,7 +245,6 @@ function SearchPageContent() {
     >
       <MainStorefrontHeader />
       <main ref={mainRef} className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-6">
-        {/* Breadcrumb + title */}
         <div className="mb-6">
           <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-2">
             <Link href="/" className="hover:text-[var(--color-primary)] transition-colors">Trang chủ</Link>
@@ -327,6 +360,47 @@ function SearchPageContent() {
                 >
                   ÁP DỤNG
                 </button>
+              </div>
+
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>Đánh Giá</p>
+                <ul className="space-y-1">
+                  {RATING_FILTER_OPTIONS.map((rating) => (
+                    <li key={rating}>
+                      <button
+                        onClick={() => setAppliedMinRating((prev) => (prev === rating ? undefined : rating))}
+                        className="w-full flex items-center gap-2 text-left text-xs py-1.5 transition-colors hover:text-[var(--color-primary)]"
+                        style={{ color: appliedMinRating === rating ? "var(--color-primary)" : "var(--color-text-main)" }}
+                      >
+                        <span
+                          className="size-3.5 rounded-sm border flex items-center justify-center shrink-0"
+                          style={{
+                            borderColor: appliedMinRating === rating ? "var(--color-primary)" : "#d1d5db",
+                            backgroundColor: appliedMinRating === rating ? "var(--color-primary)" : "white",
+                          }}
+                        >
+                          {appliedMinRating === rating && <span className="material-symbols-outlined text-white" style={{ fontSize: 10 }}>check</span>}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          {Array.from({ length: 5 }, (_, idx) => (
+                            <span
+                              key={idx}
+                              className="material-symbols-outlined"
+                              style={{
+                                fontSize: 14,
+                                color: idx < rating ? "#f59e0b" : "#d1d5db",
+                                fontVariationSettings: idx < rating ? "'FILL' 1" : "'FILL' 0",
+                              }}
+                            >
+                              star
+                            </span>
+                          ))}
+                          <span className="ml-1">trở lên</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               {/* Clear all */}
