@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "rea
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
-import { getCategories, type StorefrontCategory } from "@/services/storefront-categories"
+import { getCategories, getCategoryById, type StorefrontCategory } from "@/services/storefront-categories"
 import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
@@ -44,7 +44,9 @@ function SearchPageContent() {
   const { isFavorited, toggle: toggleFavorite } = useFavorites()
 
   const [products, setProducts] = useState<StorefrontProduct[]>([])
-  const [categories, setCategories] = useState<StorefrontCategory[]>([])
+  const [baseCategories, setBaseCategories] = useState<StorefrontCategory[]>([])
+  const [subCategories, setSubCategories] = useState<StorefrontCategory[]>([])
+  const [searchCategories, setSearchCategories] = useState<StorefrontCategory[]>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -88,9 +90,9 @@ function SearchPageContent() {
   }, [query, sortBy, selectedCategory, appliedMinPrice, appliedMaxPrice, loadProducts, categorySlug, initialCategorySet])
 
   useEffect(() => {
-    getCategories({ pageSize: 20, level: 1 }).then((res) => {
+    getCategories({ pageSize: 100, level: 1 }).then((res) => {
       if (res.success) {
-        setCategories(res.categories)
+        setBaseCategories(res.categories)
 
         if (categorySlug && !initialCategorySet) {
           const matchedCategory = res.categories.find(
@@ -98,12 +100,63 @@ function SearchPageContent() {
           )
           if (matchedCategory) {
             setSelectedCategory(matchedCategory.id)
+          } else {
+            const id = parseInt(categorySlug, 10)
+            if (!isNaN(id)) setSelectedCategory(id)
           }
           setInitialCategorySet(true)
         }
       }
     }).catch(() => { })
   }, [categorySlug, initialCategorySet])
+
+  useEffect(() => {
+    if (selectedCategory) {
+      getCategoryById(selectedCategory).then(res => {
+        if (res.success && res.category) {
+          if (res.category.subcategories && res.category.subcategories.length > 0) {
+            setSubCategories(res.category.subcategories)
+          } else if (res.category.parentId) {
+            getCategoryById(res.category.parentId).then(parentRes => {
+              if (parentRes.success && parentRes.category?.subcategories) {
+                setSubCategories(parentRes.category.subcategories)
+              }
+            }).catch(() => {})
+          } else {
+            setSubCategories([res.category])
+          }
+        } else {
+          setSubCategories([])
+        }
+      }).catch(() => setSubCategories([]))
+    } else {
+      setSubCategories([])
+    }
+  }, [selectedCategory])
+
+  useEffect(() => {
+    if (query && !selectedCategory && products.length > 0) {
+      const map = new Map<number, StorefrontCategory>()
+      products.forEach(p => {
+        if (p.categoryId && p.categoryName) {
+          if (!map.has(p.categoryId)) {
+            map.set(p.categoryId, {
+              id: p.categoryId,
+              name: p.categoryName,
+              slug: p.categorySlug || p.categoryId.toString(),
+            } as StorefrontCategory)
+          }
+        }
+      })
+      if (map.size > 0) setSearchCategories(Array.from(map.values()))
+    }
+  }, [products, query, selectedCategory])
+
+  const displayCategories = useMemo(() => {
+    if (query && searchCategories.length > 0) return searchCategories
+    if (selectedCategory && subCategories.length > 0) return subCategories
+    return baseCategories
+  }, [query, searchCategories, selectedCategory, subCategories, baseCategories])
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
@@ -134,6 +187,7 @@ function SearchPageContent() {
     setPriceMaxInput("")
     setAppliedMinPrice(undefined)
     setAppliedMaxPrice(undefined)
+    if (query) setSearchCategories([])
     const params = new URLSearchParams()
     if (query) params.set('q', query)
     router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
@@ -148,7 +202,7 @@ function SearchPageContent() {
     { value: "price_desc", label: "Giá giảm dần" },
   ]
 
-  const searchBoxValue = query || categories.find((c) => c.id === selectedCategory)?.name || ''
+  const searchBoxValue = query || displayCategories.find((c) => c.id === selectedCategory)?.name || ''
 
   return (
     <div
@@ -203,7 +257,7 @@ function SearchPageContent() {
                       Tất cả
                     </button>
                   </li>
-                  {(showMoreCategories ? categories : categories.slice(0, 5)).map((cat) => (
+                  {(showMoreCategories ? displayCategories : displayCategories.slice(0, 5)).map((cat) => (
                     <li key={cat.id}>
                       <button
                         onClick={() => handleCategoryChange(cat)}
@@ -224,7 +278,7 @@ function SearchPageContent() {
                     </li>
                   ))}
                 </ul>
-                {categories.length > 5 && (
+                {displayCategories.length > 5 && (
                   <button
                     onClick={() => setShowMoreCategories((p) => !p)}
                     className="mt-1 flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--color-primary)]"

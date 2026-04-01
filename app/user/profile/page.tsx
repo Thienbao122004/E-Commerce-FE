@@ -135,11 +135,9 @@ export default function ProfilePage() {
     }
   }
 
-  // --- Avatar upload ---
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-    // Reset input so same file can be re-selected
     e.target.value = ''
 
     if (file.size > 1024 * 1024) {

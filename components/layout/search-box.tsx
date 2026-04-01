@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getProducts } from '@/services/storefront-products'
 
 interface SearchBoxProps {
@@ -22,9 +22,12 @@ export function SearchBox({ initialValue = '' }: SearchBoxProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const searchParams = useSearchParams()
+  const currentQuery = searchParams?.get('q') || searchParams?.get('search') || initialValue
+
   useEffect(() => {
-    setValue(initialValue)
-  }, [initialValue])
+    setValue(currentQuery)
+  }, [currentQuery])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
