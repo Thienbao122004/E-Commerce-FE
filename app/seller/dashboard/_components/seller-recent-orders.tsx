@@ -93,14 +93,12 @@ export function SellerRecentOrders({ orders, loading }: Props) {
                     {timeAgo(order.createdAt)}
                   </p>
                 </div>
-                {/* Status */}
                 <Badge
                   variant="secondary"
                   className={`shrink-0 text-xs ${statusColors[order.status] ?? ""}`}
                 >
                   {OrderStatusLabels[order.status] ?? "Không rõ"}
                 </Badge>
-                {/* Amount */}
                 <span className="shrink-0 text-sm font-semibold text-right w-28">
                   {currency(order.totalAmount)}
                 </span>

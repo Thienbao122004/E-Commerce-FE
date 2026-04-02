@@ -9,7 +9,6 @@ import {
   IconCheck,
   IconChecks,
   IconChevronLeft,
-  IconCircleFilled,
   IconDotsVertical,
   IconLoader2,
   IconMessage2,
@@ -20,16 +19,22 @@ import {
 import type { ConversationDto, MessageDto } from "./chat-types"
 import { useAuth } from "@/contexts/auth-context"
 
-function Avatar({ name, online, size = "md" }: { name: string; online?: boolean; size?: "sm" | "md" | "lg" }) {
+function Avatar({ name, url, online, size = "md" }: { name: string; url?: string | null; online?: boolean; size?: "sm" | "md" | "lg" }) {
   const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
   const color = colors[name.charCodeAt(0) % colors.length]
   const sizeClass = size === "sm" ? "size-8 text-xs" : size === "lg" ? "size-11 text-base" : "size-9 text-sm"
   const initials = name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase().slice(0, 2)
   return (
     <div className="relative shrink-0">
-      <div className={cn("rounded-full flex items-center justify-center text-white font-semibold", color, sizeClass)}>
-        {initials}
-      </div>
+      {url ? (
+        <div className={cn("rounded-full overflow-hidden", sizeClass)}>
+          <img src={url} alt={name} className="size-full object-cover" />
+        </div>
+      ) : (
+        <div className={cn("rounded-full flex items-center justify-center text-white font-semibold", color, sizeClass)}>
+          {initials}
+        </div>
+      )}
       {online !== undefined && (
         <span className={cn(
           "absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-background",
@@ -69,29 +74,21 @@ export function ChatWindow({ conversation, messages, message, loadingMessages, s
   }, [messages.length, conversation.id])
 
   return (
-    <div className={cn("flex flex-col flex-1 min-w-0", className)}>
+    <div className={cn("flex flex-col flex-1 min-w-0 h-full min-h-0 overflow-hidden", className)}>
       <div className="flex items-center gap-3 px-4 py-2.5 border-b bg-background">
         <Button variant="ghost" size="icon" className="size-8 md:hidden" onClick={onBack}>
           <IconChevronLeft className="size-4" />
         </Button>
-        <Avatar name={conversation.buyerName} />
+        <Avatar name={conversation.buyerName} url={conversation.buyerAvatarUrl} />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">{conversation.buyerName}</p>
           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
             Khách hàng
           </p>
         </div>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="size-8" title="Gọi điện">
-            <IconPhone className="size-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="size-8" title="Tùy chọn">
-            <IconDotsVertical className="size-4" />
-          </Button>
-        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-muted/10">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-muted/10">
         {loadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <IconLoader2 className="size-5 animate-spin text-muted-foreground" />
@@ -109,12 +106,12 @@ export function ChatWindow({ conversation, messages, message, loadingMessages, s
               <div key={msg.id} className={cn("flex items-end gap-2", isSeller ? "justify-end" : "justify-start")}>
                 {!isSeller && (
                   <div className="w-7 shrink-0">
-                    {showAvatar && <Avatar name={conversation.buyerName} size="sm" />}
+                    {showAvatar && <Avatar name={conversation.buyerName} url={conversation.buyerAvatarUrl} size="sm" />}
                   </div>
                 )}
                 <div className={cn("flex flex-col gap-0.5 max-w-[72%]", isSeller && "items-end")}>
                   <div className={cn(
-                    "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                    "rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words",
                     isSeller
                       ? "bg-primary text-primary-foreground rounded-br-sm"
                       : "bg-background border rounded-bl-sm shadow-sm"

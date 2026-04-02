@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import {
+  createChatRealtimeConnection,
+  disposeChatRealtimeConnection,
+  startChatRealtimeConnection,
+} from "@/services/chat-realtime"
+import {
   fetchConversations,
   fetchMessages,
   sendMessage,
@@ -28,7 +33,39 @@ export default function SellerChatPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
-  const pollRef = useRef<ReturnType<typeof setInterval>>(undefined)
+  const activeIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+
+    document.body.style.overflow = "hidden"
+    document.documentElement.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [])
+
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
+
+  const upsertConversation = useCallback((next: ConversationDto) => {
+    setConversations((prev) => {
+      const exists = prev.some((c) => c.id === next.id)
+      const merged = exists
+        ? prev.map((c) => (c.id === next.id ? { ...c, ...next } : c))
+        : [next, ...prev]
+
+      return [...merged].sort((a, b) => {
+        const aTime = a.lastMessage?.createdAt ?? a.createdAt
+        const bTime = b.lastMessage?.createdAt ?? b.createdAt
+        return new Date(bTime).getTime() - new Date(aTime).getTime()
+      })
+    })
+  }, [])
 
   // ── Load conversations ────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
@@ -45,8 +82,6 @@ export default function SellerChatPage() {
 
   useEffect(() => {
     loadConversations()
-    pollRef.current = setInterval(loadConversations, 10_000)
-    return () => clearInterval(pollRef.current)
   }, [loadConversations])
 
   // ── Load messages when selecting conversation ─────────────────────────
@@ -74,19 +109,55 @@ export default function SellerChatPage() {
     if (activeId) loadMessages(activeId)
   }, [activeId, loadMessages])
 
-  // Polling messages for active conversation
+  // Realtime updates via SignalR
   useEffect(() => {
-    if (!activeId || !token) return
-    const interval = setInterval(async () => {
-      try {
-        const detail = await fetchMessages(token, activeId, 1, 50)
-        setMessages(detail.messages.reverse())
-      } catch {
-        // silent
-      }
-    }, 5_000)
-    return () => clearInterval(interval)
-  }, [activeId, token])
+    const connection = createChatRealtimeConnection(token, {
+      onConversationUpdated: (incoming: ConversationDto) => {
+      if (!incoming?.id) return
+      upsertConversation(incoming)
+      },
+      onChatMessageReceived: (payload: { conversationId?: string; message?: MessageDto }) => {
+      const conversationId = payload?.conversationId
+      const incomingMessage = payload?.message
+      if (!conversationId || !incomingMessage) return
+
+      setConversations((prev) => {
+        if (!prev.some((c) => c.id === conversationId)) {
+          void loadConversations()
+          return prev
+        }
+
+        const updated = prev.map((c) =>
+          c.id === conversationId
+            ? { ...c, lastMessage: incomingMessage }
+            : c
+        )
+
+        return [...updated].sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ?? a.createdAt
+          const bTime = b.lastMessage?.createdAt ?? b.createdAt
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+      })
+
+      setMessages((prev) => {
+        if (activeIdRef.current !== conversationId) return prev
+        if (prev.some((m) => m.id === incomingMessage.id)) return prev
+        return [...prev, incomingMessage]
+      })
+      },
+      onReconnected: () => {
+        void loadConversations()
+        if (activeIdRef.current) void loadMessages(activeIdRef.current)
+      },
+    })
+
+    void startChatRealtimeConnection(connection)
+
+    return () => {
+      void disposeChatRealtimeConnection(connection)
+    }
+  }, [token, loadConversations, loadMessages, upsertConversation])
 
   // ── Send message ──────────────────────────────────────────────────────
   const handleSend = async () => {
@@ -96,8 +167,10 @@ export default function SellerChatPage() {
     setSending(true)
     try {
       const newMsg = await sendMessage(token, activeId, content)
-      setMessages((prev) => [...prev, newMsg])
-      // Update last message in list
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev
+        return [...prev, newMsg]
+      })
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeId ? { ...c, lastMessage: newMsg } : c
@@ -120,15 +193,15 @@ export default function SellerChatPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center h-[calc(100vh-64px)]">
+      <div className="flex h-[calc(100svh-var(--header-height))] min-h-0 items-center justify-center overflow-hidden">
         <IconLoader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-1 flex-col h-[calc(100vh-64px)] overflow-hidden w-full max-w-[1360px] mx-auto">
-      <div className="flex h-full">
+    <div className="flex h-[calc(100svh-var(--header-height))] min-h-0 flex-col overflow-hidden w-full mx-auto">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <ConversationList
           conversations={conversations}
           activeId={activeId}
@@ -136,7 +209,7 @@ export default function SellerChatPage() {
           totalUnread={totalUnread}
           onSearchChange={setSearch}
           onSelect={handleSelect}
-          className={cn("w-full md:w-[300px] lg:w-[320px] shrink-0", !showList && "hidden md:flex")}
+          className={cn("w-full md:w-[300px] lg:w-[320px] shrink-0 min-h-0", !showList && "hidden md:flex")}
         />
 
         {active ? (
@@ -149,10 +222,10 @@ export default function SellerChatPage() {
             onMessageChange={setMessage}
             onSend={handleSend}
             onBack={() => setShowList(true)}
-            className={cn(showList && "hidden md:flex")}
+            className={cn("min-h-0", showList && "hidden md:flex")}
           />
         ) : (
-          <ChatEmptyState className={cn(showList && "hidden md:flex")} />
+          <ChatEmptyState className={cn("min-h-0", showList && "hidden md:flex")} />
         )}
       </div>
     </div>

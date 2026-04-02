@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import {
+  createChatRealtimeConnection,
+  disposeChatRealtimeConnection,
+  startChatRealtimeConnection,
+  type ChatMessageReceivedPayload,
+} from "@/services/chat-realtime"
+import {
   fetchConversations,
   fetchMessages,
   sendMessage,
@@ -90,6 +96,19 @@ function getMessagePreview(lastMessage?: MessageDto | null): string {
   return lastMessage.content || "Chưa có tin nhắn"
 }
 
+function dedupeMessagesById(items: MessageDto[]): MessageDto[] {
+  const seen = new Set<string>()
+  const result: MessageDto[] = []
+
+  for (const item of items) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    result.push(item)
+  }
+
+  return result
+}
+
 // ─── Main Widget ────────────────────────────────────────────────────────────
 
 type View = "list" | "chat"
@@ -116,8 +135,6 @@ export function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const pollConvRef = useRef<ReturnType<typeof setInterval>>(undefined)
-  const pollMsgRef = useRef<ReturnType<typeof setInterval>>(undefined)
   const prevConversationsRef = useRef<ConversationDto[]>([])
   const messageCacheRef = useRef<Record<string, MessageDto[]>>({})
 
@@ -136,10 +153,12 @@ export function ChatWidget() {
 
       const cached = messageCacheRef.current[conv.id]
       if (cached) {
-        setMessages(cached)
+        const dedupedCached = dedupeMessagesById(cached)
+        messageCacheRef.current[conv.id] = dedupedCached
+        setMessages(dedupedCached)
       } else {
         const detail = await fetchMessages(token, conv.id, 1, 50)
-        const fetchedMessages = detail.messages.reverse()
+        const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
         messageCacheRef.current[conv.id] = fetchedMessages
         setMessages(fetchedMessages)
       }
@@ -258,8 +277,6 @@ export function ChatWidget() {
             setSending={setSending}
             messagesEndRef={messagesEndRef}
             inputRef={inputRef}
-            pollConvRef={pollConvRef}
-            pollMsgRef={pollMsgRef}
             totalUnread={totalUnread}
             onClose={() => setOpen(false)}
             onCollapseToList={() => {
@@ -268,7 +285,6 @@ export function ChatWidget() {
               setMessages([])
               setAttachedProduct(null)
               setAttachedImage(null)
-              clearInterval(pollMsgRef.current)
             }}
             onHide={() => setOpen(false)}
             attachedProduct={attachedProduct}
@@ -296,7 +312,7 @@ type InnerProps = {
   conversations: ConversationDto[]
   setConversations: React.Dispatch<React.SetStateAction<ConversationDto[]>>
   activeConv: ConversationDto | null
-  setActiveConv: (c: ConversationDto | null) => void
+  setActiveConv: React.Dispatch<React.SetStateAction<ConversationDto | null>>
   messages: MessageDto[]
   setMessages: React.Dispatch<React.SetStateAction<MessageDto[]>>
   message: string
@@ -311,8 +327,6 @@ type InnerProps = {
   setSending: (v: boolean) => void
   messagesEndRef: React.RefObject<HTMLDivElement | null>
   inputRef: React.RefObject<HTMLTextAreaElement | null>
-  pollConvRef: React.MutableRefObject<ReturnType<typeof setInterval> | undefined>
-  pollMsgRef: React.MutableRefObject<ReturnType<typeof setInterval> | undefined>
   totalUnread: number
   onClose: () => void
   onCollapseToList: () => void
@@ -338,7 +352,6 @@ function ChatWidgetInner({
   loadingMessages, setLoadingMessages,
   sending, setSending,
   messagesEndRef, inputRef,
-  pollConvRef, pollMsgRef,
   totalUnread, onClose, onCollapseToList, onHide,
   attachedProduct, setAttachedProduct,
   attachedImage, setAttachedImage,
@@ -365,18 +378,14 @@ function ChatWidgetInner({
     } else {
       setLoading(false)
     }
-
-    pollConvRef.current = setInterval(() => {
-      void loadConversations(false)
-    }, 10_000)
-
-    return () => clearInterval(pollConvRef.current)
-  }, [loadConversations, pollConvRef, setLoading])
+  }, [loadConversations, setLoading])
 
   const loadMessages = useCallback(async (convId: string, force = false) => {
     const cached = messageCacheRef.current[convId]
     if (!force && cached) {
-      setMessages(cached)
+      const dedupedCached = dedupeMessagesById(cached)
+      messageCacheRef.current[convId] = dedupedCached
+      setMessages(dedupedCached)
       setLoadingMessages(false)
       await markAsRead(token, convId).catch(() => {})
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, unreadCount: 0 } : c))
@@ -386,7 +395,7 @@ function ChatWidgetInner({
     setLoadingMessages(true)
     try {
       const detail = await fetchMessages(token, convId, 1, 50)
-      const fetchedMessages = detail.messages.reverse()
+      const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
       messageCacheRef.current[convId] = fetchedMessages
       setMessages(fetchedMessages)
       await markAsRead(token, convId).catch(() => {})
@@ -401,18 +410,88 @@ function ChatWidgetInner({
   }, [token, setMessages, setLoadingMessages, setConversations, messageCacheRef])
 
   useEffect(() => {
-    if (!activeConv) return
-    clearInterval(pollMsgRef.current)
-    pollMsgRef.current = setInterval(async () => {
-      try {
-        const detail = await fetchMessages(token, activeConv.id, 1, 50)
-        const polledMessages = detail.messages.reverse()
-        messageCacheRef.current[activeConv.id] = polledMessages
-        setMessages(polledMessages)
-      } catch {}
-    }, 5_000)
-    return () => clearInterval(pollMsgRef.current)
-  }, [activeConv, token, setMessages, pollMsgRef, messageCacheRef])
+    const connection = createChatRealtimeConnection(token, {
+      onConversationUpdated: (incoming: ConversationDto) => {
+      if (!incoming?.id) return
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === incoming.id)
+        const merged = exists
+          ? prev.map((c) => (c.id === incoming.id ? { ...c, ...incoming } : c))
+          : [incoming, ...prev]
+
+        return [...merged].sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ?? a.createdAt
+          const bTime = b.lastMessage?.createdAt ?? b.createdAt
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+      })
+
+      setActiveConv((prev) => (prev?.id === incoming.id ? { ...prev, ...incoming } : prev))
+      },
+      onChatMessageReceived: (payload: ChatMessageReceivedPayload) => {
+      const conversationId = payload?.conversationId
+      const incoming = payload?.message
+      if (!conversationId || !incoming) return
+
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === conversationId)
+        if (!exists) {
+          void loadConversations(false)
+          return prev
+        }
+
+        const updated = prev.map((c) => {
+          if (c.id !== conversationId) return c
+          const nextUnread =
+            activeConv?.id === conversationId || incoming.senderId === currentUserId
+              ? 0
+              : (c.unreadCount ?? 0) + 1
+
+          return {
+            ...c,
+            lastMessage: incoming,
+            unreadCount: nextUnread,
+          }
+        })
+
+        return [...updated].sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ?? a.createdAt
+          const bTime = b.lastMessage?.createdAt ?? b.createdAt
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+      })
+
+      const cached = messageCacheRef.current[conversationId] ?? []
+      if (!cached.some((m) => m.id === incoming.id)) {
+        messageCacheRef.current[conversationId] = [...cached, incoming]
+      }
+
+      if (activeConv?.id === conversationId) {
+        setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]))
+      }
+      },
+      onReconnected: () => {
+        void loadConversations(false)
+        if (activeConv?.id) void loadMessages(activeConv.id, true)
+      },
+    })
+
+    void startChatRealtimeConnection(connection)
+
+    return () => {
+      void disposeChatRealtimeConnection(connection)
+    }
+  }, [
+    token,
+    setConversations,
+    setActiveConv,
+    setMessages,
+    activeConv?.id,
+    currentUserId,
+    loadConversations,
+    loadMessages,
+    messageCacheRef,
+  ])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -430,7 +509,6 @@ function ChatWidgetInner({
     setMessages([])
     setAttachedProduct(null)
     setAttachedImage(null)
-    clearInterval(pollMsgRef.current)
   }
 
   const handleSend = async () => {
@@ -447,7 +525,11 @@ function ChatWidgetInner({
     try {
       if (content) {
         const textMsg = await sendMessage(token, activeConv.id, content, "text")
-        setMessages((prev) => [...prev, textMsg])
+        setMessages((prev) => (prev.some((m) => m.id === textMsg.id) ? prev : [...prev, textMsg]))
+        const cached = messageCacheRef.current[activeConv.id] ?? []
+        if (!cached.some((m) => m.id === textMsg.id)) {
+          messageCacheRef.current[activeConv.id] = [...cached, textMsg]
+        }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: textMsg } : c)
         )
@@ -455,7 +537,11 @@ function ChatWidgetInner({
 
       if (attachedImage) {
         const imageMsg = await sendMessage(token, activeConv.id, attachedImage, "image")
-        setMessages((prev) => [...prev, imageMsg])
+        setMessages((prev) => (prev.some((m) => m.id === imageMsg.id) ? prev : [...prev, imageMsg]))
+        const cached = messageCacheRef.current[activeConv.id] ?? []
+        if (!cached.some((m) => m.id === imageMsg.id)) {
+          messageCacheRef.current[activeConv.id] = [...cached, imageMsg]
+        }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: imageMsg } : c)
         )
