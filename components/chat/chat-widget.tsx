@@ -357,14 +357,13 @@ function ChatWidgetInner({
 }: InnerProps) {
   const shouldBootstrapConversationsRef = useRef(conversations.length === 0)
 
-  // ── Load conversations ──────────────────────────────────────────────
   const loadConversations = useCallback(async (withLoading = false) => {
     if (withLoading) setLoading(true)
     try {
       const data = await fetchConversations(token)
       setConversations(data)
     } catch {
-      // silent
+
     } finally {
       if (withLoading) setLoading(false)
     }
@@ -385,7 +384,6 @@ function ChatWidgetInner({
     return () => clearInterval(pollConvRef.current)
   }, [loadConversations, pollConvRef, setLoading])
 
-  // ── Load messages ───────────────────────────────────────────────────
   const loadMessages = useCallback(async (convId: string, force = false) => {
     const cached = messageCacheRef.current[convId]
     if (!force && cached) {
@@ -413,7 +411,6 @@ function ChatWidgetInner({
     }
   }, [token, setMessages, setLoadingMessages, setConversations, messageCacheRef])
 
-  // Poll messages
   useEffect(() => {
     if (!activeConv) return
     clearInterval(pollMsgRef.current)
@@ -423,17 +420,15 @@ function ChatWidgetInner({
         const polledMessages = detail.messages.reverse()
         messageCacheRef.current[activeConv.id] = polledMessages
         setMessages(polledMessages)
-      } catch { /* silent */ }
+      } catch {}
     }, 5_000)
     return () => clearInterval(pollMsgRef.current)
   }, [activeConv, token, setMessages, pollMsgRef, messageCacheRef])
 
-  // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length, messagesEndRef])
 
-  // ── Select conversation ─────────────────────────────────────────────
   const handleSelect = useCallback((conv: ConversationDto) => {
     setActiveConv(conv)
     setView("chat")
@@ -449,7 +444,6 @@ function ChatWidgetInner({
     clearInterval(pollMsgRef.current)
   }
 
-  // ── Send message ────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!activeConv || sending) return
 
@@ -492,28 +486,20 @@ function ChatWidgetInner({
     return name.toLowerCase().includes(search.toLowerCase())
   })
 
-  // ── Two-panel layout when conversation is active ─────────────────────
   if (activeConv) {
     return (
       <div className="flex flex-col h-full">
-        {/* ── Top Header Bar ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 px-3 py-2 border-b bg-white shrink-0">
           <IconMessage2 className="size-5 text-orange-500" />
           <span className="font-semibold text-sm flex-1 text-gray-800">Chat</span>
-          {/* <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Thu gọn">
-            <IconMinus className="size-4" />
-          </button> */}
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Đóng">
             <IconX className="size-4" />
           </button>
         </div>
 
-        {/* ── Two Panel Body ───────────────────────────────────────────── */}
         <div className="flex flex-1 min-h-0">
-          {/* ── Left: Conversation List ──────────────────────────────── */}
           <div className="w-[220px] shrink-0 border-r flex flex-col bg-white">
-            {/* Search */}
-            <div className="px-2.5 py-2 border-b">
+            <div className="px-2.5 py-2.5 border-b">
               <div className="relative">
                 <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
                 <input
