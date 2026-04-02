@@ -3,10 +3,8 @@ import {
 } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
+import { formatDateTimeVN } from "@/lib/formatters"
 import type { ShopDocument } from "@/types/seller"
-
-const fmtDate = (t: string | null) =>
-  t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
 
 const DocStatusColors: Record<number, string> = {
   0: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
@@ -76,7 +74,7 @@ export function DocumentCard({ doc, onPreview }: { doc: ShopDocument; onPreview:
           <Badge variant="secondary" className={`text-xs ${DocStatusColors[doc.status] ?? ""}`}>
             {DocStatusLabels[doc.status] ?? doc.statusName}
           </Badge>
-          <span className="text-xs text-muted-foreground tabular-nums">{fmtDate(doc.submittedAt)}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{formatDateTimeVN(doc.submittedAt, "—")}</span>
         </div>
         {doc.rejectionReason && (
           <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-1.5 rounded">
@@ -85,7 +83,7 @@ export function DocumentCard({ doc, onPreview }: { doc: ShopDocument; onPreview:
         )}
         {doc.reviewedByName && (
           <p className="text-xs text-muted-foreground">
-            Duyệt bởi: {doc.reviewedByName} · {fmtDate(doc.reviewedAt ?? null)}
+            Duyệt bởi: {doc.reviewedByName} · {formatDateTimeVN(doc.reviewedAt ?? null, "—")}
           </p>
         )}
       </div>

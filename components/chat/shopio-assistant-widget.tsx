@@ -44,6 +44,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  formatConversationTimeVN as formatSessionTime,
+  formatPriceVND as formatPrice,
+  formatTimeVN as formatTime,
+} from "@/lib/formatters"
 
 type PaymentMethod = "vnpay" | "momo"
 
@@ -84,27 +89,6 @@ type ConfirmTargetState = {
 }
 
 type SessionFilter = "all" | "unread" | "muted"
-
-function formatPrice(price: number) {
-  return price.toLocaleString("vi-VN") + "đ"
-}
-
-function formatTime(dateStr?: string) {
-  if (!dateStr) return ""
-  const d = new Date(dateStr)
-  return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-}
-
-function formatSessionTime(dateStr?: string) {
-  if (!dateStr) return ""
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  if (diffDays === 0) return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-  if (diffDays === 1) return "Hôm qua"
-  if (diffDays < 7) return `${diffDays} ngày trước`
-  return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
-}
 
 function truncateText(text: string, maxLength: number) {
   if (!text) return ""

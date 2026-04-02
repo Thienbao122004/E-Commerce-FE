@@ -41,6 +41,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
 } from "@tabler/icons-react"
+import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   products: TopProduct[]
@@ -52,16 +53,6 @@ type Props = {
   activitiesLoading: boolean
   statsLoading: boolean
 }
-
-const fmt = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(v)
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
 
 const timeAgo = (ts: string) => {
   const diff = Date.now() - new Date(ts).getTime()

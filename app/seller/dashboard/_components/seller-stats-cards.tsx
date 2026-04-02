@@ -14,12 +14,7 @@ import {
 } from "@tabler/icons-react"
 import type { SellerDashboardStats, SellerWallet } from "@/types/seller-dashboard"
 import { StatsCard, StatsGrid } from "@/components/common/stats-card"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const fmt = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(v)
+import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   stats: SellerDashboardStats | null

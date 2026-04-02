@@ -56,22 +56,7 @@ import {
 import { ProductStatus } from "@/types/seller-dashboard"
 import type { SellerProductDetail } from "@/types/seller-dashboard"
 import { supabase } from "@/lib/supabase"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
-
-const fmtDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
 
 const statusMap: Record<number, { label: string; cls: string; dotCls: string }> = {
   [ProductStatus.Draft]: {

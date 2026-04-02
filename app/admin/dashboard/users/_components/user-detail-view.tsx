@@ -13,10 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
+import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
 import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
 import type { AdminUser, UserAuditLog } from "@/types/user"
-
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 type Props = {
   user: AdminUser

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { formatConversationTimeVN as formatTime } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { IconDotsVertical, IconMessage2, IconSearch } from "@tabler/icons-react"
 import type { ConversationDto } from "./chat-types"
@@ -25,20 +26,6 @@ function Avatar({ name, online, size = "md" }: { name: string; online?: boolean;
       )}
     </div>
   )
-}
-
-function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-  }
-  if (diffDays === 1) return "Hôm qua"
-  if (diffDays < 7) return `${diffDays} ngày trước`
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
 }
 
 function getLastMessagePreview(conversation: ConversationDto): string {

@@ -4,6 +4,7 @@ import { useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { formatTimeVN as formatMessageTime } from "@/lib/formatters"
 import {
   IconCheck,
   IconChecks,
@@ -42,11 +43,6 @@ function Avatar({ name, online, size = "md" }: { name: string; online?: boolean;
 function MessageStatus({ isRead }: { isRead: boolean }) {
   if (isRead) return <IconChecks className="size-3.5 text-blue-500" />
   return <IconCheck className="size-3.5 text-muted-foreground" />
-}
-
-function formatMessageTime(dateStr: string) {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
 }
 
 const QUICK_REPLIES = ["Còn hàng bạn nhé!", "Shop sẽ phản hồi sớm", "Cảm ơn bạn đã quan tâm!", "Bạn có thể đặt hàng tại đây"]

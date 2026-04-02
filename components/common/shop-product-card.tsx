@@ -1,13 +1,13 @@
 import Link from "next/link"
 import { IconShoppingCart } from "@tabler/icons-react"
+import { formatPriceVND, formatSoldCount } from "@/lib/formatters"
 import type { StorefrontProduct } from "@/services/storefront-products"
 
 type ShopProductCardProps = {
   product: StorefrontProduct
-  formatPrice: (price: number) => string
 }
 
-export function ShopProductCard({ product, formatPrice }: ShopProductCardProps) {
+export function ShopProductCard({ product }: ShopProductCardProps) {
   const img = product.imageUrls?.[0]
 
   return (
@@ -29,10 +29,10 @@ export function ShopProductCard({ product, formatPrice }: ShopProductCardProps) 
           {product.name}
         </p>
         <div className="mt-auto pt-3 flex items-end justify-between gap-1">
-          <p className="font-bold text-sm text-orange-600">{formatPrice(product.basePrice)}</p>
+          <p className="font-bold text-sm text-orange-600">{formatPriceVND(product.basePrice)}</p>
           {product.soldCount > 0 && (
             <span className="text-[12px] text-gray-400 shrink-0">
-              Đã bán {product.soldCount >= 1000 ? `${(product.soldCount / 1000).toFixed(1)}k` : product.soldCount}
+              Đã bán {formatSoldCount(product.soldCount)}
             </span>
           )}
         </div>

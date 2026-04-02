@@ -8,14 +8,7 @@ import { getCategories, getCategoryById, type StorefrontCategory } from "@/servi
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(price)
-}
+import { formatPriceVND as formatPrice } from "@/lib/formatters"
 
 function ProductCardSkeleton() {
   return (

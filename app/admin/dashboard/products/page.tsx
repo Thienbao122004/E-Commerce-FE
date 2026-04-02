@@ -30,12 +30,7 @@ import type { SortConfig } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
 export default function ProductsPage() {
   const router = useRouter()
@@ -226,11 +221,11 @@ export default function ProductsPage() {
                       </div>
                     </TableCell>
                     <TableCell><span className="text-sm">{product.shopName}</span></TableCell>
-                    <TableCell className="font-medium tabular-nums">{currency(product.basePrice)}</TableCell>
+                    <TableCell className="font-medium tabular-nums">{formatPriceVND(product.basePrice)}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={ProductStatusColors[product.status] ?? ""}>{ProductStatusLabels[product.status] ?? product.statusName}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDate(product.createdAt)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(product.createdAt)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" className="size-8" onClick={() => viewDetail(product)}>

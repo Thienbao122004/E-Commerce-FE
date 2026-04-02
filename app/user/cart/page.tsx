@@ -5,13 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cartService, type Cart, type CartItem } from '@/services/cart'
 import { toast } from 'sonner'
+import { formatPriceVND as formatPrice } from '@/lib/formatters'
 
 const CART_UPDATED_EVENT = 'cart:updated'
 const CHECKOUT_SELECTED_IDS_KEY = 'checkout:selected-item-ids'
-
-function formatPrice(price: number) {
-  return price.toLocaleString('vi-VN') + 'đ'
-}
 
 function getSafeQuantityInput(value: string, stockAvailable: number): string {
   const digitsOnly = value.replace(/\D/g, '')

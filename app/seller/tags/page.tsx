@@ -13,11 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatDateVN as fmtDate } from "@/lib/formatters"
 import { supabase } from "@/lib/supabase"
 import { fetchTags, createTag, updateTag, deleteTag } from "@/services/tags"
 import type { Tag } from "@/types/tag"
-
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 
 export default function TagsPage() {
   const [tags, setTags] = React.useState<Tag[]>([])

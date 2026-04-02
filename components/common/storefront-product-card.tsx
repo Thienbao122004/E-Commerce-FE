@@ -1,18 +1,17 @@
 import Link from "next/link"
+import { formatPriceVND, formatSoldCount } from "@/lib/formatters"
 import type { StorefrontProduct } from "@/services/storefront-products"
 
 type StorefrontProductCardProps = {
   product: StorefrontProduct
   isFavorited: boolean
   onToggleFavorite: (productId: string) => void
-  formatPrice: (price: number) => string
 }
 
 export function StorefrontProductCard({
   product,
   isFavorited,
   onToggleFavorite,
-  formatPrice,
 }: StorefrontProductCardProps) {
   const img = product.imageUrls?.[0]
 
@@ -59,11 +58,11 @@ export function StorefrontProductCard({
         </h3>
         <div className="mt-auto pt-3 flex items-end justify-between gap-1">
           <span className="font-bold text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            {formatPrice(product.basePrice)}
+            {formatPriceVND(product.basePrice)}
           </span>
           {product.soldCount > 0 && (
             <span className="text-[12px] text-gray-400 shrink-0">
-              Đã bán {product.soldCount >= 1000 ? `${(product.soldCount / 1000).toFixed(1)}k` : product.soldCount}
+              Đã bán {formatSoldCount(product.soldCount)}
             </span>
           )}
         </div>

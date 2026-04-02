@@ -5,10 +5,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { formatCurrencyVN as fmtMoney } from "@/lib/formatters"
 import type { WithdrawRequest } from "@/types/withdraw"
-
-const fmtMoney = (amount: number, cur: string) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: cur || "VND" }).format(amount)
 
 type DialogType = "approve" | "reject" | null
 

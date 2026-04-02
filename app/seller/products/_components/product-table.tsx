@@ -12,12 +12,7 @@ import type { SellerProduct } from "@/types/seller-dashboard"
 import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
 
 const statusLabels: Record<number, string> = {
   [ProductStatus.Draft]: "Nháp",

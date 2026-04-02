@@ -30,6 +30,10 @@ import {
 } from "@tabler/icons-react"
 import { getShopProducts } from "@/services/storefront-shops"
 import type { StorefrontProduct } from "@/services/storefront-products"
+import {
+  formatConversationTimeVN as formatTime,
+  formatPriceVND as formatPrice,
+} from "@/lib/formatters"
 
 
 export interface ChatProductInfo {
@@ -62,21 +66,6 @@ function Avatar({ name, url, size = "sm" }: { name: string; url?: string | null;
       {initials}
     </div>
   )
-}
-
-function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-  if (diffDays === 1) return "Hôm qua"
-  if (diffDays < 7) return `${diffDays} ngày trước`
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price)
 }
 
 function slugify(value: string): string {
@@ -960,7 +949,7 @@ function ProductPickerModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-medium line-clamp-2 leading-tight text-gray-700 group-hover:text-gray-900">{p.name}</p>
                     <p className="text-[12px] font-bold text-red-500 mt-1">
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(p.basePrice)}
+                      {formatPrice(p.basePrice)}
                     </p>
                   </div>
                   <button

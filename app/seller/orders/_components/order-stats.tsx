@@ -9,9 +9,7 @@ import {
 import { OrderStatus } from "@/types/seller-dashboard"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { StatsCard, StatsGrid } from "@/components/common/stats-card"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
+import { formatNumberVN, formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   orders: SellerOrder[]
@@ -31,7 +29,7 @@ export function OrderStats({ orders, totalCount, loading }: Props) {
   const cards = [
     {
       label: "Tổng đơn hàng",
-      value: totalCount.toLocaleString("vi-VN"),
+      value: formatNumberVN(totalCount),
       icon: <IconShoppingCart />,
       iconBg: "bg-primary/10",
       iconColor: "text-primary",

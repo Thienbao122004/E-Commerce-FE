@@ -7,6 +7,10 @@ import Link from "next/link"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 import { ShopProductCard } from "@/components/common/shop-product-card"
 import {
+  formatCompactNumber as formatNumber,
+  formatJoinTime,
+} from "@/lib/formatters"
+import {
   getShopBySlug,
   getShopProducts,
   getShopCategories,
@@ -25,31 +29,9 @@ import {
   IconPackage,
   IconUsers,
   IconCalendar,
-  IconChevronLeft,
   IconChevronDown,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
-function formatNumber(n: number): string {
-  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M"
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k"
-  return n.toString()
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
-  if (years > 0) return `${years} Năm Trước`
-  const months = Math.floor(diff / (30 * 24 * 60 * 60 * 1000))
-  if (months > 0) return `${months} Tháng Trước`
-  return "Mới tham gia"
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price)
-}
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới Nhất" },
@@ -223,7 +205,11 @@ export default function ShopDetailPage() {
               <StatCard icon={<IconPackage className="size-4" />} label="Sản Phẩm" value={formatNumber(shop.productCount)} />
               <StatCard icon={<IconUsers className="size-4" />} label="Người Theo Dõi" value={formatNumber(shop.followerCount)} />
               <StatCard icon={<IconStarFilled className="size-4 text-amber-500" />} label="Đánh Giá" value={`${shop.averageRating} (${formatNumber(shop.reviewCount)})`} />
-              <StatCard icon={<IconCalendar className="size-4" />} label="Tham Gia" value={formatDate(shop.createdAt)} />
+              <StatCard
+                icon={<IconCalendar className="size-4" />}
+                label="Tham Gia"
+                value={formatJoinTime(shop.createdAt, { unknownLabel: "Chưa cập nhật", textCase: "title" })}
+              />
             </div>
           </div>
         </div>
@@ -306,7 +292,6 @@ export default function ShopDetailPage() {
                 <ShopProductCard
                   key={product.id}
                   product={product}
-                  formatPrice={formatPrice}
                 />
               ))}
             </div>

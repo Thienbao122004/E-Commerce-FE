@@ -25,12 +25,7 @@ import type { SortConfig } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const fmtDate = (t: string | null) =>
-  t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
-
-const fmtMoney = (amount: number, currency: string) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: currency || "VND" }).format(amount)
+import { formatCurrencyVN as fmtMoney, formatDateTimeVN } from "@/lib/formatters"
 
 type DialogType = "approve" | "reject" | null
 
@@ -196,8 +191,8 @@ export default function WithdrawalsPage() {
                         {WithdrawStatusLabels[r.status] ?? r.statusName}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(r.requestedAt)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(r.reviewedAt)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(r.requestedAt, "—")}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(r.reviewedAt, "—")}</TableCell>
                     <TableCell>
                       {r.status === WithdrawStatus.Pending && (
                         <div className="flex items-center justify-end gap-1">

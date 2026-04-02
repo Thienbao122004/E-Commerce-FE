@@ -17,12 +17,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { supabase } from "@/lib/supabase"
+import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
 import { fetchDisputeById, approveRefund, rejectDispute } from "@/services/disputes"
 import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
-
-const currency = (v: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 export default function DisputeDetailPage() {
   const { id } = useParams<{ id: string }>()

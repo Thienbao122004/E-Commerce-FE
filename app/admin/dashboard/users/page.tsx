@@ -20,12 +20,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
+import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
 import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
 import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
 import type { AdminUser } from "@/types/user"
-
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
 
 export default function UsersPage() {
   const [users, setUsers] = React.useState<AdminUser[]>([])

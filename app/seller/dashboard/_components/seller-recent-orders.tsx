@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { formatDateVN, formatPriceVND as currency } from "@/lib/formatters"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { OrderStatusLabels } from "@/types/seller-dashboard"
 
@@ -48,17 +49,10 @@ function timeAgo(dateStr: string): string {
   if (diffHours < 24) return `${diffHours} giờ trước`
   const diffDays = Math.floor(diffHours / 24)
   if (diffDays < 30) return `${diffDays} ngày trước`
-  return date.toLocaleDateString("vi-VN")
+  return formatDateVN(date)
 }
 
 export function SellerRecentOrders({ orders, loading }: Props) {
-  const currency = (value: number) =>
-    new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value)
-
   const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5)

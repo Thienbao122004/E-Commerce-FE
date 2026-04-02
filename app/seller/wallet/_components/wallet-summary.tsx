@@ -10,9 +10,7 @@ import {
   IconWallet,
 } from "@tabler/icons-react"
 import type { SellerWallet } from "@/types/seller-dashboard"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
+import { formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   wallet: SellerWallet | null

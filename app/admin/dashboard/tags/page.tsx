@@ -30,8 +30,7 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+import { formatDateVN as fmtDate } from "@/lib/formatters"
 
 export default function TagsPage() {
   const [tags, setTags] = React.useState<Tag[]>([])

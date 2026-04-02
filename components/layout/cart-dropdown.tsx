@@ -4,12 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { cartService, type Cart } from '@/services/cart'
 import { useAuth } from '@/contexts/auth-context'
+import { formatPriceVND as formatPrice } from '@/lib/formatters'
 
 const CART_UPDATED_EVENT = 'cart:updated'
-
-function formatPrice(price: number) {
-  return price.toLocaleString('vi-VN') + 'đ'
-}
 
 export function CartDropdown() {
   const { session } = useAuth()
