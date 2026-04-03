@@ -32,12 +32,7 @@ import type { SortConfig } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+import { formatDateTimeVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
 
 export default function SellerDisputesPage() {
   const [disputes, setDisputes] = React.useState<SellerDispute[]>([])

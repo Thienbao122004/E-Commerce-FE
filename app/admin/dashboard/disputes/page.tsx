@@ -29,12 +29,7 @@ import type { SortConfig } from "@/components/common/table-sorting"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
 export default function DisputesPage() {
   const router = useRouter()
@@ -209,13 +204,13 @@ export default function DisputesPage() {
                       <TableCell className="text-sm">{d.customerName}</TableCell>
                       <TableCell className="text-sm">{d.shopName}</TableCell>
                       <TableCell><Badge variant="outline" className="text-xs">{DisputeTypeLabels[d.type] ?? d.typeName}</Badge></TableCell>
-                      <TableCell className="font-medium tabular-nums">{currency(d.requestedAmount)}</TableCell>
+                      <TableCell className="font-medium tabular-nums">{formatPriceVND(d.requestedAmount)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={`text-xs ${DisputeStatusColors[d.status] ?? ""}`}>
                           {DisputeStatusLabels[d.status] ?? d.statusName}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDate(d.createdAt)}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(d.createdAt)}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => router.push(`/admin/dashboard/disputes/${d.id}`)}>

@@ -16,6 +16,7 @@ import {
 import { aiChatService, type AiChatSendResponse } from '@/services/ai-chat'
 import { cartService } from '@/services/cart'
 import { profileService } from '@/services/profile'
+import { formatPriceVND as formatPrice, formatTimeVN as formatTime } from '@/lib/formatters'
 import type { AddressResponse } from '@/types/profile'
 
 const CART_UPDATED_EVENT = 'cart:updated'
@@ -47,16 +48,6 @@ type ConfirmTargetState = {
   messageId: string
   preview?: ConfirmPreview
   previews?: ConfirmPreview[]
-}
-
-function formatPrice(price: number) {
-  return price.toLocaleString('vi-VN') + 'đ'
-}
-
-function formatTime(dateStr?: string) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
 
 function isOrderRequestText(text: string) {

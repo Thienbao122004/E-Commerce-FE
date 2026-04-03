@@ -21,6 +21,7 @@ export interface ConversationDto {
   shopLogoUrl: string | null
   buyerId: string
   buyerName: string
+  buyerAvatarUrl?: string | null
   sellerId: string
   orderId: string | null
   lastMessage: MessageDto | null

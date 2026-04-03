@@ -7,9 +7,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { AdminDispute } from "@/types/dispute"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
+import { formatPriceVND } from "@/lib/formatters"
 
 export function DisputeActionDialog({
   dispute,
@@ -66,7 +64,7 @@ export function DisputeActionDialog({
                 onChange={(e) => setApprovedAmount(e.target.value)}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Yêu cầu: {dispute ? currency(dispute.requestedAmount) : ""}
+                Yêu cầu: {dispute ? formatPriceVND(dispute.requestedAmount) : ""}
               </p>
               {approvedAmount && Number(approvedAmount) > (dispute?.requestedAmount ?? 0) && (
                 <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>

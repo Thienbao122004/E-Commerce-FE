@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { formatMonthYearVN } from "@/lib/formatters"
 import type { DashboardStats } from "@/types/dashboard"
 
 export const description = "An interactive area chart"
@@ -77,7 +78,7 @@ export function ChartAreaInteractive({ stats }: Props) {
 
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const label = d.toLocaleDateString("vi-VN", { month: "short", year: "numeric" })
+      const label = formatMonthYearVN(d)
 
       let rev = 0
       let ord = 0

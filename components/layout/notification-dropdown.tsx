@@ -5,24 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { notificationsService, type NotificationItem } from '@/services/notifications'
 import { useAuth } from '@/contexts/auth-context'
-
-function formatRelativeTime(input: string) {
-  const createdAt = new Date(input)
-  const now = Date.now()
-  const diffMs = now - createdAt.getTime()
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-
-  if (diffMins < 1) return 'Vừa xong'
-  if (diffMins < 60) return `${diffMins} phút trước`
-
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours} giờ trước`
-
-  const diffDays = Math.floor(diffHours / 24)
-  if (diffDays < 7) return `${diffDays} ngày trước`
-
-  return createdAt.toLocaleDateString('vi-VN')
-}
+import { formatRelativeTimeVN as formatRelativeTime } from '@/lib/formatters'
 
 const ANIM_DURATION = 150
 const STALE_MS = 30_000

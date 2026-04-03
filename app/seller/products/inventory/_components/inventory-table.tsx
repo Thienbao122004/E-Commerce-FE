@@ -10,9 +10,7 @@ import type { SellerProduct } from "@/types/seller-dashboard"
 import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
+import { formatPriceVND as currency } from "@/lib/formatters"
 
 
 function getStockWarning(stock: number | null): { label: string; cls: string } | null {

@@ -3,17 +3,14 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, CircleDollarSign, ReceiptText, ShoppingBag } from 'lucide-react'
-
-function formatPrice(value: string | null) {
-  const amount = Number(value ?? 0)
-  if (Number.isNaN(amount)) return '0đ'
-  return amount.toLocaleString('vi-VN') + 'đ'
-}
+import { formatPriceVND } from '@/lib/formatters'
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const amount = searchParams.get('amount')
+  const amountValue = Number(amount ?? 0)
+  const amountLabel = formatPriceVND(Number.isNaN(amountValue) ? 0 : amountValue)
 
   return (
     <div
@@ -49,7 +46,7 @@ export default function PaymentSuccessPage() {
               <div className="grid gap-1">
                 <span className="text-xs text-muted-foreground">Số tiền thanh toán</span>
                 <span className="text-lg font-semibold" style={{ color: 'var(--color-primary)' }}>
-                  {formatPrice(amount)}
+                  {amountLabel}
                 </span>
               </div>
             </div>

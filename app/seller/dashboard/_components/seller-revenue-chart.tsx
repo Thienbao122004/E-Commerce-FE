@@ -15,6 +15,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { formatPriceVND as currency } from "@/lib/formatters"
 import type { SellerProduct, SellerWallet } from "@/types/seller-dashboard"
 
 type Props = {
@@ -72,13 +73,6 @@ export function SellerRevenueChart({ wallet, products, loading }: Props) {
   }, [products])
 
   const totalProducts = products.length
-
-  const currency = (value: number) =>
-    new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value)
 
   if (loading) {
     return (

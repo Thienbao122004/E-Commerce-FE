@@ -9,6 +9,7 @@ import { profileService } from '@/services/profile'
 import { paymentsService } from '@/services/payments'
 import type { AddressResponse } from '@/types/profile'
 import { getProductById } from '@/services/storefront-products'
+import { formatPriceVND as formatPrice } from '@/lib/formatters'
 import { toast } from 'sonner'
 import {
   ChevronRight,
@@ -39,10 +40,6 @@ interface ShopGroup {
   shippingFee: number
   total: number
   itemCount: number
-}
-
-function formatPrice(price: number) {
-  return price.toLocaleString('vi-VN') + 'đ'
 }
 
 function formatAddress(address: AddressResponse) {

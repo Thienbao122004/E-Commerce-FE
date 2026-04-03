@@ -26,14 +26,12 @@ import {
   IconLoader2,
 } from "@tabler/icons-react"
 import type { CreateWithdrawalPayload } from "@/types/seller-dashboard"
+import { formatPriceVND as currency } from "@/lib/formatters"
 
 const BANKS = [
   "Vietcombank", "MB Bank", "Techcombank", "VPBank", "ACB",
   "BIDV", "Agribank", "Sacombank", "TPBank", "HDBank",
 ]
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
 type Step = "form" | "confirm" | "success"
 

@@ -29,22 +29,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
 import { useProducts } from "@/hooks/use-products"
 import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/types/product"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
 
 export default function InventoryPage() {
   const {

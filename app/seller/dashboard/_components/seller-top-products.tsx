@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatPriceVND as currency } from "@/lib/formatters"
 import type { SellerProduct } from "@/types/seller-dashboard"
 
 type Props = {
@@ -27,13 +28,6 @@ function SkeletonRow() {
 }
 
 export function SellerTopProducts({ products, loading }: Props) {
-  const currency = (value: number) =>
-    new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value)
-
   // Sort by price * stock as a proxy for best sellers (since we don't have sold count)
   const topProducts = [...products]
     .filter((p) => p.status === 1)

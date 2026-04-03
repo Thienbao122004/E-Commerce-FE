@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
 import type { DashboardStats } from "@/types/dashboard"
 
 type Props = {
@@ -46,16 +47,6 @@ function SkeletonCard() {
 }
 
 export function SectionCards({ stats, loading }: Props) {
-  const fmt = (value: number) =>
-    new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value)
-
-  const currency = (value: number) =>
-    new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value)
-
   if (loading || !stats) {
     return (
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">

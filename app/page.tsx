@@ -9,14 +9,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(price)
-}
+import { StorefrontProductCard } from "@/components/common/storefront-product-card"
+import { formatPriceVND as formatPrice } from "@/lib/formatters"
 
 const ICON_MAP: Record<string, string> = {
   fashion: "checkroom", thoi_trang: "checkroom",
@@ -172,7 +166,7 @@ export default function LandingPage() {
     const [catsRes, flashRes, featuredRes] = await Promise.allSettled([
       getCategories({ pageSize: 6, level: 1 }),
       getProducts({ pageSize: 12, sortBy: "best_seller" }),
-      getProducts({ pageSize: 12, sortBy: "rating" }),
+      getProducts({ pageSize: 12, sortBy: "newest" }),
     ])
 
     if (catsRes.status === "fulfilled" && catsRes.value.success)
@@ -277,7 +271,6 @@ export default function LandingPage() {
     >
       <header>
         <MainStorefrontHeader />
-
         <nav className="border-t bg-white" style={{ borderColor: "#e5ded6" }}>
           <div className="max-w-[1440px] mx-auto px-10">
             <ul className="flex items-center gap-8 py-3 overflow-x-auto no-scrollbar">
@@ -610,63 +603,14 @@ export default function LandingPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                {uniqueFeaturedProducts.map((product, i) => {
-                  const img = product.imageUrls?.[0]
-                  return (
-                    <Link
-                      key={product.id}
-                      href={`/products/${product.slug || product.id}`}
-                      className="group flex flex-col bg-white rounded-xl border border-gray-200 hover:border-[rgba(236,127,19,0.5)] hover:shadow-md transition-all duration-300"
-                    >
-                      <div className="relative aspect-square overflow-hidden rounded-t-xl bg-gray-100 shrink-0">
-                        {img ? (
-                          <img
-                            src={img}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="material-symbols-outlined text-5xl text-gray-300">image</span>
-                          </div>
-                        )}
-                        <button
-                          onClick={(e) => { e.preventDefault(); toggleFavorite(product.id) }}
-                          className="absolute top-2 right-2 size-8 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
-                          style={{
-                            backgroundColor: isFavorited(product.id) ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.85)",
-                            color: isFavorited(product.id) ? "#ef4444" : "#9ca3af",
-                          }}
-                          aria-label={isFavorited(product.id) ? "Bỏ yêu thích" : "Yêu thích"}
-                        >
-                          <span
-                            className="material-symbols-outlined"
-                            style={{ fontSize: "18px", fontVariationSettings: isFavorited(product.id) ? "'FILL' 1" : "'FILL' 0" }}
-                          >
-                            favorite
-                          </span>
-                        </button>
-                      </div>
-                      <div className="p-4 flex flex-col flex-1">
-                        <h3 className="text-sm mb-1 line-clamp-2" style={{ color: "var(--color-text-main)" }}>
-                          {product.name}
-                        </h3>
-                        <div className="mt-auto pt-3 flex items-end justify-between gap-1">
-                          <span className="font-bold text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                            {formatPrice(product.basePrice)}
-                          </span>
-                          {product.soldCount > 0 && (
-                            <span className="text-[12px] text-gray-400 shrink-0">
-                              Đã bán {product.soldCount >= 1000
-                                ? `${(product.soldCount / 1000).toFixed(1)}k`
-                                : product.soldCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  )
-                })}
+                {uniqueFeaturedProducts.map((product) => (
+                  <StorefrontProductCard
+                    key={product.id}
+                    product={product}
+                    isFavorited={isFavorited(product.id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
               </div>
               {hasMore && (
                 <div className="flex flex-col items-center gap-2 mt-8">

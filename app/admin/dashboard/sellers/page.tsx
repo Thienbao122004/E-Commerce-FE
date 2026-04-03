@@ -35,9 +35,7 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const fmtDate = (t: string | null) =>
-  t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
+import { formatDateTimeVN } from "@/lib/formatters"
 
 type DialogType = "approve" | "reject" | "suspend" | "close" | null
 
@@ -373,7 +371,7 @@ export default function SellersPage() {
                         {ShopStatusLabels[s.status] ?? s.statusName}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(s.createdAt)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(s.createdAt, "—")}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" className="size-8" onClick={() => viewDetail(s)}>
