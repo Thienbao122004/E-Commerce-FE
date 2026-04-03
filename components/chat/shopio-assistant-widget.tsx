@@ -1305,7 +1305,7 @@ export function ShopioAssistantWidget() {
                                           )}
                                         </div>
                                         <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                                          <p className="text-[11px] font-semibold line-clamp-2" style={{ color: "#2f2f2f" }}>{p.name}</p>
+                                          <p className="text-[11px] font-semibold truncate" style={{ color: "#2f2f2f" }}>{p.name}</p>
                                           <p className="text-[10px] text-muted-foreground">{p.categoryName ?? "Sản phẩm gợi ý"}</p>
                                           <div className="flex items-center justify-between gap-1">
                                             <span className="text-[11px] font-bold" style={{ color: "var(--color-primary)" }}>
@@ -1390,7 +1390,7 @@ export function ShopioAssistantWidget() {
                                             )}
                                           </div>
                                           <div className="min-w-0 flex-1">
-                                            <p className="text-[10px] font-medium line-clamp-1" style={{ color: "#3d3d3d" }}>{item.name}</p>
+                                            <p className="text-[10px] font-medium truncate" style={{ color: "#3d3d3d" }}>{item.name}</p>
                                             <p className="text-[10px]" style={{ color: "#8a6a36" }}>SL: {item.quantity} · {formatPrice(item.basePrice)}</p>
                                           </div>
                                         </div>

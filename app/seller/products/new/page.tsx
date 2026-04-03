@@ -178,7 +178,9 @@ export default function CreateProductPage() {
   const { create, actionLoading } = useSellerProducts()
 
   const [name, setName] = React.useState("")
+  // price: hiển thị có dấu phẩy nghìn, priceRaw: số thực để submit
   const [price, setPrice] = React.useState("")
+  const [priceRaw, setPriceRaw] = React.useState(0)
   const [sku, setSku] = React.useState("")
   const [baseStock, setBaseStock] = React.useState("0")
   const [useVariants, setUseVariants] = React.useState(false)
@@ -202,6 +204,7 @@ export default function CreateProductPage() {
   const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
   const [manualCategoryRows, setManualCategoryRows] = React.useState<ManualCategoryRow[]>([])
   const [manualCatQuery, setManualCatQuery] = React.useState("")
+  const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
   const [catLogId, setCatLogId] = React.useState<string | null>(null)
   const [tagLogId, setTagLogId] = React.useState<string | null>(null)
@@ -218,8 +221,15 @@ export default function CreateProductPage() {
   const tagMatReqRef = React.useRef(0)
   const imageAnalyzeReqRef = React.useRef(0)
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedManualCatQuery(manualCatQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [manualCatQuery])
+
   const manualCategoryOptions = React.useMemo(() => {
-    const q = manualCatQuery.trim().toLowerCase()
+    const q = debouncedManualCatQuery.trim().toLowerCase()
     if (!q) return manualCategoryRows.slice(0, 12)
     return manualCategoryRows
       .filter(
@@ -227,7 +237,7 @@ export default function CreateProductPage() {
           c.pathLabel.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
       )
       .slice(0, 24)
-  }, [manualCategoryRows, manualCatQuery])
+  }, [manualCategoryRows, debouncedManualCatQuery])
 
   React.useEffect(() => {
     let mounted = true
@@ -483,7 +493,7 @@ export default function CreateProductPage() {
 
     const basePayload = {
       name: name.trim(),
-      basePrice: Number(price),
+      basePrice: priceRaw,
       description: description.trim() || undefined,
       currency: "VND",
       imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
@@ -568,7 +578,7 @@ export default function CreateProductPage() {
   }, [useVariants, variantRows])
 
   const canSubmit =
-    name.trim().length > 0 && Number(price) > 0 && variantRowsValid && !uploadingImages
+    name.trim().length > 0 && priceRaw > 0 && variantRowsValid && !uploadingImages
   const confidenceBadge = selCategory?.confidenceScore ?? catSuggestions[0]?.confidenceScore
 
   // ── Tag & material toggles ───────────────────────────
@@ -622,11 +632,17 @@ export default function CreateProductPage() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold">₫</span>
                     <Input
                       id="price"
-                      type="number"
-                      min="0"
+                      inputMode="numeric"
                       placeholder="299,000"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      onChange={(e) => {
+                        // Xoá ký tự không phải số
+                        const digits = e.target.value.replace(/[^0-9]/g, "")
+                        const num = digits === "" ? 0 : Number(digits)
+                        setPriceRaw(num)
+                        // Hiển thị có dấu phẩy nghìn
+                        setPrice(digits === "" ? "" : num.toLocaleString("vi-VN"))
+                      }}
                       className="h-9 pl-7 text-sm"
                     />
                   </div>
@@ -1002,12 +1018,17 @@ export default function CreateProductPage() {
                         <p className="mb-2 text-[11px] text-[#6d7f62]">
                           Không đúng gợi ý? Chọn danh mục thủ công:
                         </p>
-                        <Input
-                          value={manualCatQuery}
-                          onChange={(e) => setManualCatQuery(e.target.value)}
-                          placeholder="Tìm danh mục..."
-                          className="h-8 text-xs bg-white"
-                        />
+                        <div className="relative">
+                          <Input
+                            value={manualCatQuery}
+                            onChange={(e) => setManualCatQuery(e.target.value)}
+                            placeholder="Tìm danh mục..."
+                            className="h-8 text-xs bg-white pr-7"
+                          />
+                          {manualCatQuery !== debouncedManualCatQuery && (
+                            <IconLoader2 className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 animate-spin text-[#8a9a80]" />
+                          )}
+                        </div>
                         <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
                           {manualCategoryOptions.map((c, idx) => {
                             const active = selCategory?.categoryId === c.id

@@ -733,7 +733,7 @@ export default function UserAiChatPage() {
 
                                 {/* Info */}
                                 <div className="min-w-0 flex-1 flex flex-col gap-1">
-                                  <p className="text-xs font-semibold line-clamp-2" style={{ color: '#2f2f2f' }}>
+                                  <p className="text-xs font-semibold truncate" style={{ color: '#2f2f2f' }}>
                                     {p.name}
                                   </p>
                                   <p className="text-[11px] text-muted-foreground">{p.categoryName ?? 'Sản phẩm gợi ý'}</p>
@@ -856,7 +856,7 @@ export default function UserAiChatPage() {
                                     )}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-medium line-clamp-1" style={{ color: '#3d3d3d' }}>
+                                    <p className="text-xs font-medium truncate" style={{ color: '#3d3d3d' }}>
                                       {item.name}
                                     </p>
                                     <p className="text-[11px]" style={{ color: '#8a6a36' }}>

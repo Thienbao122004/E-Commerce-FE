@@ -188,7 +188,7 @@ export default function ShopDetailPage() {
             <div className="pt-14 md:pt-16 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
                 <h2 className="text-xl md:text-2xl font-bold" style={{ color: "#3d2e1f" }}>{shop.name}</h2>
-                {shop.description && <p className="text-sm mt-1 max-w-xl line-clamp-2" style={{ color: "#8b7355" }}>{shop.description}</p>}
+                {shop.description && <p className="text-sm mt-1 max-w-xl truncate" style={{ color: "#8b7355" }}>{shop.description}</p>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={handleFollow} disabled={followLoading} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${following ? "border-2 border-orange-500 text-orange-600 bg-orange-50 hover:bg-orange-100" : "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25"}`}>

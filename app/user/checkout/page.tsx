@@ -469,7 +469,7 @@ export default function CheckoutPage() {
                         )}
                       </div>
                       <div className="grid min-w-0 gap-1">
-                        <p className="line-clamp-2 text-sm font-medium" style={{ color: 'var(--color-text-main)' }}>
+                        <p className="truncate text-sm font-medium" style={{ color: 'var(--color-text-main)' }}>
                           {item.productName}
                         </p>
                         {item.variantName && (
@@ -588,7 +588,7 @@ export default function CheckoutPage() {
                         </div>
                       )}
                     </div>
-                    <span className="line-clamp-1 text-xs text-muted-foreground">
+                    <span className="truncate text-xs text-muted-foreground">
                       x{line.quantity} {line.label}
                     </span>
                   </div>

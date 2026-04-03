@@ -56,7 +56,7 @@ function showAddedToCartToast(productName: string, quantity: number) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-emerald-700">Đã thêm vào giỏ hàng</p>
-            <p className="mt-1 text-xs text-emerald-800 line-clamp-2">
+            <p className="mt-1 text-xs text-emerald-800 truncate">
               +{quantity} {productName}
             </p>
           </div>
@@ -458,7 +458,7 @@ export default function ProductDetailPage() {
               </>
             )}
             <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>chevron_right</span>
-            <span className="text-gray-600 line-clamp-1 max-w-[200px]">{product.name}</span>
+            <span className="text-gray-600 truncate max-w-[200px]">{product.name}</span>
           </nav>
         )}
 
@@ -885,7 +885,7 @@ export default function ProductDetailPage() {
                       </div>
                       <div className="p-3 flex flex-col flex-1">
                         <p className="text-xs text-gray-500 mb-1">{p.shopName}</p>
-                        <h3 className="text-sm mb-1 line-clamp-2 flex-1" style={{ color: "var(--color-text-main)" }}>
+                        <h3 className="text-sm mb-1 truncate flex-1" style={{ color: "var(--color-text-main)" }}>
                           {p.name}
                         </h3>
                         <span className="font-bold text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>

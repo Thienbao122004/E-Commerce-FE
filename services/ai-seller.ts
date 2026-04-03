@@ -20,22 +20,6 @@ async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
   return res.json()
 }
 
-async function aiGet<T>(endpoint: string): Promise<T> {
-  const token = await getAccessToken()
-  const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error((err as { message?: string }).message ?? "AI request failed")
-  }
-  return res.json()
-}
-
 
 export type CategorySuggestion = {
   categoryId: number
@@ -44,15 +28,14 @@ export type CategorySuggestion = {
   confidenceScore: number
 }
 
-/** Format item trong suggested_tags JSONB: {"tag": "vải cotton", "confidence": 0.95} */
-export type TagSuggestionItem = {
-  tag: string
-  confidence: number
+export type TagSuggestion = {
+  tagId: number
+  tagName: string
+  confidence?: number
 }
 
 export type MaterialSuggestion = {
-  /** UUID trong DB; AI đôi khi bỏ trống — UI vẫn chọn được theo tên */
-  materialId?: string | null
+  materialId: string
   materialName: string
   confidence?: number
 }
@@ -63,7 +46,7 @@ export type SuggestCategoryResponse = {
 }
 
 export type SuggestTagsResponse = {
-  suggestions: TagSuggestionItem[]
+  suggestions: TagSuggestion[]
   logId: string | null
 }
 
@@ -82,7 +65,7 @@ export type AnalyzeImageResponse = {
     hasHighResolution: boolean
   }
   suggestedCategories: CategorySuggestion[]
-  suggestedTags: TagSuggestionItem[]
+  suggestedTags: TagSuggestion[]
   suggestedMaterials: MaterialSuggestion[]
   improvements: string[]
   summary: string
@@ -138,21 +121,57 @@ export function aiSuggestMaterials(params: {
 export function aiSendFeedback(params: {
   logId: string
   chosenCategoryId?: number
-  /** Tên các tag đã chọn (khớp format DB: ["vải cotton", "tối giản"]) */
-  chosenTagNames?: string[]
+  chosenTagIds?: number[]
   chosenMaterialIds?: string[]
   action: "accepted" | "rejected" | "modified" | "skipped"
 }) {
   return aiPost<{ success: boolean }>("/api/ai/seller/tag-feedback", {
     logId: params.logId,
     chosenCategoryId: params.chosenCategoryId ?? null,
-    chosenTagNames: params.chosenTagNames ?? [],
+    chosenTagIds: params.chosenTagIds ?? [],
     chosenMaterialIds: params.chosenMaterialIds ?? [],
     action: params.action,
   })
 }
 
-// ── Tag Suggestion Log ─────────────────────────────────────────────
+/** Phan tich anh san pham bang AI vision */
+export function aiAnalyzeImage(params: {
+  imageUrls: string[]
+  productTitle?: string
+  productDescription?: string
+}) {
+  return aiPost<AnalyzeImageResponse>("/api/ai/seller/analyze-image", {
+    imageUrls: params.imageUrls,
+    productTitle: params.productTitle ?? null,
+    productDescription: params.productDescription ?? null,
+  })
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function aiGet<T>(endpoint: string): Promise<T> {
+  const token = await getAccessToken()
+  const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { message?: string }).message ?? "AI request failed")
+  }
+  return res.json()
+}
+
+// ── Tag Suggestion Log ────────────────────────────────────────────────────────
+
+/** Format item trong suggested_tags JSONB: {"tag": "vải cotton", "confidence": 0.95} */
+export type TagSuggestionItem = {
+  tag: string
+  confidence: number
+}
 
 export type TagSuggestionLogItem = {
   id: string
@@ -161,7 +180,7 @@ export type TagSuggestionLogItem = {
   suggestedCategoryId: number | null
   /** AI gợi ý: [{tag: "vải cotton", confidence: 0.95}] */
   suggestedTags: TagSuggestionItem[]
-  /** Seller đã chọn: ["vải cotton", "tối giản"] */
+  /** Seller đã chọn cuối cùng: ["vải cotton", "tối giản"] */
   chosenTags: string[]
   action: "accepted" | "modified" | "rejected"
   createdAt: string
@@ -180,17 +199,4 @@ export function aiGetTagSuggestionLogs(page = 1, pageSize = 20) {
   return aiGet<TagSuggestionLogResponse>(
     `/api/ai/seller/tag-suggestions?page=${page}&pageSize=${pageSize}`
   )
-}
-
-/** Phan tich anh san pham bang AI vision */
-export function aiAnalyzeImage(params: {
-  imageUrls: string[]
-  productTitle?: string
-  productDescription?: string
-}) {
-  return aiPost<AnalyzeImageResponse>("/api/ai/seller/analyze-image", {
-    imageUrls: params.imageUrls,
-    productTitle: params.productTitle ?? null,
-    productDescription: params.productDescription ?? null,
-  })
-}
+}

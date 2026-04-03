@@ -25,7 +25,7 @@ export function ShopProductCard({ product }: ShopProductCardProps) {
         )}
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <p className="text-sm mb-1 line-clamp-2" style={{ color: "#3d2e1f" }}>
+        <p className="text-sm mb-1 truncate" style={{ color: "#3d2e1f" }}>
           {product.name}
         </p>
         <div className="mt-auto pt-3 flex items-end justify-between gap-1">

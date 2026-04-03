@@ -267,7 +267,7 @@ export default function CartPage() {
                 <div className="min-w-0">
                   <Link
                     href={`/product/${item.productId}`}
-                    className="text-sm font-medium line-clamp-2 hover:text-[var(--color-primary)] transition-colors"
+                    className="text-sm font-medium truncate hover:text-[var(--color-primary)] transition-colors"
                     style={{ color: 'var(--color-text-main)' }}
                   >
                     {item.productName}

@@ -537,7 +537,7 @@ export default function LandingPage() {
                           >
                             {product.shopName}
                           </span>
-                          <h3 className="font-bold line-clamp-2 min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
+                          <h3 className="font-bold truncate min-h-[48px] text-sm" style={{ color: "var(--color-text-main)" }}>
                             {product.name}
                           </h3>
                           <div className="flex items-center justify-between mt-1">

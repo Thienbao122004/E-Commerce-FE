@@ -256,7 +256,7 @@ function ReviewItemCard({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium line-clamp-2" style={{ color: 'var(--color-text-main)' }}>
+          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-main)' }}>
             {item.productName}
           </p>
           {item.variantName && (

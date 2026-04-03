@@ -807,7 +807,7 @@ function ChatWidgetInner({
                     </div>
                     {/* Product info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium leading-tight line-clamp-2 text-gray-800 hover:underline">{attachedProduct.name}</p>
+                      <p className="text-[12px] font-medium leading-tight truncate text-gray-800 hover:underline">{attachedProduct.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[12px] font-bold text-red-500">{formatPrice(attachedProduct.price)}</span>
                       </div>
@@ -898,7 +898,7 @@ function ChatWidgetInner({
                     <img src={attachedImage} alt="Ảnh đính kèm" className="size-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium leading-tight line-clamp-1">Ảnh đính kèm</p>
+                    <p className="text-[11px] font-medium leading-tight truncate">Ảnh đính kèm</p>
                     <p className="text-[10px] text-gray-400">Sẽ gửi cùng tin nhắn</p>
                   </div>
                   <button
@@ -1157,7 +1157,7 @@ function ProductPickerModal({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium line-clamp-2 leading-tight text-gray-700 group-hover:text-gray-900">{p.name}</p>
+                    <p className="text-[12px] font-medium truncate leading-tight text-gray-700 group-hover:text-gray-900">{p.name}</p>
                     <p className="text-[12px] font-bold text-red-500 mt-1">
                       {formatPrice(p.basePrice)}
                     </p>

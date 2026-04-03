@@ -129,9 +129,9 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                     <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
                     <TableCell>
                       <div className="max-w-[200px]">
-                        <p className="font-medium">{product.name}</p>
+                        <p className="font-medium truncate">{product.name}</p>
                         {product.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{product.description}</p>
                         )}
                       </div>
                     </TableCell>

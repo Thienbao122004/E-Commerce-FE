@@ -523,7 +523,7 @@ function SearchPageContent() {
                         </div>
                         <div className="p-3 flex flex-col flex-1">
                           <p className="text-[11px] text-gray-400 truncate mb-1">{product.shopName}</p>
-                          <h3 className="text-sm line-clamp-2 flex-1" style={{ color: "var(--color-text-main)" }}>
+                          <h3 className="text-sm truncate flex-1" style={{ color: "var(--color-text-main)" }}>
                             {product.name}
                           </h3>
                           <div className="mt-2 flex items-end justify-between gap-1">

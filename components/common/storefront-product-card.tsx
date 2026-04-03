@@ -53,7 +53,7 @@ export function StorefrontProductCard({
         </button>
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="text-sm mb-1 line-clamp-2" style={{ color: "var(--color-text-main)" }}>
+        <h3 className="text-sm mb-1 truncate" style={{ color: "var(--color-text-main)" }}>
           {product.name}
         </h3>
         <div className="mt-auto pt-3 flex items-end justify-between gap-1">

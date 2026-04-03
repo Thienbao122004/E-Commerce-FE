@@ -158,7 +158,7 @@ export function SectionCards({ stats, loading }: Props) {
             </CardAction>
           </CardHeader>
           <CardFooter className="flex-col items-start gap-1.5 text-sm">
-            <div className="line-clamp-1 flex gap-2 font-medium">
+            <div className="truncate flex gap-2 font-medium">
               {card.footer}
             </div>
             <div className="text-muted-foreground">{card.sub}</div>

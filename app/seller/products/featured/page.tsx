@@ -91,7 +91,7 @@ export default function FeaturedProductsPage() {
                         #{i + 1}
                       </Badge>
                     </div>
-                    <CardTitle className="text-base line-clamp-1">
+                    <CardTitle className="text-base truncate">
                       {product.name}
                     </CardTitle>
                     <CardDescription className="space-y-1">

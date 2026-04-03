@@ -122,7 +122,7 @@ export default function InventoryPage() {
                       <TableCell>
                         <Link
                           href={`/admin/dashboard/products/${product.id}`}
-                          className="font-medium hover:underline line-clamp-1 max-w-[200px]"
+                          className="font-medium hover:underline truncate max-w-[200px]"
                         >
                           {product.name}
                         </Link>
