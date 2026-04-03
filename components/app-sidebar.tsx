@@ -159,8 +159,8 @@ const SELLERS_ITEMS = [
 ]
 
 const NAV_SECONDARY = [
-  { title: "Hỗ trợ", url: "#", icon: IconHelp },
-  { title: "Tìm kiếm", url: "#", icon: IconSearch },
+  { title: "Hỗ trợ", url: "/dashboard/support", icon: IconHelp },
+  { title: "Tìm kiếm", url: "/dashboard/search", icon: IconSearch },
 ]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -198,7 +198,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const basePath = role === 'admin' ? '/admin' : (role === 'seller' ? '/seller' : '')
     return {
       ...item,
-      url: item.url.startsWith('/dashboard') ? `${basePath}${item.url}` : item.url,
+      url: prefixUrl(item.url, basePath),
     }
   })
 

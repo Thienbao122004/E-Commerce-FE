@@ -7,6 +7,7 @@ import { ordersService, type OrderSummary } from '@/services/orders'
 import { usePurchaseOrders } from '@/hooks/use-purchase-orders'
 import { cartService } from '@/services/cart'
 import { paymentsService } from '@/services/payments'
+import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { toast } from 'sonner'
 import { MessageCircle, RotateCcw, Store, StoreIcon, Wallet } from 'lucide-react'
 
@@ -49,14 +50,6 @@ const STATUS_COLORS: Record<number, string> = {
 
 const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
 const PAGE_SIZE = 10
-
-function formatPrice(value: number) {
-  return value.toLocaleString('vi-VN') + 'đ'
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
 
 export default function PurchasePage() {
   const router = useRouter()

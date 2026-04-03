@@ -1,31 +1,23 @@
 "use client"
 
 import * as React from "react"
+import {
+  formatDateTimeVN,
+  formatPriceVND,
+  isoDateDaysAgo,
+  isoDateToday,
+} from "@/lib/formatters"
 
-export const fmtVND = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
+export const fmtVND = (v: number) => formatPriceVND(v)
 
-export const fmtDateTime = (s: string) =>
-  new Date(s).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+export const fmtDateTime = (s: string) => formatDateTimeVN(s)
 
 export function today() {
-  return new Date().toISOString().slice(0, 10)
+  return isoDateToday()
 }
 
 export function daysAgo(n: number) {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
+  return isoDateDaysAgo(n)
 }
 
 export const METRIC_OPTIONS = [

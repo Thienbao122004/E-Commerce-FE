@@ -1,6 +1,4 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
-
-
 export interface ShopPublicDto {
   id: string
   name: string
@@ -41,10 +39,46 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export function getShopBySlug(slug: string, token?: string): Promise<ShopPublicDetailResponse> {
+function normalizeShopDto(input: unknown): ShopPublicDto | undefined {
+  if (!input || typeof input !== "object") return undefined
+  const raw = input as Record<string, unknown>
+  const normalizedKeyMap = Object.fromEntries(
+    Object.keys(raw).map((key) => [key.toLowerCase().replace(/[_-]/g, ""), key])
+  )
+  const pick = (...aliases: string[]): unknown => {
+    for (const alias of aliases) {
+      const key = normalizedKeyMap[alias.toLowerCase().replace(/[_-]/g, "")]
+      if (key && raw[key] !== undefined) return raw[key]
+    }
+    return undefined
+  }
+
+  return {
+    id: String(pick("id") ?? ""),
+    name: String(pick("name") ?? ""),
+    slug: String(pick("slug") ?? ""),
+    description: (pick("description") as string | null | undefined) ?? null,
+    logoUrl: (pick("logoUrl", "logo_url") as string | null | undefined) ?? null,
+    coverUrl: (pick("coverUrl", "cover_url") as string | null | undefined) ?? null,
+    productCount: Number(pick("productCount", "product_count") ?? 0),
+    followerCount: Number(pick("followerCount", "follower_count") ?? 0),
+    averageRating: Number(pick("averageRating", "average_rating") ?? 0),
+    reviewCount: Number(pick("reviewCount", "review_count") ?? 0),
+    createdAt: String(pick("createdAt", "createAt", "created_at") ?? ""),
+    isFollowing: Boolean(pick("isFollowing", "is_following") ?? false),
+  }
+}
+
+export async function getShopBySlug(slug: string, token?: string): Promise<ShopPublicDetailResponse> {
   const headers: Record<string, string> = {}
   if (token) headers["Authorization"] = `Bearer ${token}`
-  return fetchJson<ShopPublicDetailResponse>(`/api/shops/${slug}`, { headers })
+  const raw = await fetchJson<ShopPublicDetailResponse>(`/api/shops/${slug}`, { headers })
+  if (!raw.shop) return raw
+
+  return {
+    ...raw,
+    shop: normalizeShopDto(raw.shop),
+  }
 }
 
 export function getShopProducts(

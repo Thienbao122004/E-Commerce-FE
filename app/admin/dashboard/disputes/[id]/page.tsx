@@ -20,9 +20,7 @@ import { supabase } from "@/lib/supabase"
 import { fetchDisputeById, approveRefund, rejectDispute } from "@/services/disputes"
 import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
-
-const currency = (v: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-const fmtDate = (t: string) => new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
 export default function DisputeDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -121,20 +119,20 @@ export default function DisputeDetailPage() {
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Số tiền yêu cầu</span>
-                      <span className="text-sm font-bold text-orange-600 tabular-nums">{currency(dispute.requestedAmount)}</span>
+                      <span className="text-sm font-bold text-orange-600 tabular-nums">{formatPriceVND(dispute.requestedAmount)}</span>
                     </div>
                     {dispute.approvedAmount !== null && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Số tiền duyệt</span>
-                        <span className="text-sm font-bold text-green-600 tabular-nums">{currency(dispute.approvedAmount)}</span>
+                        <span className="text-sm font-bold text-green-600 tabular-nums">{formatPriceVND(dispute.approvedAmount)}</span>
                       </div>
                     )}
                     <Separator />
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Ngày tạo</span><span className="tabular-nums">{fmtDate(dispute.createdAt)}</span>
+                      <span>Ngày tạo</span><span className="tabular-nums">{formatDateTimeVN(dispute.createdAt)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>Cập nhật</span><span className="tabular-nums">{fmtDate(dispute.updatedAt)}</span>
+                      <span>Cập nhật</span><span className="tabular-nums">{formatDateTimeVN(dispute.updatedAt)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -199,7 +197,7 @@ export default function DisputeDetailPage() {
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Số tiền duyệt</label>
                 <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                <p className="text-xs text-muted-foreground mt-1">Yêu cầu: {dispute ? currency(dispute.requestedAmount) : ""}</p>
+                <p className="text-xs text-muted-foreground mt-1">Yêu cầu: {dispute ? formatPriceVND(dispute.requestedAmount) : ""}</p>
                 {amount && Number(amount) > (dispute?.requestedAmount ?? 0) && (
                   <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>
                 )}

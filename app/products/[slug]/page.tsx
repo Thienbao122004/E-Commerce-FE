@@ -15,21 +15,16 @@ import { useFavorites } from "@/contexts/favorites-context"
 import { cartService } from "@/services/cart"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import dynamic from "next/dynamic"
 import { useAuth } from "@/contexts/auth-context"
+import {
+  formatCompactNumber,
+  formatJoinTime,
+  formatPriceVND as formatPrice,
+  formatSoldCount as formatSold,
+} from "@/lib/formatters"
 const CART_UPDATED_EVENT = "cart:updated"
 
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-
-/* ─────────── helpers ─────────── */
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(price)
-}
 
 function parseVariantAttributes(raw?: string | null): Record<string, string> {
   if (!raw) return {}
@@ -49,28 +44,6 @@ function parseVariantAttributes(raw?: string | null): Record<string, string> {
   }
 }
 
-function formatSold(n: number) {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
-}
-
-function formatCompactNumber(n: number) {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace(/\.0$/, "")}M`
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`
-  return String(n)
-}
-
-function formatJoinTime(dateStr?: string | null) {
-  if (!dateStr) return "Đang cập nhật"
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
-  if (years > 0) return `${years} năm trước`
-  const months = Math.floor(diff / (30 * 24 * 60 * 60 * 1000))
-  if (months > 0) return `${months} tháng trước`
-  return "Mới tham gia"
-}
 
 function showAddedToCartToast(productName: string, quantity: number) {
   toast.custom(

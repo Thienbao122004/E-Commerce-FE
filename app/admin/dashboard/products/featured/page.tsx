@@ -29,19 +29,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
 import { supabase } from "@/lib/supabase"
 import { fetchTopProducts } from "@/services/dashboard"
 import type { TopProduct } from "@/types/dashboard"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
-
-const fmt = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(v)
 
 export default function FeaturedProductsPage() {
   const [products, setProducts] = React.useState<TopProduct[]>([])

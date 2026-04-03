@@ -15,10 +15,8 @@ import {
   ShopStatus, ShopStatusLabels, ShopStatusColors,
 } from "@/types/seller"
 import type { ShopVerification } from "@/types/seller"
+import { formatDateTimeVN } from "@/lib/formatters"
 import { DocumentCard } from "./document-card"
-
-const fmtDate = (t: string | null) =>
-  t ? new Date(t).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
 
 type DialogType = "approve" | "reject" | "suspend" | "close" | null
 
@@ -172,7 +170,7 @@ export function SellerDetailView({
                   {shop.description && <p className="text-sm text-muted-foreground">{shop.description}</p>}
                   <div className="text-sm">
                     <span className="text-muted-foreground">Ngày đăng ký: </span>
-                    <span className="tabular-nums">{fmtDate(shop.createdAt)}</span>
+                    <span className="tabular-nums">{formatDateTimeVN(shop.createdAt, "—")}</span>
                   </div>
                 </div>
 
@@ -210,7 +208,7 @@ export function SellerDetailView({
                     )}
                     {shop.verifiedByName && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Duyệt bởi: {shop.verifiedByName} · {fmtDate(shop.verifiedAt ?? null)}
+                        Duyệt bởi: {shop.verifiedByName} · {formatDateTimeVN(shop.verifiedAt ?? null, "—")}
                       </div>
                     )}
                   </div>

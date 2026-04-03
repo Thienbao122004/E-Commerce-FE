@@ -14,18 +14,9 @@ import {
   IconCircleX,
 } from "@tabler/icons-react"
 import type { WithdrawalRecord } from "@/types/seller-dashboard"
+import { formatDateTimeVN, formatPriceVND as currency } from "@/lib/formatters"
 
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
-
-const formatDateTime = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+const formatDateTime = (ts: string) => formatDateTimeVN(ts)
 
 const STATUS_MAP: Record<number, { label: string; icon: React.ElementType; cls: string; dotCls: string }> = {
   0: {

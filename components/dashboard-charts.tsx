@@ -23,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { formatPriceVND as currency } from "@/lib/formatters"
 import type { DashboardStats } from "@/types/dashboard"
 
 ChartJS.register(
@@ -49,13 +50,6 @@ export function DashboardCharts({ stats }: Props) {
   }, [stats])
 
   if (!stats) return null
-
-  const currency = (value: number) =>
-    new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value)
 
   const pf = stats.platformFees
 

@@ -14,11 +14,9 @@ import TablePagination from "@/components/common/table-pagination"
 import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import { useTableData } from "@/hooks/use-table-data"
+import { formatPriceVND as currency } from "@/lib/formatters"
 
 const PAGE_SIZE = 10
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
 
 const orderStatusColors: Record<number, string> = {
   [OrderStatus.Pending]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",

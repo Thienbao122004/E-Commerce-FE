@@ -4,6 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import Link from "next/link"
+import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
+import { ShopProductCard } from "@/components/common/shop-product-card"
+import {
+  formatCompactNumber as formatNumber,
+  formatJoinTime,
+} from "@/lib/formatters"
 import {
   getShopBySlug,
   getShopProducts,
@@ -23,32 +29,9 @@ import {
   IconPackage,
   IconUsers,
   IconCalendar,
-  IconChevronLeft,
   IconChevronDown,
-  IconShoppingCart,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
-function formatNumber(n: number): string {
-  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M"
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k"
-  return n.toString()
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const years = Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000))
-  if (years > 0) return `${years} Năm Trước`
-  const months = Math.floor(diff / (30 * 24 * 60 * 60 * 1000))
-  if (months > 0) return `${months} Tháng Trước`
-  return "Mới tham gia"
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price)
-}
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Mới Nhất" },
@@ -81,7 +64,6 @@ export default function ShopDetailPage() {
   const moreRef = useRef<HTMLDivElement>(null)
   const pageSize = 20
 
-  // ── Close dropdown on click outside ──────────────────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) setShowMoreCats(false)
@@ -90,7 +72,6 @@ export default function ShopDetailPage() {
     return () => document.removeEventListener("mousedown", handler)
   }, [])
 
-  // ── Load shop detail ──────────────────────────────────────────────────
   useEffect(() => {
     if (!slug) return
     setLoading(true)
@@ -105,7 +86,6 @@ export default function ShopDetailPage() {
       .finally(() => setLoading(false))
   }, [slug, token])
 
-  // ── Load categories ───────────────────────────────────────────────────
   useEffect(() => {
     if (!shop) return
     getShopCategories(shop.id).then((res) => {
@@ -113,7 +93,6 @@ export default function ShopDetailPage() {
     }).catch(() => {})
   }, [shop])
 
-  // ── Load shop products ────────────────────────────────────────────────
   const loadProducts = useCallback(async () => {
     if (!shop) return
     setLoadingProducts(true)
@@ -132,7 +111,6 @@ export default function ShopDetailPage() {
     loadProducts()
   }, [loadProducts])
 
-  // ── Follow / Unfollow ─────────────────────────────────────────────────
   const handleFollow = async () => {
     if (!token || !shop) { router.push("/login"); return }
     setFollowLoading(true)
@@ -152,7 +130,6 @@ export default function ShopDetailPage() {
     finally { setFollowLoading(false) }
   }
 
-  // ── Chat ──────────────────────────────────────────────────────────────
   const handleChat = () => {
     if (!token || !shop) { router.push("/login"); return }
     window.dispatchEvent(new CustomEvent("open-chat-widget", { detail: { shopId: shop.id } }))
@@ -168,7 +145,6 @@ export default function ShopDetailPage() {
   const visibleCats = categories.slice(0, MAX_VISIBLE_CATS)
   const overflowCats = categories.slice(MAX_VISIBLE_CATS)
 
-  // ── Loading ───────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f8f7f6" }}>
@@ -188,23 +164,9 @@ export default function ShopDetailPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#f8f7f6" }}>
-      {/* ── Header ────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 w-full border-b backdrop-blur-sm" style={{ backgroundColor: "rgba(248,247,246,0.96)", borderColor: "#e5ded6" }}>
-        <div className="max-w-[1200px] mx-auto px-4 md:px-10 py-3 flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-1.5 rounded-lg hover:bg-[#f0ebe4] transition-colors">
-            <IconChevronLeft className="size-5" style={{ color: "#3d2e1f" }} />
-          </button>
-          <Link href="/" className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-3xl" style={{ color: "#b8860b" }}>local_florist</span>
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: "#3d2e1f" }}>EcomViet</h1>
-          </Link>
-          <span className="text-sm" style={{ color: "#8b7355" }}>/ {shop.name}</span>
-        </div>
-      </header>
-
-      {/* ── Shop Banner ───────────────────────────────────────────────── */}
+      <MainStorefrontHeader/>
       <div className="max-w-[1200px] mx-auto px-4 md:px-10 mt-4">
-        <div className="relative rounded-2xl overflow-hidden shadow-lg" style={{ backgroundColor: "#fff" }}>
+        <div className="relative rounded overflow-hidden" style={{ backgroundColor: "#fff" }}>
           <div
             className="h-40 md:h-56 w-full bg-gradient-to-br from-orange-400 via-orange-500 to-red-500 relative"
             style={shop.coverUrl ? { backgroundImage: `url(${shop.coverUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : {}}
@@ -243,18 +205,18 @@ export default function ShopDetailPage() {
               <StatCard icon={<IconPackage className="size-4" />} label="Sản Phẩm" value={formatNumber(shop.productCount)} />
               <StatCard icon={<IconUsers className="size-4" />} label="Người Theo Dõi" value={formatNumber(shop.followerCount)} />
               <StatCard icon={<IconStarFilled className="size-4 text-amber-500" />} label="Đánh Giá" value={`${shop.averageRating} (${formatNumber(shop.reviewCount)})`} />
-              <StatCard icon={<IconCalendar className="size-4" />} label="Tham Gia" value={formatDate(shop.createdAt)} />
+              <StatCard
+                icon={<IconCalendar className="size-4" />}
+                label="Tham Gia"
+                value={formatJoinTime(shop.createdAt, { unknownLabel: "Chưa cập nhật", textCase: "title" })}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Products Section ──────────────────────────────────────────── */}
-      <div className="max-w-[1200px] mx-auto px-4 md:px-10 mt-6 pb-12">
-
-        {/* ── Category Tabs + Sort ─────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-3 rounded-xl mb-4 shadow-sm gap-4" style={{ backgroundColor: "#fff", border: "1px solid #e5ded6" }}>
-          {/* Category tabs */}
+      <div className="max-w-[1200px] mx-auto px-4 md:px-10 pb-12">
+        <div className="flex items-center justify-between px-5 py-3 rounded mb-4 gap-4" style={{ backgroundColor: "#fff" }}>
           <div className="flex items-center gap-1 flex-wrap min-w-0">
             <button
               onClick={() => selectCategory(null)}
@@ -300,7 +262,6 @@ export default function ShopDetailPage() {
               </div>
             )}
           </div>
-          {/* Sort buttons */}
           <div className="flex items-center gap-1 shrink-0">
             {SORT_OPTIONS.map((opt) => (
               <button
@@ -315,7 +276,6 @@ export default function ShopDetailPage() {
           </div>
         </div>
 
-        {/* Product Grid */}
         {loadingProducts ? (
           <div className="flex items-center justify-center h-64">
             <IconLoader2 className="size-6 animate-spin text-orange-500" />
@@ -329,31 +289,10 @@ export default function ShopDetailPage() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {products.map((product) => (
-                <Link
+                <ShopProductCard
                   key={product.id}
-                  href={`/products/${product.slug || product.id}`}
-                  className="group rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
-                  style={{ backgroundColor: "#fff", border: "1px solid #e5ded6" }}
-                >
-                  <div className="aspect-square relative overflow-hidden" style={{ backgroundColor: "#f0ebe4" }}>
-                    {product.imageUrls?.[0] ? (
-                      <img src={product.imageUrls[0]} alt={product.name} className="size-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <div className="size-full flex items-center justify-center">
-                        <IconShoppingCart className="size-10 opacity-20" style={{ color: "#8b7355" }} />
-                      </div>
-                    )}
-                    {product.soldCount > 0 && (
-                      <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-black/60 text-white backdrop-blur-sm">
-                        Đã bán {formatNumber(product.soldCount)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="text-xs line-clamp-2 font-medium leading-relaxed" style={{ color: "#3d2e1f" }}>{product.name}</p>
-                    <p className="mt-2 text-sm font-bold text-orange-600">{formatPrice(product.basePrice)}</p>
-                  </div>
-                </Link>
+                  product={product}
+                />
               ))}
             </div>
 

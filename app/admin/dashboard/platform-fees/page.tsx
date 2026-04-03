@@ -26,18 +26,7 @@ import {
 } from "@/services/admin-platform-fees"
 import type { PlatformFeeRecordRow, PlatformFeeSummary } from "@/types/admin-platform-fees"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
-
-const fmtMoney = (n: number, c = "VND") =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: c, maximumFractionDigits: 0 }).format(n)
-
-const fmtDt = (iso: string) =>
-  new Date(iso).toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
 function startOfDayUtcIso(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00.000Z")
@@ -168,7 +157,7 @@ export default function AdminPlatformFeesPage() {
                 <CardHeader className="pb-2">
                   <CardDescription>Tổng phí sàn</CardDescription>
                   <CardTitle className="text-xl tabular-nums">
-                    {fmtMoney(summary?.totalFeeAmount ?? 0)}
+                    {formatPriceVND(summary?.totalFeeAmount ?? 0)}
                   </CardTitle>
                 </CardHeader>
               </Card>
@@ -176,7 +165,7 @@ export default function AdminPlatformFeesPage() {
                 <CardHeader className="pb-2">
                   <CardDescription>Tổng tiền hàng (subtotal)</CardDescription>
                   <CardTitle className="text-xl tabular-nums">
-                    {fmtMoney(summary?.totalGrossSubtotal ?? 0)}
+                    {formatPriceVND(summary?.totalGrossSubtotal ?? 0)}
                   </CardTitle>
                 </CardHeader>
               </Card>
@@ -184,7 +173,7 @@ export default function AdminPlatformFeesPage() {
                 <CardHeader className="pb-2">
                   <CardDescription>Đã trả seller (net)</CardDescription>
                   <CardTitle className="text-xl tabular-nums">
-                    {fmtMoney(summary?.totalNetToSeller ?? 0)}
+                    {formatPriceVND(summary?.totalNetToSeller ?? 0)}
                   </CardTitle>
                 </CardHeader>
               </Card>
@@ -236,15 +225,15 @@ export default function AdminPlatformFeesPage() {
                   ) : (
                     records.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="whitespace-nowrap text-sm">{fmtDt(r.createdAt)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">{formatDateTimeVN(r.createdAt)}</TableCell>
                         <TableCell className="max-w-[140px] truncate">{r.shopName ?? "—"}</TableCell>
                         <TableCell className="max-w-[120px] truncate">{r.sellerName ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmtMoney(r.grossSubtotal, r.currency)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatPriceVND(r.grossSubtotal)}</TableCell>
                         <TableCell className="text-right">{r.commissionPercent}%</TableCell>
                         <TableCell className="text-right tabular-nums font-medium text-amber-700 dark:text-amber-400">
-                          {fmtMoney(r.feeAmount, r.currency)}
+                          {formatPriceVND(r.feeAmount)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{fmtMoney(r.netToSeller, r.currency)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatPriceVND(r.netToSeller)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-mono text-xs">
                             {r.orderId.slice(0, 8)}…

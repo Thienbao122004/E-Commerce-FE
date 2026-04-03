@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense, Fragment } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getProducts, type StorefrontProduct } from "@/services/storefront-products"
@@ -8,14 +8,7 @@ import { getCategories, getCategoryById, type StorefrontCategory } from "@/servi
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-
-function formatPrice(price: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(price)
-}
+import { formatPriceVND as formatPrice } from "@/lib/formatters"
 
 function ProductCardSkeleton() {
   return (
@@ -175,6 +168,29 @@ function SearchPageContent() {
     return baseCategories
   }, [activeParentCategory, query, searchCategories, subCategories, baseCategories])
 
+  const selectedCategoryName = useMemo(() => {
+    if (selectedCategory !== undefined) {
+      const selectedSub = subCategories.find((c) => c.id === selectedCategory)
+      if (selectedSub) return selectedSub.name
+
+      const selectedBase = baseCategories.find((c) => c.id === selectedCategory)
+      if (selectedBase) return selectedBase.name
+
+      const selectedSearch = searchCategories.find((c) => c.id === selectedCategory)
+      if (selectedSearch) return selectedSearch.name
+    }
+
+    return activeParentCategory?.name
+  }, [selectedCategory, subCategories, baseCategories, searchCategories, activeParentCategory])
+
+  const breadcrumbCategoryNames = useMemo(() => {
+    if (activeParentCategory && selectedCategoryName && selectedCategoryName !== activeParentCategory.name) {
+      return [activeParentCategory.name, selectedCategoryName]
+    }
+    if (selectedCategoryName) return [selectedCategoryName]
+    return []
+  }, [activeParentCategory, selectedCategoryName])
+
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return
     setPage(newPage)
@@ -250,6 +266,12 @@ function SearchPageContent() {
             <Link href="/" className="hover:text-[var(--color-primary)] transition-colors">Trang chủ</Link>
             <span className="material-symbols-outlined text-sm">chevron_right</span>
             <span style={{ color: "var(--color-text-main)" }}>Tìm kiếm</span>
+            {breadcrumbCategoryNames.map((name, idx) => (
+              <Fragment key={`${name}-${idx}`}>
+                <span className="material-symbols-outlined text-sm">chevron_right</span>
+                <span style={{ color: "var(--color-text-main)" }}>{name}</span>
+              </Fragment>
+            ))}
           </div>
           {query && (
             <h2 className="text-xl font-bold" style={{ color: "var(--color-text-main)" }}>

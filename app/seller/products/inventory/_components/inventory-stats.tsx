@@ -8,9 +8,7 @@ import {
 } from "@tabler/icons-react"
 import type { SellerProduct } from "@/types/seller-dashboard"
 import { StatsCard, StatsGrid } from "@/components/common/stats-card"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(v)
+import { formatNumberVN, formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   products: SellerProduct[]
@@ -28,7 +26,7 @@ export function InventoryStats({ products, loading }: Props) {
       <StatsCard
         loading={loading}
         label="Tổng sản phẩm"
-        value={totalProducts.toLocaleString("vi-VN")}
+        value={formatNumberVN(totalProducts)}
         icon={<IconPackage />}
         iconBg="bg-primary/10"
         iconColor="text-primary"

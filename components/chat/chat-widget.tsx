@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import {
+  createChatRealtimeConnection,
+  disposeChatRealtimeConnection,
+  startChatRealtimeConnection,
+  type ChatMessageReceivedPayload,
+} from "@/services/chat-realtime"
+import {
   fetchConversations,
   fetchMessages,
   sendMessage,
@@ -30,6 +36,10 @@ import {
 } from "@tabler/icons-react"
 import { getShopProducts } from "@/services/storefront-shops"
 import type { StorefrontProduct } from "@/services/storefront-products"
+import {
+  formatConversationTimeVN as formatTime,
+  formatPriceVND as formatPrice,
+} from "@/lib/formatters"
 
 
 export interface ChatProductInfo {
@@ -64,21 +74,6 @@ function Avatar({ name, url, size = "sm" }: { name: string; url?: string | null;
   )
 }
 
-function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-  if (diffDays === 1) return "Hôm qua"
-  if (diffDays < 7) return `${diffDays} ngày trước`
-  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(price)
-}
-
 function slugify(value: string): string {
   return value
     .normalize("NFD")
@@ -99,6 +94,19 @@ function getMessagePreview(lastMessage?: MessageDto | null): string {
   if (!lastMessage) return "Chưa có tin nhắn"
   if (lastMessage.messageType === "image") return "[Hình ảnh]"
   return lastMessage.content || "Chưa có tin nhắn"
+}
+
+function dedupeMessagesById(items: MessageDto[]): MessageDto[] {
+  const seen = new Set<string>()
+  const result: MessageDto[] = []
+
+  for (const item of items) {
+    if (seen.has(item.id)) continue
+    seen.add(item.id)
+    result.push(item)
+  }
+
+  return result
 }
 
 // ─── Main Widget ────────────────────────────────────────────────────────────
@@ -127,8 +135,6 @@ export function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const pollConvRef = useRef<ReturnType<typeof setInterval>>(undefined)
-  const pollMsgRef = useRef<ReturnType<typeof setInterval>>(undefined)
   const prevConversationsRef = useRef<ConversationDto[]>([])
   const messageCacheRef = useRef<Record<string, MessageDto[]>>({})
 
@@ -147,10 +153,12 @@ export function ChatWidget() {
 
       const cached = messageCacheRef.current[conv.id]
       if (cached) {
-        setMessages(cached)
+        const dedupedCached = dedupeMessagesById(cached)
+        messageCacheRef.current[conv.id] = dedupedCached
+        setMessages(dedupedCached)
       } else {
         const detail = await fetchMessages(token, conv.id, 1, 50)
-        const fetchedMessages = detail.messages.reverse()
+        const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
         messageCacheRef.current[conv.id] = fetchedMessages
         setMessages(fetchedMessages)
       }
@@ -269,8 +277,6 @@ export function ChatWidget() {
             setSending={setSending}
             messagesEndRef={messagesEndRef}
             inputRef={inputRef}
-            pollConvRef={pollConvRef}
-            pollMsgRef={pollMsgRef}
             totalUnread={totalUnread}
             onClose={() => setOpen(false)}
             onCollapseToList={() => {
@@ -279,7 +285,6 @@ export function ChatWidget() {
               setMessages([])
               setAttachedProduct(null)
               setAttachedImage(null)
-              clearInterval(pollMsgRef.current)
             }}
             onHide={() => setOpen(false)}
             attachedProduct={attachedProduct}
@@ -307,7 +312,7 @@ type InnerProps = {
   conversations: ConversationDto[]
   setConversations: React.Dispatch<React.SetStateAction<ConversationDto[]>>
   activeConv: ConversationDto | null
-  setActiveConv: (c: ConversationDto | null) => void
+  setActiveConv: React.Dispatch<React.SetStateAction<ConversationDto | null>>
   messages: MessageDto[]
   setMessages: React.Dispatch<React.SetStateAction<MessageDto[]>>
   message: string
@@ -322,8 +327,6 @@ type InnerProps = {
   setSending: (v: boolean) => void
   messagesEndRef: React.RefObject<HTMLDivElement | null>
   inputRef: React.RefObject<HTMLTextAreaElement | null>
-  pollConvRef: React.MutableRefObject<ReturnType<typeof setInterval> | undefined>
-  pollMsgRef: React.MutableRefObject<ReturnType<typeof setInterval> | undefined>
   totalUnread: number
   onClose: () => void
   onCollapseToList: () => void
@@ -349,7 +352,6 @@ function ChatWidgetInner({
   loadingMessages, setLoadingMessages,
   sending, setSending,
   messagesEndRef, inputRef,
-  pollConvRef, pollMsgRef,
   totalUnread, onClose, onCollapseToList, onHide,
   attachedProduct, setAttachedProduct,
   attachedImage, setAttachedImage,
@@ -357,14 +359,13 @@ function ChatWidgetInner({
 }: InnerProps) {
   const shouldBootstrapConversationsRef = useRef(conversations.length === 0)
 
-  // ── Load conversations ──────────────────────────────────────────────
   const loadConversations = useCallback(async (withLoading = false) => {
     if (withLoading) setLoading(true)
     try {
       const data = await fetchConversations(token)
       setConversations(data)
     } catch {
-      // silent
+
     } finally {
       if (withLoading) setLoading(false)
     }
@@ -377,19 +378,14 @@ function ChatWidgetInner({
     } else {
       setLoading(false)
     }
+  }, [loadConversations, setLoading])
 
-    pollConvRef.current = setInterval(() => {
-      void loadConversations(false)
-    }, 10_000)
-
-    return () => clearInterval(pollConvRef.current)
-  }, [loadConversations, pollConvRef, setLoading])
-
-  // ── Load messages ───────────────────────────────────────────────────
   const loadMessages = useCallback(async (convId: string, force = false) => {
     const cached = messageCacheRef.current[convId]
     if (!force && cached) {
-      setMessages(cached)
+      const dedupedCached = dedupeMessagesById(cached)
+      messageCacheRef.current[convId] = dedupedCached
+      setMessages(dedupedCached)
       setLoadingMessages(false)
       await markAsRead(token, convId).catch(() => {})
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, unreadCount: 0 } : c))
@@ -399,7 +395,7 @@ function ChatWidgetInner({
     setLoadingMessages(true)
     try {
       const detail = await fetchMessages(token, convId, 1, 50)
-      const fetchedMessages = detail.messages.reverse()
+      const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
       messageCacheRef.current[convId] = fetchedMessages
       setMessages(fetchedMessages)
       await markAsRead(token, convId).catch(() => {})
@@ -413,27 +409,94 @@ function ChatWidgetInner({
     }
   }, [token, setMessages, setLoadingMessages, setConversations, messageCacheRef])
 
-  // Poll messages
   useEffect(() => {
-    if (!activeConv) return
-    clearInterval(pollMsgRef.current)
-    pollMsgRef.current = setInterval(async () => {
-      try {
-        const detail = await fetchMessages(token, activeConv.id, 1, 50)
-        const polledMessages = detail.messages.reverse()
-        messageCacheRef.current[activeConv.id] = polledMessages
-        setMessages(polledMessages)
-      } catch { /* silent */ }
-    }, 5_000)
-    return () => clearInterval(pollMsgRef.current)
-  }, [activeConv, token, setMessages, pollMsgRef, messageCacheRef])
+    const connection = createChatRealtimeConnection(token, {
+      onConversationUpdated: (incoming: ConversationDto) => {
+      if (!incoming?.id) return
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === incoming.id)
+        const merged = exists
+          ? prev.map((c) => (c.id === incoming.id ? { ...c, ...incoming } : c))
+          : [incoming, ...prev]
 
-  // Scroll to bottom
+        return [...merged].sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ?? a.createdAt
+          const bTime = b.lastMessage?.createdAt ?? b.createdAt
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+      })
+
+      setActiveConv((prev) => (prev?.id === incoming.id ? { ...prev, ...incoming } : prev))
+      },
+      onChatMessageReceived: (payload: ChatMessageReceivedPayload) => {
+      const conversationId = payload?.conversationId
+      const incoming = payload?.message
+      if (!conversationId || !incoming) return
+
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === conversationId)
+        if (!exists) {
+          void loadConversations(false)
+          return prev
+        }
+
+        const updated = prev.map((c) => {
+          if (c.id !== conversationId) return c
+          const nextUnread =
+            activeConv?.id === conversationId || incoming.senderId === currentUserId
+              ? 0
+              : (c.unreadCount ?? 0) + 1
+
+          return {
+            ...c,
+            lastMessage: incoming,
+            unreadCount: nextUnread,
+          }
+        })
+
+        return [...updated].sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ?? a.createdAt
+          const bTime = b.lastMessage?.createdAt ?? b.createdAt
+          return new Date(bTime).getTime() - new Date(aTime).getTime()
+        })
+      })
+
+      const cached = messageCacheRef.current[conversationId] ?? []
+      if (!cached.some((m) => m.id === incoming.id)) {
+        messageCacheRef.current[conversationId] = [...cached, incoming]
+      }
+
+      if (activeConv?.id === conversationId) {
+        setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]))
+      }
+      },
+      onReconnected: () => {
+        void loadConversations(false)
+        if (activeConv?.id) void loadMessages(activeConv.id, true)
+      },
+    })
+
+    void startChatRealtimeConnection(connection)
+
+    return () => {
+      void disposeChatRealtimeConnection(connection)
+    }
+  }, [
+    token,
+    setConversations,
+    setActiveConv,
+    setMessages,
+    activeConv?.id,
+    currentUserId,
+    loadConversations,
+    loadMessages,
+    messageCacheRef,
+  ])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length, messagesEndRef])
 
-  // ── Select conversation ─────────────────────────────────────────────
   const handleSelect = useCallback((conv: ConversationDto) => {
     setActiveConv(conv)
     setView("chat")
@@ -446,10 +509,8 @@ function ChatWidgetInner({
     setMessages([])
     setAttachedProduct(null)
     setAttachedImage(null)
-    clearInterval(pollMsgRef.current)
   }
 
-  // ── Send message ────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!activeConv || sending) return
 
@@ -464,7 +525,11 @@ function ChatWidgetInner({
     try {
       if (content) {
         const textMsg = await sendMessage(token, activeConv.id, content, "text")
-        setMessages((prev) => [...prev, textMsg])
+        setMessages((prev) => (prev.some((m) => m.id === textMsg.id) ? prev : [...prev, textMsg]))
+        const cached = messageCacheRef.current[activeConv.id] ?? []
+        if (!cached.some((m) => m.id === textMsg.id)) {
+          messageCacheRef.current[activeConv.id] = [...cached, textMsg]
+        }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: textMsg } : c)
         )
@@ -472,7 +537,11 @@ function ChatWidgetInner({
 
       if (attachedImage) {
         const imageMsg = await sendMessage(token, activeConv.id, attachedImage, "image")
-        setMessages((prev) => [...prev, imageMsg])
+        setMessages((prev) => (prev.some((m) => m.id === imageMsg.id) ? prev : [...prev, imageMsg]))
+        const cached = messageCacheRef.current[activeConv.id] ?? []
+        if (!cached.some((m) => m.id === imageMsg.id)) {
+          messageCacheRef.current[activeConv.id] = [...cached, imageMsg]
+        }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: imageMsg } : c)
         )
@@ -492,28 +561,20 @@ function ChatWidgetInner({
     return name.toLowerCase().includes(search.toLowerCase())
   })
 
-  // ── Two-panel layout when conversation is active ─────────────────────
   if (activeConv) {
     return (
       <div className="flex flex-col h-full">
-        {/* ── Top Header Bar ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 px-3 py-2 border-b bg-white shrink-0">
           <IconMessage2 className="size-5 text-orange-500" />
           <span className="font-semibold text-sm flex-1 text-gray-800">Chat</span>
-          {/* <button onClick={onHide} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Thu gọn">
-            <IconMinus className="size-4" />
-          </button> */}
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-500" title="Đóng">
             <IconX className="size-4" />
           </button>
         </div>
 
-        {/* ── Two Panel Body ───────────────────────────────────────────── */}
         <div className="flex flex-1 min-h-0">
-          {/* ── Left: Conversation List ──────────────────────────────── */}
           <div className="w-[220px] shrink-0 border-r flex flex-col bg-white">
-            {/* Search */}
-            <div className="px-2.5 py-2 border-b">
+            <div className="px-2.5 py-2.5 border-b">
               <div className="relative">
                 <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
                 <input
@@ -974,7 +1035,7 @@ function ProductPickerModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-medium line-clamp-2 leading-tight text-gray-700 group-hover:text-gray-900">{p.name}</p>
                     <p className="text-[12px] font-bold text-red-500 mt-1">
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(p.basePrice)}
+                      {formatPrice(p.basePrice)}
                     </p>
                   </div>
                   <button

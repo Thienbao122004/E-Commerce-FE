@@ -16,7 +16,6 @@ import {
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -32,6 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 import { supabase } from "@/lib/supabase"
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 import { fetchProductById, hideProduct, unhideProduct, removeProduct } from "@/services/products"
 import {
   ProductStatus,
@@ -39,22 +39,6 @@ import {
   ProductStatusColors,
 } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
-
-const currency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(v)
-
-const formatDate = (ts: string) =>
-  new Date(ts).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>()
@@ -203,7 +187,7 @@ export default function ProductDetailPage() {
                       <div className="flex items-center gap-2">
                         <IconCurrencyDollar className="size-4 text-green-600" />
                         <span className="font-semibold text-lg text-foreground">
-                          {currency(product.basePrice)}
+                          {formatPriceVND(product.basePrice)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -218,11 +202,11 @@ export default function ProductDetailPage() {
                       )}
                       <div className="flex items-center gap-2">
                         <IconCalendar className="size-4" />
-                        <span>Tạo: {formatDate(product.createdAt)}</span>
+                        <span>Tạo: {formatDateTimeVN(product.createdAt)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <IconCalendar className="size-4" />
-                        <span>Cập nhật: {formatDate(product.updatedAt)}</span>
+                        <span>Cập nhật: {formatDateTimeVN(product.updatedAt)}</span>
                       </div>
                     </CardDescription>
                   </CardHeader>
