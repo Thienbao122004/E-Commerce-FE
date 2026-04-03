@@ -8,9 +8,10 @@ type Props = {
   accepted: number
   modified: number
   rejected: number
+  loading?: boolean
 }
 
-export function SuggestionStats({ total, accepted, modified, rejected }: Props) {
+export function SuggestionStats({ total, accepted, modified, rejected, loading }: Props) {
   const acceptanceRate = total > 0 ? Math.round(((accepted + modified) / total) * 100) : 0
 
   return (
