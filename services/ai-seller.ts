@@ -20,6 +20,22 @@ async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
   return res.json()
 }
 
+async function aiGet<T>(endpoint: string): Promise<T> {
+  const token = await getAccessToken()
+  const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as { message?: string }).message ?? "AI request failed")
+  }
+  return res.json()
+}
+
 
 export type CategorySuggestion = {
   categoryId: number
@@ -28,10 +44,10 @@ export type CategorySuggestion = {
   confidenceScore: number
 }
 
-export type TagSuggestion = {
-  tagId: number
-  tagName: string
-  confidence?: number
+/** Format item trong suggested_tags JSONB: {"tag": "vải cotton", "confidence": 0.95} */
+export type TagSuggestionItem = {
+  tag: string
+  confidence: number
 }
 
 export type MaterialSuggestion = {
@@ -46,7 +62,7 @@ export type SuggestCategoryResponse = {
 }
 
 export type SuggestTagsResponse = {
-  suggestions: TagSuggestion[]
+  suggestions: TagSuggestionItem[]
   logId: string | null
 }
 
@@ -65,7 +81,7 @@ export type AnalyzeImageResponse = {
     hasHighResolution: boolean
   }
   suggestedCategories: CategorySuggestion[]
-  suggestedTags: TagSuggestion[]
+  suggestedTags: TagSuggestionItem[]
   suggestedMaterials: MaterialSuggestion[]
   improvements: string[]
   summary: string
@@ -121,17 +137,48 @@ export function aiSuggestMaterials(params: {
 export function aiSendFeedback(params: {
   logId: string
   chosenCategoryId?: number
-  chosenTagIds?: number[]
+  /** Tên các tag đã chọn (khớp format DB: ["vải cotton", "tối giản"]) */
+  chosenTagNames?: string[]
   chosenMaterialIds?: string[]
   action: "accepted" | "rejected" | "modified" | "skipped"
 }) {
   return aiPost<{ success: boolean }>("/api/ai/seller/tag-feedback", {
     logId: params.logId,
     chosenCategoryId: params.chosenCategoryId ?? null,
-    chosenTagIds: params.chosenTagIds ?? [],
+    chosenTagNames: params.chosenTagNames ?? [],
     chosenMaterialIds: params.chosenMaterialIds ?? [],
     action: params.action,
   })
+}
+
+// ── Tag Suggestion Log ─────────────────────────────────────────────
+
+export type TagSuggestionLogItem = {
+  id: string
+  productId: string
+  inputTitle: string | null
+  suggestedCategoryId: number | null
+  /** AI gợi ý: [{tag: "vải cotton", confidence: 0.95}] */
+  suggestedTags: TagSuggestionItem[]
+  /** Seller đã chọn: ["vải cotton", "tối giản"] */
+  chosenTags: string[]
+  action: "accepted" | "modified" | "rejected"
+  createdAt: string
+}
+
+export type TagSuggestionLogResponse = {
+  items: TagSuggestionLogItem[]
+  total: number
+  accepted: number
+  modified: number
+  rejected: number
+}
+
+/** Lấy lịch sử gợi ý tags của seller */
+export function aiGetTagSuggestionLogs(page = 1, pageSize = 20) {
+  return aiGet<TagSuggestionLogResponse>(
+    `/api/ai/seller/tag-suggestions?page=${page}&pageSize=${pageSize}`
+  )
 }
 
 /** Phan tich anh san pham bang AI vision */
