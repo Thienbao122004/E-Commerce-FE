@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { IconSearch, IconX } from "@tabler/icons-react"
@@ -9,13 +8,11 @@ import { useDebounce } from "@/hooks/use-debounce"
 type Props = {
   search: string
   filterRating: string
-  filterReply: string
   onSearchChange: (v: string) => void
   onRatingChange: (v: string) => void
-  onReplyChange: (v: string) => void
 }
 
-export function ReviewFilters({ search, filterRating, filterReply, onSearchChange, onRatingChange, onReplyChange }: Props) {
+export function ReviewFilters({ search, filterRating, onSearchChange, onRatingChange }: Props) {
   const debounced = useDebounce(search)
   const isPending = search !== debounced
 
@@ -36,6 +33,7 @@ export function ReviewFilters({ search, filterRating, filterReply, onSearchChang
         )}
         {!isPending && search && (
           <button
+            type="button"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => onSearchChange("")}
             tabIndex={-1}
@@ -44,29 +42,17 @@ export function ReviewFilters({ search, filterRating, filterReply, onSearchChang
           </button>
         )}
       </div>
-      <div className="flex gap-2">
-        <Select value={filterRating} onValueChange={onRatingChange}>
-          <SelectTrigger className="w-[130px] h-9 text-xs">
-            <SelectValue placeholder="Số sao" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tất cả</SelectItem>
-            {[5, 4, 3, 2, 1].map((s) => (
-              <SelectItem key={s} value={String(s)}>{s} sao</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterReply} onValueChange={onReplyChange}>
-          <SelectTrigger className="w-[145px] h-9 text-xs">
-            <SelectValue placeholder="Trạng thái phản hồi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tất cả</SelectItem>
-            <SelectItem value="replied">Đã phản hồi</SelectItem>
-            <SelectItem value="not_replied">Chưa phản hồi</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Select value={filterRating} onValueChange={onRatingChange}>
+        <SelectTrigger className="w-[130px] h-9 text-xs sm:w-[140px]">
+          <SelectValue placeholder="Số sao" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Tất cả sao</SelectItem>
+          {[5, 4, 3, 2, 1].map((s) => (
+            <SelectItem key={s} value={String(s)}>{s} sao</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }

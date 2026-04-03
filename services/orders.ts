@@ -9,11 +9,14 @@ export interface OrderItem {
   unitPrice: number
   totalPrice: number
   thumbnailUrl?: string
+  /** Từ API: đã có đánh giá sản phẩm (theo user + product, không theo từng đơn). */
+  hasReviewedByUser?: boolean
 }
 
 export interface OrderSummary {
   id: string
   shopId: string
+  shopSlug?: string
   shopName: string
   totalAmount: number
   status: number

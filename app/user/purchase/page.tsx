@@ -8,8 +8,10 @@ import { usePurchaseOrders } from '@/hooks/use-purchase-orders'
 import { cartService } from '@/services/cart'
 import { paymentsService } from '@/services/payments'
 import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
+import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { toast } from 'sonner'
-import { MessageCircle, RotateCcw, Store, StoreIcon, Wallet } from 'lucide-react'
+import { MessageCircle, RotateCcw, Star, Store, StoreIcon, Wallet } from 'lucide-react'
+import ReviewModal from './_components/review-modal'
 
 const STATUS_TABS = [
   { label: 'Tất cả', value: undefined },
@@ -51,6 +53,13 @@ const STATUS_COLORS: Record<number, string> = {
 const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
 const PAGE_SIZE = 10
 
+type PayChannel = 'vnpay' | 'momo'
+
+const PAY_CHANNELS: Array<{ id: PayChannel; label: string; logo: string }> = [
+  { id: 'vnpay', label: 'VNPay', logo: '/vnpay-logo.png' },
+  { id: 'momo', label: 'MoMo', logo: '/momo-logo.png' },
+]
+
 export default function PurchasePage() {
   const router = useRouter()
   const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders()
@@ -59,6 +68,7 @@ export default function PurchasePage() {
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null)
+  const [reviewingOrder, setReviewingOrder] = useState<OrderSummary | null>(null)
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
 
   const handleSearchChange = (value: string) => {
@@ -158,6 +168,7 @@ export default function PurchasePage() {
                 reorderingOrderId={reorderingOrderId}
                 payingOrderId={payingOrderId}
                 onRefresh={invalidateAndRefresh}
+                onReview={(targetOrder) => setReviewingOrder(targetOrder)}
                 onReorder={async (targetOrder) => {
                   setReorderingOrderId(targetOrder.id)
                   let successCount = 0
@@ -184,12 +195,17 @@ export default function PurchasePage() {
                   }
                   setReorderingOrderId(null)
                 }}
-                onPayNow={async (targetOrder) => {
+                onPayNow={async (targetOrder, method) => {
                   setPayingOrderId(targetOrder.id)
+                  const label = method === 'momo' ? 'MoMo' : 'VNPay'
                   try {
-                    const paymentRes = await paymentsService.createVNPayPayment(targetOrder.id)
+                    const payFn =
+                      method === 'momo'
+                        ? paymentsService.createMoMoPayment
+                        : paymentsService.createVNPayPayment
+                    const paymentRes = await payFn(targetOrder.id)
                     if (!paymentRes.success || !paymentRes.paymentUrl) {
-                      toast.error(paymentRes.message || 'Không thể tạo giao dịch VNPay')
+                      toast.error(paymentRes.message || `Không thể tạo giao dịch ${label}`)
                       return
                     }
                     window.location.href = paymentRes.paymentUrl
@@ -199,9 +215,7 @@ export default function PurchasePage() {
                     setPayingOrderId(null)
                   }
                 }}
-                onChatShop={(shopName) => {
-                  toast.message(`Chat trực tiếp với shop "${shopName}"`)
-                }}
+                onChatShop={(o) => openShopChatWithOrderProduct(o)}
               />
             ))}
           </div>
@@ -285,6 +299,14 @@ export default function PurchasePage() {
           )}
         </>
       )}
+
+      {reviewingOrder && (
+        <ReviewModal
+          order={reviewingOrder}
+          onClose={() => setReviewingOrder(null)}
+          onSuccess={invalidateAndRefresh}
+        />
+      )}
     </div>
   )
 }
@@ -292,6 +314,7 @@ export default function PurchasePage() {
 function OrderCard({
   order,
   onRefresh,
+  onReview,
   onReorder,
   onPayNow,
   onChatShop,
@@ -300,13 +323,16 @@ function OrderCard({
 }: {
   order: OrderSummary
   onRefresh: () => void
+  onReview: (order: OrderSummary) => void
   onReorder: (order: OrderSummary) => Promise<void>
-  onPayNow: (order: OrderSummary) => Promise<void>
-  onChatShop: (shopName: string) => void
+  onPayNow: (order: OrderSummary, method: PayChannel) => Promise<void>
+  onChatShop: (order: OrderSummary) => void
   reorderingOrderId: string | null
   payingOrderId: string | null
 }) {
+  const router = useRouter()
   const [confirming, setConfirming] = useState(false)
+  const [payChannel, setPayChannel] = useState<PayChannel>('vnpay')
 
   const handleConfirm = async () => {
     setConfirming(true)
@@ -325,6 +351,9 @@ function OrderCard({
   const canConfirm = order.status === 4
   const canPayNow = order.status === 0
   const canReorder = REORDERABLE_STATUSES.has(order.status)
+  /** Đơn hoàn thành và còn ít nhất một sản phẩm chưa đánh giá (theo DB). */
+  const canReview =
+    order.status === 6 && order.items.some((i) => i.hasReviewedByUser !== true)
   const isReordering = reorderingOrderId === order.id
   const isPaying = payingOrderId === order.id
 
@@ -338,7 +367,7 @@ function OrderCard({
           </span>
           <button
             type="button"
-            onClick={() => onChatShop(order.shopName)}
+            onClick={() => onChatShop(order)}
             className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors hover:bg-[rgba(236,127,19,0.08)]"
             style={{ borderColor: '#d9cec2', color: 'var(--color-primary)' }}
           >
@@ -347,7 +376,14 @@ function OrderCard({
           </button>
           <button
             type="button"
-            onClick={() => toast.message(`Trang chi tiết của shop "${order.shopName}"`)}
+            onClick={() => {
+              const slug = order.shopSlug?.trim()
+              if (!slug) {
+                toast.error('Không tìm thấy đường dẫn shop')
+                return
+              }
+              router.push(`/shop/${encodeURIComponent(slug)}`)
+            }}
             className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition-colors hover:bg-gray-50"
             style={{ borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }}
           >
@@ -403,15 +439,50 @@ function OrderCard({
           </p>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {canPayNow && (
-              <button
-                onClick={() => void onPayNow(order)}
-                disabled={isPaying}
-                className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60 inline-flex items-center gap-1.5"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                <Wallet size={14} />
-                <span>{isPaying ? 'Đang chuyển hướng...' : 'Thanh toán ngay'}</span>
-              </button>
+              <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap hidden sm:inline">
+                    Thanh toán qua
+                  </span>
+                  <div
+                    className="inline-flex rounded-md border p-0.5 gap-0.5"
+                    style={{ borderColor: '#d1c9c0', background: '#faf8f5' }}
+                    role="group"
+                    aria-label="Chọn cổng thanh toán"
+                  >
+                    {PAY_CHANNELS.map((ch) => {
+                      const active = payChannel === ch.id
+                      return (
+                        <button
+                          key={ch.id}
+                          type="button"
+                          onClick={() => setPayChannel(ch.id)}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors"
+                          style={{
+                            background: active ? 'rgba(236,127,19,0.12)' : 'transparent',
+                            color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                            boxShadow: active ? 'inset 0 0 0 1px rgba(236,127,19,0.35)' : undefined,
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={ch.logo} alt="" className="h-4 w-auto object-contain" />
+                          {ch.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onPayNow(order, payChannel)}
+                  disabled={isPaying}
+                  className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60 inline-flex items-center gap-1.5"
+                  style={{ backgroundColor: 'var(--color-primary)' }}
+                >
+                  <Wallet size={14} />
+                  <span>{isPaying ? 'Đang chuyển hướng...' : 'Thanh toán ngay'}</span>
+                </button>
+              </div>
             )}
             {canConfirm && (
               <button
@@ -421,6 +492,16 @@ function OrderCard({
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
                 {confirming ? 'Đang xử lý...' : 'Đã nhận được hàng'}
+              </button>
+            )}
+            {canReview && (
+              <button
+                onClick={() => onReview(order)}
+                className="text-sm px-4 py-1.5 rounded text-white transition-opacity inline-flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                <Star size={14} />
+                <span>Đánh Giá</span>
               </button>
             )}
             {canReorder && (

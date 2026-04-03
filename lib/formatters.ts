@@ -89,6 +89,37 @@ export function formatConversationTimeVN(dateInput?: string | Date | null, fallb
   return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
 }
 
+export function formatChatListTimeVN(dateInput?: string | Date | null, fallback = ""): string {
+  if (!dateInput) return fallback
+
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput
+  if (Number.isNaN(date.getTime())) return fallback
+
+  const d = date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+  const t = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+  return `${d} ${t}`
+}
+
+/** Bong bóng tin nhắn: ngày/tháng (và năm nếu khác năm hiện tại) + giờ. */
+export function formatChatMessageTimeVN(dateInput?: string | Date | null, fallback = ""): string {
+  if (!dateInput) return fallback
+
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput
+  if (Number.isNaN(date.getTime())) return fallback
+
+  const now = new Date()
+  const sameYear = date.getFullYear() === now.getFullYear()
+  const datePart = sameYear
+    ? date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+    : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
+  const t = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+  return `${datePart} · ${t}`
+}
+
 export function formatRelativeTimeVN(dateInput?: string | Date | null, fallback = ""): string {
   if (!dateInput) return fallback
 

@@ -18,12 +18,12 @@ type Props = {
 }
 
 export function OrderStats({ orders, totalCount, loading }: Props) {
-  const pendingCount = orders.filter((o) => o.status === OrderStatus.Pending).length
+  const pendingCount = orders.filter((o) => o.status === OrderStatus.PendingConfirmation).length
   const processingCount = orders.filter(
-    (o) => o.status === OrderStatus.Confirmed || o.status === OrderStatus.Shipping
+    (o) => o.status === OrderStatus.Confirmed || o.status === OrderStatus.Processing || o.status === OrderStatus.Shipping
   ).length
   const totalRevenue = orders
-    .filter((o) => o.status === OrderStatus.Delivered)
+    .filter((o) => o.status === OrderStatus.Completed)
     .reduce((sum, o) => sum + o.totalAmount, 0)
 
   const cards = [

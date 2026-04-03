@@ -81,6 +81,27 @@ export function ReviewList({ reviews, replies, onOpenReply }: Props) {
 
                   <p className="text-sm text-foreground leading-relaxed">{review.comment}</p>
 
+                  {review.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {review.images.map((src, i) => (
+                        <a
+                          key={i}
+                          href={src}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block shrink-0 rounded-md border bg-muted/30 overflow-hidden"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- data URL / URL ngoài */}
+                          <img
+                            src={src}
+                            alt={`Ảnh đánh giá ${i + 1}`}
+                            className="size-20 object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
                   {review.helpful > 0 && (
                     <div className="flex items-center gap-1 mt-2">
                       <IconThumbUp className="size-3 text-muted-foreground" />

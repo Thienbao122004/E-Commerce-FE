@@ -8,12 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 
 const validTransitions: Record<number, number[]> = {
-  [OrderStatus.Pending]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
-  [OrderStatus.Confirmed]: [OrderStatus.Shipping, OrderStatus.Cancelled],
+  [OrderStatus.PendingPayment]: [],
+  [OrderStatus.PendingConfirmation]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
+  [OrderStatus.Confirmed]: [OrderStatus.Processing, OrderStatus.Cancelled],
+  [OrderStatus.Processing]: [OrderStatus.Shipping, OrderStatus.Cancelled],
   [OrderStatus.Shipping]: [OrderStatus.Delivered],
-  [OrderStatus.Delivered]: [],
+  [OrderStatus.Delivered]: [OrderStatus.Completed],
+  [OrderStatus.Completed]: [],
   [OrderStatus.Cancelled]: [],
-  [OrderStatus.Returned]: [],
+  [OrderStatus.Refunded]: [],
 }
 
 type Props = {

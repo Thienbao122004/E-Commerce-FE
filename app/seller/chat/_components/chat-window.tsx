@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { formatTimeVN as formatMessageTime } from "@/lib/formatters"
+import { formatChatMessageTimeVN as formatMessageTime } from "@/lib/formatters"
 import {
   IconCheck,
   IconChecks,

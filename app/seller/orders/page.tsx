@@ -65,10 +65,12 @@ export default function SellerOrdersPage() {
       width: "w-[180px]",
       options: [
         { value: "all", label: "Tất cả trạng thái" },
-        { value: String(OrderStatus.Pending), label: "Chờ xác nhận" },
+        { value: String(OrderStatus.PendingConfirmation), label: "Chờ xác nhận" },
         { value: String(OrderStatus.Confirmed), label: "Đã xác nhận" },
-        { value: String(OrderStatus.Shipping), label: "Đang giao" },
-        { value: String(OrderStatus.Delivered), label: "Đã giao" },
+        { value: String(OrderStatus.Processing), label: "Đang chuẩn bị" },
+        { value: String(OrderStatus.Shipping), label: "Đang giao hàng" },
+        { value: String(OrderStatus.Delivered), label: "Đã giao hàng" },
+        { value: String(OrderStatus.Completed), label: "Hoàn thành" },
         { value: String(OrderStatus.Cancelled), label: "Đã hủy" },
       ],
     },
@@ -81,7 +83,7 @@ export default function SellerOrdersPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4">
+    <div className="flex flex-1 flex-col gap-4 p-4 min-w-0">
       <SetHeaderActions>
         <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
           <IconRefresh className="mr-1.5 size-4" />Làm mới

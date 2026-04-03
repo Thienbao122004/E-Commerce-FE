@@ -64,7 +64,13 @@ type StatusCfg = {
 }
 
 const statusConfig: Record<number, StatusCfg> = {
-  [OrderStatus.Pending]: {
+  [OrderStatus.PendingPayment]: {
+    label: "Chờ thanh toán",
+    dotCls: "bg-amber-500",
+    badgeCls: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+    icon: <IconClock className="size-4" />,
+  },
+  [OrderStatus.PendingConfirmation]: {
     label: "Chờ xác nhận",
     dotCls: "bg-yellow-500",
     badgeCls: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800",
@@ -76,17 +82,29 @@ const statusConfig: Record<number, StatusCfg> = {
     badgeCls: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
     icon: <IconCircleCheck className="size-4" />,
   },
+  [OrderStatus.Processing]: {
+    label: "Đang chuẩn bị",
+    dotCls: "bg-violet-500",
+    badgeCls: "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
+    icon: <IconPackage className="size-4" />,
+  },
   [OrderStatus.Shipping]: {
-    label: "Đang giao",
+    label: "Đang giao hàng",
     dotCls: "bg-cyan-500",
     badgeCls: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-300 dark:border-cyan-800",
     icon: <IconTruck className="size-4" />,
   },
   [OrderStatus.Delivered]: {
-    label: "Đã giao",
+    label: "Đã giao hàng",
     dotCls: "bg-emerald-500",
     badgeCls: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
     icon: <IconCheck className="size-4" />,
+  },
+  [OrderStatus.Completed]: {
+    label: "Hoàn thành",
+    dotCls: "bg-green-500",
+    badgeCls: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+    icon: <IconCircleCheck className="size-4" />,
   },
   [OrderStatus.Cancelled]: {
     label: "Đã hủy",
@@ -94,8 +112,8 @@ const statusConfig: Record<number, StatusCfg> = {
     badgeCls: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",
     icon: <IconX className="size-4" />,
   },
-  [OrderStatus.Returned]: {
-    label: "Trả hàng",
+  [OrderStatus.Refunded]: {
+    label: "Đã hoàn tiền",
     dotCls: "bg-zinc-500",
     badgeCls: "bg-zinc-50 text-zinc-700 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:border-zinc-700",
     icon: <IconPackage className="size-4" />,
@@ -104,17 +122,19 @@ const statusConfig: Record<number, StatusCfg> = {
 
 // ── Status timeline steps ──
 const STATUS_STEPS = [
-  OrderStatus.Pending,
+  OrderStatus.PendingConfirmation,
   OrderStatus.Confirmed,
+  OrderStatus.Processing,
   OrderStatus.Shipping,
   OrderStatus.Delivered,
+  OrderStatus.Completed,
 ]
 
 function StatusTimeline({ currentStatus }: { currentStatus: number }) {
   const isCancelled = currentStatus === OrderStatus.Cancelled
-  const isReturned = currentStatus === OrderStatus.Returned
+  const isRefunded = currentStatus === OrderStatus.Refunded
 
-  if (isCancelled || isReturned) {
+  if (isCancelled || isRefunded) {
     const cfg = statusConfig[currentStatus]
     return (
       <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border ${cfg.badgeCls}`}>

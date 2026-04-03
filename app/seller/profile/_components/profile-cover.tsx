@@ -15,12 +15,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog"
-import {
-  VerificationStatus,
-  VerificationStatusLabels,
-  ShopStatusLabels,
-  ShopStatusColors,
-} from "@/types/seller"
+import { VerificationStatus, VerificationStatusLabels } from "@/types/seller"
 import type { SellerShopInfo } from "@/types/seller-dashboard"
 import {
   IconCamera,
@@ -29,6 +24,9 @@ import {
   IconLoader2,
   IconPhoto,
 } from "@tabler/icons-react"
+import { toast } from "sonner"
+
+const COVER_MAX_FILE_BYTES = 2 * 1024 * 1024
 
 type Props = {
   shop: SellerShopInfo | null
@@ -57,6 +55,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
   const [coverPreviewError, setCoverPreviewError] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const coverFileInputRef = useRef<HTMLInputElement>(null)
 
   const handleOpenLogoDialog = () => {
     setLogoInput(shop?.logoUrl ?? "")
@@ -94,6 +93,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
     setCoverInput(coverUrl)
     setCoverPreview(coverUrl)
     setCoverPreviewError(false)
+    if (coverFileInputRef.current) coverFileInputRef.current.value = ""
     setCoverDialog(true)
   }
 
@@ -101,6 +101,29 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
     setCoverInput(val)
     setCoverPreview(val)
     setCoverPreviewError(false)
+  }
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn file ảnh")
+      e.target.value = ""
+      return
+    }
+    if (file.size > COVER_MAX_FILE_BYTES) {
+      toast.error("Ảnh quá lớn (tối đa 2MB). Vui lòng chọn ảnh nhỏ hơn hoặc dán URL.")
+      e.target.value = ""
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setCoverInput(base64String)
+      setCoverPreview(base64String)
+      setCoverPreviewError(false)
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleSaveCover = () => {
@@ -308,7 +331,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               Cập nhật ảnh bìa
             </DialogTitle>
             <DialogDescription>
-              Dán URL hình ảnh để thay đổi ảnh bìa cửa hàng
+              Tải ảnh từ máy hoặc dán URL — ảnh bìa hiển thị trên trang hồ sơ (lưu trên trình duyệt của bạn).
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -329,11 +352,38 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               )}
             </div>
 
+            <input
+              type="file"
+              ref={coverFileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleCoverFileChange}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => coverFileInputRef.current?.click()}
+              className="w-full sm:w-auto"
+            >
+              <IconPhoto className="mr-2 size-4" />
+              Chọn ảnh từ máy
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Hoặc dùng URL</span>
+              </div>
+            </div>
+
             <div className="grid gap-2">
               <Label className="text-xs font-medium">URL hình ảnh</Label>
               <Input
                 placeholder="https://example.com/cover.jpg"
-                value={coverInput}
+                value={coverInput.startsWith("data:") ? "" : coverInput}
                 onChange={(e) => handleCoverInputChange(e.target.value)}
                 className="text-sm"
               />
@@ -341,7 +391,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
                 <p className="text-xs text-red-500">URL hình ảnh không hợp lệ hoặc không tải được</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Khuyến nghị: ảnh ngang tỉ lệ 3:1 (ví dụ 1200×400px)
+                Khuyến nghị: ảnh ngang tỉ lệ 3:1 (ví dụ 1200×400px). Ảnh từ máy: tối đa 2MB.
               </p>
             </div>
           </div>

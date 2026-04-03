@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { formatConversationTimeVN as formatTime } from "@/lib/formatters"
+import { formatChatListTimeVN } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { IconDotsVertical, IconMessage2, IconSearch } from "@tabler/icons-react"
 import type { ConversationDto } from "./chat-types"
@@ -108,7 +108,7 @@ export function ConversationList({ conversations, activeId, search, totalUnread,
                     {conv.buyerName}
                   </p>
                   <span className={cn("text-[10px] shrink-0 ml-1", conv.unreadCount > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
-                    {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : ""}
+                    {conv.lastMessage ? formatChatListTimeVN(conv.lastMessage.createdAt) : ""}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-0.5">

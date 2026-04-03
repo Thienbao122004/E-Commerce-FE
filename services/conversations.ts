@@ -27,6 +27,8 @@ export interface ConversationDto {
   lastMessage: MessageDto | null
   unreadCount: number
   createdAt: string
+  /** Từ API: đã tắt thông báo (theo user đang đăng nhập). */
+  isMuted?: boolean
 }
 
 export interface ConversationDetailDto {
@@ -107,4 +109,28 @@ export async function markAsRead(token: string, conversationId: string): Promise
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) throw new Error("Lỗi đánh dấu đã đọc")
+}
+
+export async function setConversationMuted(
+  token: string,
+  conversationId: string,
+  muted: boolean
+): Promise<void> {
+  const res = await fetch(`${API}/api/conversations/${conversationId}/mute`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ muted }),
+  })
+  if (!res.ok) throw new Error("Không cập nhật được thông báo")
+}
+
+export async function hideConversationForUser(token: string, conversationId: string): Promise<void> {
+  const res = await fetch(`${API}/api/conversations/${conversationId}/hide`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Không ẩn được cuộc trò chuyện")
 }

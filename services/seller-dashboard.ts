@@ -16,6 +16,7 @@ import type {
   UpdateSellerOrderStatusPayload,
   WithdrawalsResponse,
   CreateWithdrawalPayload,
+  SellerProductReviewsResponse,
 } from "@/types/seller-dashboard"
 
 // ====== Shop ======
@@ -119,5 +120,26 @@ export function updateMyOrderStatus(orderId: string, dto: UpdateSellerOrderStatu
     `/api/seller/orders/${orderId}/status`,
     dto
   )
+}
+
+// ====== Reviews (product reviews của khách) ======
+
+export function fetchMyProductReviews(
+  page = 1,
+  pageSize = 20,
+  rating?: number,
+  search?: string
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  })
+  if (rating !== undefined && rating !== null && rating >= 1 && rating <= 5) {
+    params.set("rating", String(rating))
+  }
+  if (search && search.trim()) {
+    params.set("search", search.trim())
+  }
+  return api.get<SellerProductReviewsResponse>(`/api/seller/reviews?${params}`)
 }
 

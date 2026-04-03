@@ -116,21 +116,27 @@ export type SellerDashboardStats = {
 
 // ====== Order Status ======
 export const OrderStatus = {
-  Pending: 0,
-  Confirmed: 1,
-  Shipping: 2,
-  Delivered: 3,
-  Cancelled: 4,
-  Returned: 5,
+  PendingPayment: 0,
+  PendingConfirmation: 1,
+  Confirmed: 2,
+  Processing: 3,
+  Shipping: 4,
+  Delivered: 5,
+  Completed: 6,
+  Cancelled: 7,
+  Refunded: 8,
 } as const
 
 export const OrderStatusLabels: Record<number, string> = {
-  [OrderStatus.Pending]: "Chờ xác nhận",
+  [OrderStatus.PendingPayment]: "Chờ thanh toán",
+  [OrderStatus.PendingConfirmation]: "Chờ xác nhận",
   [OrderStatus.Confirmed]: "Đã xác nhận",
-  [OrderStatus.Shipping]: "Đang giao",
-  [OrderStatus.Delivered]: "Đã giao",
+  [OrderStatus.Processing]: "Đang chuẩn bị",
+  [OrderStatus.Shipping]: "Đang giao hàng",
+  [OrderStatus.Delivered]: "Đã giao hàng",
+  [OrderStatus.Completed]: "Hoàn thành",
   [OrderStatus.Cancelled]: "Đã hủy",
-  [OrderStatus.Returned]: "Trả hàng",
+  [OrderStatus.Refunded]: "Đã hoàn tiền",
 }
 
 // ====== Product Status ======
@@ -247,4 +253,34 @@ export type UpdateInventoryPayload = {
 export type UpdateSellerOrderStatusPayload = {
   status: number
   note?: string
+}
+
+// ====== Product reviews (seller) ======
+export type SellerProductReviewItem = {
+  id: string
+  productId: string
+  productName: string
+  productThumbnailUrl: string | null
+  buyerName: string | null
+  rating: number
+  comment: string | null
+  createdAt: string
+  imageUrls: string[]
+}
+
+export type SellerProductReviewsData = {
+  reviews: SellerProductReviewItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+  averageRating: number
+  /** Số lượng theo sao: [5★, 4★, 3★, 2★, 1★] */
+  ratingDistribution: number[]
+  pendingReplyCount: number
+}
+
+export type SellerProductReviewsResponse = {
+  success: boolean
+  data?: SellerProductReviewsData
+  message?: string
 }

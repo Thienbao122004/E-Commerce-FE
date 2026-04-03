@@ -25,6 +25,7 @@ import {
 const CART_UPDATED_EVENT = "cart:updated"
 
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
+import { ProductReviewsSection } from "./_components/product-reviews-section"
 
 function parseVariantAttributes(raw?: string | null): Record<string, string> {
   if (!raw) return {}
@@ -833,48 +834,18 @@ export default function ProductDetailPage() {
           </section>
         )}
 
-        {/* Reviews placeholder */}
+        {/* Đánh giá từ người mua (API công khai) */}
         {!loading && product && (
           <section className="bg-white shadow-sm border border-gray-100 overflow-hidden p-6 md:p-8">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: "var(--color-text-main)" }}>
               <span className="w-1 h-5 rounded-full" style={{ backgroundColor: "var(--color-primary)" }} />
               Đánh giá sản phẩm
             </h2>
-            {product.reviewCount > 0 ? (
-              <div className="flex flex-col sm:flex-row gap-6 items-start">
-                <div className="text-center shrink-0">
-                  <div className="text-5xl font-extrabold" style={{ color: "#f59e0b" }}>
-                    {product.averageRating.toFixed(1)}
-                  </div>
-                  <StarRating rating={product.averageRating} count={0} />
-                  <p className="text-xs text-gray-400 mt-1">{product.reviewCount} đánh giá</p>
-                </div>
-                <Separator orientation="vertical" className="hidden sm:block h-20 bg-gray-100" />
-                <div className="flex-1 flex flex-col justify-center gap-1 w-full">
-                  {[5, 4, 3, 2, 1].map((star) => (
-                    <div key={star} className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{star}</span>
-                      <span className="material-symbols-outlined text-sm" style={{ color: "#f59e0b", fontVariationSettings: "'FILL' 1" }}>star</span>
-                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: star === Math.round(product.averageRating) ? "60%" : star > product.averageRating ? "10%" : "30%",
-                            backgroundColor: "#f59e0b",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="py-8 text-center text-gray-400">
-                <span className="material-symbols-outlined text-4xl block mb-2">rate_review</span>
-                <p className="font-medium">Chưa có đánh giá nào</p>
-                <p className="text-sm mt-1">Hãy là người đầu tiên đánh giá sản phẩm này</p>
-              </div>
-            )}
+            <ProductReviewsSection
+              productId={product.id}
+              averageRating={product.averageRating}
+              reviewCount={product.reviewCount}
+            />
           </section>
         )}
 

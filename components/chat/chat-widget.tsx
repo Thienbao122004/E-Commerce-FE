@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
@@ -16,6 +16,8 @@ import {
   sendMessage,
   markAsRead,
   startOrGetConversation,
+  setConversationMuted,
+  hideConversationForUser,
   type ConversationDto,
   type MessageDto,
 } from "@/services/conversations"
@@ -25,7 +27,6 @@ import {
   IconChevronLeft,
   IconSend,
   IconLoader2,
-  IconMinus,
   IconSearch,
   IconCheck,
   IconChecks,
@@ -33,13 +34,25 @@ import {
   IconShoppingCart,
   IconPhotoPlus,
   IconChevronDown,
+  IconDotsVertical,
+  IconBell,
+  IconBellOff,
+  IconTrash,
 } from "@tabler/icons-react"
 import { getShopProducts } from "@/services/storefront-shops"
 import type { StorefrontProduct } from "@/services/storefront-products"
 import {
-  formatConversationTimeVN as formatTime,
+  formatChatListTimeVN,
+  formatChatMessageTimeVN,
   formatPriceVND as formatPrice,
 } from "@/lib/formatters"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 
 export interface ChatProductInfo {
@@ -138,6 +151,54 @@ export function ChatWidget() {
   const prevConversationsRef = useRef<ConversationDto[]>([])
   const messageCacheRef = useRef<Record<string, MessageDto[]>>({})
 
+  const toggleMuteConversation = useCallback(
+    async (convId: string) => {
+      if (!token) return
+      const current = conversations.find((c) => c.id === convId)
+      const next = !(current?.isMuted ?? false)
+      try {
+        await setConversationMuted(token, convId, next)
+        setConversations((prev) =>
+          prev.map((c) => (c.id === convId ? { ...c, isMuted: next } : c))
+        )
+        setActiveConv((prev) =>
+          prev?.id === convId ? { ...prev, isMuted: next } : prev
+        )
+      } catch {
+        toast.error("Không cập nhật được thông báo")
+      }
+    },
+    [token, conversations, setConversations, setActiveConv]
+  )
+
+  const hideConversationFromList = useCallback(
+    async (convId: string) => {
+      if (!token) return
+      try {
+        await hideConversationForUser(token, convId)
+        setConversations((prev) => prev.filter((c) => c.id !== convId))
+        setActiveConv((prev) => (prev?.id === convId ? null : prev))
+        setView("list")
+        setMessages([])
+        setAttachedProduct(null)
+        setAttachedImage(null)
+        delete messageCacheRef.current[convId]
+        toast.message("Đã ẩn cuộc trò chuyện khỏi danh sách")
+      } catch {
+        toast.error("Không ẩn được cuộc trò chuyện")
+      }
+    },
+    [
+      token,
+      setConversations,
+      setActiveConv,
+      setView,
+      setMessages,
+      setAttachedProduct,
+      setAttachedImage,
+    ]
+  )
+
   const openChatByShop = useCallback(async (shopId: string, product?: ChatProductInfo) => {
     if (!token || !shopId) return
 
@@ -208,6 +269,8 @@ export function ChatWidget() {
 
       if (!hasNewUnread || !isIncoming || isCurrentlyViewing) continue
 
+      if (conv.isMuted) continue
+
       const senderName = conv.shopName || conv.buyerName || "Tin nhắn mới"
       const preview = lastMessage?.messageType === "image"
         ? "Da gui mot hinh anh"
@@ -226,10 +289,13 @@ export function ChatWidget() {
     prevConversationsRef.current = conversations
   }, [conversations, currentUserId, open, activeConv?.id])
 
+  const totalUnread = useMemo(
+    () => conversations.reduce((s, c) => s + c.unreadCount, 0),
+    [conversations]
+  )
+
   // Don't render if not logged in or still loading
   if (authLoading || !token) return null
-
-  const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0)
 
   return (
     <>
@@ -295,6 +361,8 @@ export function ChatWidget() {
             setShowProductPicker={setShowProductPicker}
             imageInputRef={imageInputRef}
             messageCacheRef={messageCacheRef}
+            onToggleMute={toggleMuteConversation}
+            onHideConversation={hideConversationFromList}
           />
         </div>
       )}
@@ -339,6 +407,8 @@ type InnerProps = {
   setShowProductPicker: (v: boolean) => void
   imageInputRef: React.RefObject<HTMLInputElement | null>
   messageCacheRef: React.MutableRefObject<Record<string, MessageDto[]>>
+  onToggleMute: (conversationId: string) => void | Promise<void>
+  onHideConversation: (conversationId: string) => void | Promise<void>
 }
 
 function ChatWidgetInner({
@@ -356,6 +426,8 @@ function ChatWidgetInner({
   attachedProduct, setAttachedProduct,
   attachedImage, setAttachedImage,
   showProductPicker, setShowProductPicker, imageInputRef, messageCacheRef,
+  onToggleMute,
+  onHideConversation,
 }: InnerProps) {
   const shouldBootstrapConversationsRef = useRef(conversations.length === 0)
 
@@ -615,7 +687,7 @@ function ChatWidgetInner({
                             {displayName}
                           </p>
                           <span className={cn("text-[10px] shrink-0 ml-1", conv.unreadCount > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                            {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : ""}
+                            {conv.lastMessage ? formatChatListTimeVN(conv.lastMessage.createdAt) : ""}
                           </span>
                         </div>
                         <div className="flex items-center justify-between mt-0.5">
@@ -652,15 +724,67 @@ function ChatWidgetInner({
                   {activeConv.shopName || activeConv.buyerName}
                 </a>
               </div>
-              <button
-                type="button"
-                onClick={onCollapseToList}
-                className="text-[10px] text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                title="Thu nhỏ"
-              >
-                <IconChevronDown className="size-3" />
-                Thu nhỏ
-              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={onCollapseToList}
+                  className="text-[10px] text-gray-500 hover:text-gray-700 flex items-center gap-1 px-1.5 py-1 rounded-md"
+                  title="Thu nhỏ"
+                >
+                  <IconChevronDown className="size-3" />
+                  Thu nhỏ
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-md hover:bg-gray-200 text-gray-500"
+                      aria-label="Tùy chọn cuộc trò chuyện"
+                    >
+                      <IconDotsVertical className="size-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 z-[10000]">
+                    <DropdownMenuItem
+                      className="text-xs cursor-pointer flex items-center gap-2"
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        void onToggleMute(activeConv.id)
+                      }}
+                    >
+                      {activeConv.isMuted ? (
+                        <>
+                          <IconBell className="size-3.5 shrink-0" />
+                          Bật thông báo
+                        </>
+                      ) : (
+                        <>
+                          <IconBellOff className="size-3.5 shrink-0" />
+                          Tắt thông báo
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-xs text-red-600 focus:text-red-600 cursor-pointer flex items-center gap-2"
+                      onSelect={(e) => {
+                        e.preventDefault()
+                        if (
+                          typeof window !== "undefined" &&
+                          window.confirm(
+                            "Ẩn cuộc trò chuyện khỏi danh sách? Tin nhắn mới từ shop sẽ hiện lại cuộc trò chuyện."
+                          )
+                        ) {
+                          void onHideConversation(activeConv.id)
+                        }
+                      }}
+                    >
+                      <IconTrash className="size-3.5 shrink-0" />
+                      Ẩn khỏi danh sách
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
             {/* ── Product Card (top of chat) ──────────────────────────── */}
@@ -751,7 +875,7 @@ function ChatWidgetInner({
                           )}
                         </div>
                         <div className="flex items-center gap-1 px-0.5">
-                          <span className="text-[9px] text-gray-400">{formatTime(msg.createdAt)}</span>
+                          <span className="text-[9px] text-gray-400">{formatChatMessageTimeVN(msg.createdAt)}</span>
                           {isMe && (
                             msg.isRead
                               ? <IconChecks className="size-3 text-blue-500" />
@@ -919,7 +1043,7 @@ function ChatWidgetInner({
                       {displayName}
                     </p>
                     <span className={cn("text-[10px] shrink-0 ml-1", conv.unreadCount > 0 ? "text-gray-700 font-medium" : "text-gray-400")}>
-                      {conv.lastMessage ? formatTime(conv.lastMessage.createdAt) : ""}
+                      {conv.lastMessage ? formatChatListTimeVN(conv.lastMessage.createdAt) : ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-0.5">

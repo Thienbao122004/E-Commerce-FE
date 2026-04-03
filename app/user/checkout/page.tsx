@@ -280,20 +280,27 @@ export default function CheckoutPage() {
       const orderIds = checkoutRes.data.orderIds ?? []
       sessionStorage.removeItem(CHECKOUT_SELECTED_IDS_KEY)
 
-      if (paymentMethod === 'vnpay') {
+      if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
         if (orderIds.length === 0) {
           toast.success('Đặt hàng thành công')
           router.push('/user/purchase')
           return
         }
 
+        const gatewayLabel = paymentMethod === 'momo' ? 'MoMo' : 'VNPay'
         if (orderIds.length > 1) {
-          toast.info('Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán VNPay cho đơn đầu tiên.')
+          toast.info(
+            `Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán ${gatewayLabel} cho đơn đầu tiên.`
+          )
         }
 
-        const paymentRes = await paymentsService.createVNPayPayment(orderIds[0])
+        const payFn =
+          paymentMethod === 'momo'
+            ? paymentsService.createMoMoPayment
+            : paymentsService.createVNPayPayment
+        const paymentRes = await payFn(orderIds[0])
         if (!paymentRes.success || !paymentRes.paymentUrl) {
-          toast.error(paymentRes.message || 'Không thể tạo giao dịch VNPay')
+          toast.error(paymentRes.message || `Không thể tạo giao dịch ${gatewayLabel}`)
           router.push('/user/purchase')
           return
         }
@@ -301,9 +308,6 @@ export default function CheckoutPage() {
         window.location.href = paymentRes.paymentUrl
         return
       }
-
-      toast.success('Đặt hàng thành công. Đơn hàng đang chờ thanh toán qua MoMo.')
-      router.push('/user/purchase')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Có lỗi xảy ra khi đặt hàng')
     } finally {

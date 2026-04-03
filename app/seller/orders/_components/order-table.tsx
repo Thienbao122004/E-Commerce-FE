@@ -14,14 +14,50 @@ import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
 import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
+import { cn } from "@/lib/utils"
+
+
+const nextStatusAction: Record<
+  number,
+  { label: string; buttonClass: string } | undefined
+> = {
+  [OrderStatus.PendingConfirmation]: {
+    label: "Xác nhận",
+    buttonClass:
+      "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500/40 dark:bg-blue-600 dark:hover:bg-blue-500",
+  },
+  [OrderStatus.Confirmed]: {
+    label: "Chuẩn bị",
+    buttonClass:
+      "bg-violet-600 text-white hover:bg-violet-700 focus-visible:ring-violet-500/40 dark:bg-violet-600 dark:hover:bg-violet-500",
+  },
+  [OrderStatus.Processing]: {
+    label: "Giao hàng",
+    buttonClass:
+      "bg-cyan-600 text-white hover:bg-cyan-700 focus-visible:ring-cyan-500/40 dark:bg-cyan-600 dark:hover:bg-cyan-500",
+  },
+  [OrderStatus.Shipping]: {
+    label: "Đã giao",
+    buttonClass:
+      "bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500/40 dark:bg-green-600 dark:hover:bg-green-500",
+  },
+  [OrderStatus.Delivered]: {
+    label: "Hoàn thành",
+    buttonClass:
+      "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500",
+  },
+}
 
 const statusColors: Record<number, string> = {
-  [OrderStatus.Pending]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  [OrderStatus.PendingPayment]: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  [OrderStatus.PendingConfirmation]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
   [OrderStatus.Confirmed]: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  [OrderStatus.Processing]: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   [OrderStatus.Shipping]: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
   [OrderStatus.Delivered]: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  [OrderStatus.Completed]: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   [OrderStatus.Cancelled]: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-  [OrderStatus.Returned]: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  [OrderStatus.Refunded]: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 }
 
 function TableSkeleton() {
@@ -69,7 +105,7 @@ export function OrderTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader className="bg-muted">
             <TableRow>
@@ -79,8 +115,13 @@ export function OrderTable({
               <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={onSort}>Ngày đặt</SortableTableHead>
               <SortableTableHead sortKey="status" currentSort={sort} onSort={onSort}>Trạng thái</SortableTableHead>
               <SortableTableHead sortKey="totalAmount" currentSort={sort} onSort={onSort}>Tổng tiền</SortableTableHead>
-              <TableHead className="hidden lg:table-cell">Địa chỉ</TableHead>
-              <TableHead className="w-[100px] text-center"></TableHead>
+              <TableHead className="hidden lg:table-cell max-w-[220px]">Địa chỉ</TableHead>
+              <TableHead
+                className="w-[1%] whitespace-nowrap text-center"
+                title="Cập nhật trạng thái nhanh hoặc mở chi tiết đơn"
+              >
+                Thao tác
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,22 +180,51 @@ export function OrderTable({
                     <TableCell className="font-semibold text-sm tabular-nums">
                       {currency(order.totalAmount)}
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <p className="text-sm text-muted-foreground">
+                    <TableCell className="hidden lg:table-cell max-w-[min(220px,22vw)]">
+                      <p className="text-sm text-muted-foreground truncate" title={order.shippingAddress ?? "—"}>
                         {order.shippingAddress ?? "—"}
                       </p>
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-1">
-                        {canUpdate && (
-                          <Button
-                            variant="outline" size="sm" className="h-7 text-xs"
-                            onClick={() => onOpenStatusDialog(order.id, order.status)}
-                          >
-                            Xử lý
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                    <TableCell
+                      className="align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1 sm:justify-center">
+                        {canUpdate && (() => {
+                          const action = nextStatusAction[order.status]
+                          return action ? (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              className={cn(
+                                "h-8 min-w-[5.5rem] border-transparent px-3 text-xs font-medium shadow-sm",
+                                action.buttonClass
+                              )}
+                              title="Mở hộp thoại để xác nhận bước tiếp theo"
+                              onClick={() => onOpenStatusDialog(order.id, order.status)}
+                            >
+                              {action.label}
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 min-w-[5rem] px-3 text-xs"
+                              onClick={() => onOpenStatusDialog(order.id, order.status)}
+                            >
+                              Xử lý
+                            </Button>
+                          )
+                        })()}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0 text-muted-foreground opacity-50 transition-opacity hover:opacity-100 group-hover:opacity-100"
+                          title="Xem chi tiết đơn"
+                          asChild
+                        >
                           <Link href={`/seller/orders/${order.id}`}>
                             <IconExternalLink className="size-3.5" />
                           </Link>
