@@ -9,44 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { IconExternalLink, IconShoppingCart } from "@tabler/icons-react"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import type { SellerOrder } from "@/types/seller-dashboard"
-import { validTransitions } from "./order-status-dialog"
 import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
 import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
-import { cn } from "@/lib/utils"
-
-
-const nextStatusAction: Record<
-  number,
-  { label: string; buttonClass: string } | undefined
-> = {
-  [OrderStatus.PendingConfirmation]: {
-    label: "Xác nhận",
-    buttonClass:
-      "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500/40 dark:bg-blue-600 dark:hover:bg-blue-500",
-  },
-  [OrderStatus.Confirmed]: {
-    label: "Chuẩn bị",
-    buttonClass:
-      "bg-violet-600 text-white hover:bg-violet-700 focus-visible:ring-violet-500/40 dark:bg-violet-600 dark:hover:bg-violet-500",
-  },
-  [OrderStatus.Processing]: {
-    label: "Giao hàng",
-    buttonClass:
-      "bg-cyan-600 text-white hover:bg-cyan-700 focus-visible:ring-cyan-500/40 dark:bg-cyan-600 dark:hover:bg-cyan-500",
-  },
-  [OrderStatus.Shipping]: {
-    label: "Đã giao",
-    buttonClass:
-      "bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500/40 dark:bg-green-600 dark:hover:bg-green-500",
-  },
-  [OrderStatus.Delivered]: {
-    label: "Hoàn thành",
-    buttonClass:
-      "bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500",
-  },
-}
 
 const statusColors: Record<number, string> = {
   [OrderStatus.PendingPayment]: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
@@ -83,7 +49,6 @@ type Props = {
   pageSize: number
   sort: SortConfig | null
   onSort: (key: string) => void
-  onOpenStatusDialog: (orderId: string, currentStatus: number) => void
   onPageChange: (p: number) => void
   onPageSizeChange?: (size: number) => void
 }
@@ -97,7 +62,6 @@ export function OrderTable({
   pageSize,
   sort,
   onSort,
-  onOpenStatusDialog,
   onPageChange,
   onPageSizeChange,
 }: Props) {
@@ -118,7 +82,7 @@ export function OrderTable({
               <TableHead className="hidden lg:table-cell max-w-[220px]">Địa chỉ</TableHead>
               <TableHead
                 className="w-[1%] whitespace-nowrap text-center"
-                title="Cập nhật trạng thái nhanh hoặc mở chi tiết đơn"
+                title="Xem chi tiết đơn"
               >
                 Thao tác
               </TableHead>
@@ -143,7 +107,6 @@ export function OrderTable({
               </TableRow>
             ) : (
               orders.map((order, idx) => {
-                const canUpdate = (validTransitions[order.status] ?? []).length > 0
                 return (
                   <TableRow
                     key={order.id}
@@ -190,34 +153,6 @@ export function OrderTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-end gap-1 sm:justify-center">
-                        {canUpdate && (() => {
-                          const action = nextStatusAction[order.status]
-                          return action ? (
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              className={cn(
-                                "h-8 min-w-[5.5rem] border-transparent px-3 text-xs font-medium shadow-sm",
-                                action.buttonClass
-                              )}
-                              title="Mở hộp thoại để xác nhận bước tiếp theo"
-                              onClick={() => onOpenStatusDialog(order.id, order.status)}
-                            >
-                              {action.label}
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 min-w-[5rem] px-3 text-xs"
-                              onClick={() => onOpenStatusDialog(order.id, order.status)}
-                            >
-                              Xử lý
-                            </Button>
-                          )
-                        })()}
                         <Button
                           variant="ghost"
                           size="icon"
