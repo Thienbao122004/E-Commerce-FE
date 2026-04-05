@@ -247,7 +247,7 @@ export default function CreateProductPage() {
         if (!mounted || !res.success) return
         setManualCategoryRows(flattenCategoryTree(res.tree ?? []))
       } catch {
-        /* non-blocking */
+        
       }
     })()
     return () => {
@@ -452,7 +452,6 @@ export default function CreateProductPage() {
     fetchTagsAndMaterials(cat.categoryId)
   }
 
-  // ── 3. tag-feedback on submit ────────────────────────
   const sendFeedback = async () => {
     const logId = catLogId ?? tagLogId
     if (!logId) return
@@ -465,11 +464,10 @@ export default function CreateProductPage() {
         action: selCategory ? "accepted" : "skipped",
       })
     } catch {
-      // feedback is best-effort
+      
     }
   }
 
-  // ── Submit ───────────────────────────────────────────
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
     await sendFeedback()
@@ -498,6 +496,7 @@ export default function CreateProductPage() {
       currency: "VND",
       imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
       categoryId: selCategory?.categoryId ?? undefined,
+      tagIds: selTagIds.length > 0 ? selTagIds : undefined,
     }
 
     const ok = useVariants
@@ -523,12 +522,10 @@ export default function CreateProductPage() {
         })
 
     if (ok) {
-      toast.success("Tạo sản phẩm thành công!")
       router.push("/seller/products")
     }
   }
 
-  // ── Image helpers ────────────────────────────────────
   const handleFilesSelected = (files: FileList | null) => {
     if (!files) return
     Array.from(files)
@@ -951,7 +948,7 @@ export default function CreateProductPage() {
                   </div>
                 </div>
 
-                {imageAnalyzeResult?.summary && (
+                {!imageAnalyzeLoading && imageAnalyzeResult?.summary && (
                   <div className="rounded-xl border border-[#d4deca] bg-white p-2.5 text-[11px] leading-relaxed text-[#647759]">
                     <span className="font-semibold text-[#44553a]">Phân tích ảnh:</span> {imageAnalyzeResult.summary}
                   </div>
@@ -960,9 +957,11 @@ export default function CreateProductPage() {
                   <SectionLabel
                     icon={IconCategory}
                     badge={
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-[#60794b]">
-                        Độ chính xác: {confidenceText(confidenceBadge)}
-                      </span>
+                      (catLoading || typeof confidenceBadge !== 'number') ? null : (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-[#60794b]">
+                          Độ chính xác: {confidenceText(confidenceBadge)}
+                        </span>
+                      )
                     }
                   >
                     Danh mục
@@ -1013,6 +1012,15 @@ export default function CreateProductPage() {
                           </button>
                         )
                       })}
+
+                      {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
+                        <div
+                          key={`empty-cat-${idx}`}
+                          className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
+                        >
+                          <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                        </div>
+                      ))}
 
                       <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
                         <p className="mb-2 text-[11px] text-[#6d7f62]">

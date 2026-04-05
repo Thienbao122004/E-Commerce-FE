@@ -90,6 +90,7 @@ export type SellerOrder = {
   id: string
   customerId: string
   customerName: string | null
+  customerAvatarUrl?: string | null
   customerPhone: string | null
   totalAmount: number
   status: number
@@ -104,7 +105,6 @@ export type SellerOrdersResponse = {
   message?: string
 }
 
-// ====== Dashboard computed stats ======
 export type SellerDashboardStats = {
   totalRevenue: number
   totalOrders: number
@@ -114,7 +114,6 @@ export type SellerDashboardStats = {
   activeProducts: number
 }
 
-// ====== Order Status ======
 export const OrderStatus = {
   PendingPayment: 0,
   PendingConfirmation: 1,

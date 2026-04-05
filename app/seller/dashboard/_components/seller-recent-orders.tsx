@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDateVN, formatPriceVND as currency } from "@/lib/formatters"
+import { cn } from "@/lib/utils"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { OrderStatusLabels } from "@/types/seller-dashboard"
 
@@ -52,6 +53,28 @@ function timeAgo(dateStr: string): string {
   return formatDateVN(date)
 }
 
+function Avatar({ name, url }: { name: string; url?: string | null }) {
+  const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
+  const color = colors[name.charCodeAt(0) % colors.length]
+  const sizeClass = "size-10 text-sm"
+  const initials = name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase().slice(0, 2)
+
+  return (
+    <div className="relative shrink-0">
+      {url ? (
+        <div className={cn("rounded-full overflow-hidden", sizeClass)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt={name} className="size-full object-cover" />
+        </div>
+      ) : (
+        <div className={cn("rounded-full flex items-center justify-center text-white font-semibold", color, sizeClass)}>
+          {initials || "K"}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SellerRecentOrders({ orders, loading }: Props) {
   const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -62,7 +85,7 @@ export function SellerRecentOrders({ orders, loading }: Props) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Đơn hàng gần đây</CardTitle>
         <a
-          href="/seller/dashboard/orders"
+          href="/seller/orders"
           className="text-sm text-primary hover:underline"
         >
           Xem danh sách
@@ -82,9 +105,10 @@ export function SellerRecentOrders({ orders, loading }: Props) {
                 key={order.id}
                 className="flex items-center gap-4 py-3 transition-colors hover:bg-muted/30 px-1"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
-                  {(order.customerName ?? "K").charAt(0).toUpperCase()}
-                </div>
+                <Avatar
+                  name={order.customerName ?? "Khách hàng"}
+                  url={order.customerAvatarUrl}
+                />
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium">
                     {order.customerName ?? "Khách hàng"}

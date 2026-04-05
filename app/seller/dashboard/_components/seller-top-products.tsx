@@ -28,7 +28,6 @@ function SkeletonRow() {
 }
 
 export function SellerTopProducts({ products, loading }: Props) {
-  // Sort by price * stock as a proxy for best sellers (since we don't have sold count)
   const topProducts = [...products]
     .filter((p) => p.status === 1)
     .sort((a, b) => b.basePrice - a.basePrice)
@@ -38,12 +37,6 @@ export function SellerTopProducts({ products, loading }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Sản phẩm bán chạy nhất</CardTitle>
-        <a
-          href="/seller/dashboard/products"
-          className="text-sm text-primary hover:underline"
-        >
-          Xem tất cả
-        </a>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -54,19 +47,12 @@ export function SellerTopProducts({ products, loading }: Props) {
           </div>
         ) : topProducts.length > 0 ? (
           <>
-            {/* Header */}
-            <div className="flex items-center gap-4 pb-2 text-xs font-medium text-muted-foreground uppercase">
-              <span className="flex-1">Sản phẩm</span>
-              <span className="w-16 text-right">Tồn kho</span>
-              <span className="w-28 text-right">Giá</span>
-            </div>
             <div className="divide-y">
               {topProducts.map((product) => (
                 <div
                   key={product.id}
-                  className="flex items-center gap-4 py-3 transition-colors hover:bg-muted/30 rounded-lg px-1"
+                  className="flex items-center gap-4 py-3 px-1"
                 >
-                  {/* Product image */}
                   <div className="size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
                     {product.images && product.images.length > 0 ? (
                       <img
@@ -80,16 +66,13 @@ export function SellerTopProducts({ products, loading }: Props) {
                       </div>
                     )}
                   </div>
-                  {/* Name */}
                   <span className="flex-1 truncate text-sm font-medium">
                     {product.name}
                   </span>
-                  {/* Stock */}
-                  <span className="w-16 text-right text-sm text-muted-foreground">
+                  <span className="w-16 text-center text-sm text-muted-foreground">
                     {product.totalStock ?? 0}
                   </span>
-                  {/* Price */}
-                  <span className="w-28 text-right text-sm font-semibold text-primary">
+                  <span className="w-28 text-center text-sm font-semibold text-primary">
                     {currency(product.basePrice)}
                   </span>
                 </div>

@@ -3,7 +3,6 @@
 import {
   IconCurrencyDollar,
   IconShoppingCart,
-  IconUsers,
   IconPackage,
   IconWallet,
   IconClock,
@@ -12,17 +11,39 @@ import {
   IconCircleCheck,
   IconLock,
 } from "@tabler/icons-react"
-import type { SellerDashboardStats, SellerWallet } from "@/types/seller-dashboard"
+import {
+  OrderStatus,
+  type SellerDashboardStats,
+  type SellerWallet,
+  type SellerOrder,
+} from "@/types/seller-dashboard"
 import { StatsCard, StatsGrid } from "@/components/common/stats-card"
 import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
 
 type Props = {
   stats: SellerDashboardStats | null
   wallet: SellerWallet | null
+  orders: SellerOrder[]
   loading: boolean
 }
 
-export function SellerStatsCards({ stats, wallet, loading }: Props) {
+export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
+  const pendingOrders = orders.filter(
+    (o) =>
+      o.status === OrderStatus.PendingPayment
+  ).length
+  const confirmedOrders = orders.filter(
+    (o) => o.status === OrderStatus.Confirmed).length
+  const processingOrders = orders.filter(
+    (o) => o.status === OrderStatus.Shipping
+  ).length
+  const completedOrders = orders.filter(
+    (o) => o.status === OrderStatus.Completed
+  ).length
+  const cancelledOrders = orders.filter(
+    (o) => o.status === OrderStatus.Cancelled
+  ).length
+
   if (loading || !stats) {
     return (
       <StatsGrid cols={4} className="px-4 lg:px-6">
@@ -34,7 +55,7 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
   }
 
   return (
-    <StatsGrid cols={4} className="px-4 lg:px-6">
+    <StatsGrid cols={3} className="px-4 lg:px-6">
       <StatsCard
         label="Tổng doanh thu"
         value={currency(stats.totalRevenue)}
@@ -47,20 +68,19 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
               <IconWallet className="size-3.5" />
               Khả dụng: {wallet ? currency(wallet.availableBalance) : "—"}
             </div>
-            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="flex items-center gap-1">
+            <div className="space-y-1 text-muted-foreground">
+              <div className="flex items-center gap-1">
                 <IconLock className="size-3.5 opacity-70" />
                 Tạm giữ: {wallet ? currency(wallet.heldBalance ?? 0) : "—"}
-              </span>
-              <span className="flex items-center gap-1">
+              </div>
+              <div className="flex items-center gap-1">
                 <IconClock className="size-3.5" />
                 Chờ rút: {wallet ? currency(wallet.pendingBalance) : "—"}
-              </span>
-              <span className="text-muted-foreground/40">|</span>
-              <span className="flex items-center gap-1">
+              </div>
+              <div className="flex items-center gap-1">
                 <IconArrowDownRight className="size-3.5" />
                 Rút: {wallet ? currency(wallet.totalWithdrawn) : "—"}
-              </span>
+              </div>
             </div>
             {wallet && (wallet.totalRefunded ?? 0) > 0 && (
               <div className="text-xs text-amber-700 dark:text-amber-400">
@@ -82,21 +102,33 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
         icon={<IconShoppingCart />}
         iconBg="bg-blue-50 dark:bg-blue-950"
         iconColor="text-blue-500"
-        subText="Tất cả đơn hàng bạn đã nhận được"
-      />
-
-      <StatsCard
-        label="Khách hàng"
-        value={
-          <>
-            {fmt(stats.totalCustomers)}
-            <span className="text-muted-foreground ml-1.5 text-sm font-normal">khách</span>
-          </>
+        footer={
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
+              <IconCircleCheck className="size-3.5" />
+              Đã xác nhận: {fmt(confirmedOrders)} đơn
+            </div>
+            <div className="space-y-1 text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <IconClock className="size-3.5 opacity-70" />
+                Chờ xử lý: {fmt(pendingOrders)}
+              </div>
+              <div className="flex items-center gap-1">
+                <IconShoppingCart className="size-3.5" />
+                Đang giao: {fmt(processingOrders)}
+              </div>
+              <div className="flex items-center gap-1">
+                <IconArrowDownRight className="size-3.5" />
+                Hoàn thành: {fmt(completedOrders)}
+              </div>
+            </div>
+            {cancelledOrders > 0 && (
+              <div className="text-xs text-amber-700 dark:text-amber-400">
+                Đơn hủy/hoàn tiền: {fmt(cancelledOrders)}
+              </div>
+            )}
+          </div>
         }
-        icon={<IconUsers />}
-        iconBg="bg-violet-50 dark:bg-violet-950"
-        iconColor="text-violet-500"
-        subText="Khách hàng đã mua hàng tại cửa hàng"
       />
 
       <StatsCard
@@ -115,6 +147,10 @@ export function SellerStatsCards({ stats, wallet, loading }: Props) {
             <div className="flex items-center gap-1.5">
               <IconCircleCheck className="size-3.5 text-green-600 dark:text-green-400" />
               {fmt(stats.activeProducts)} đang hoạt động
+            </div>
+            <div className="flex items-center gap-1.5">
+              <IconLock className="size-3.5 opacity-70" />
+              {fmt(stats.totalProducts - stats.activeProducts)} đã ẩn
             </div>
             <div className="flex items-center gap-1.5">
               <IconCategory className="size-3.5" />
