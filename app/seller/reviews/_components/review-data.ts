@@ -27,7 +27,7 @@ export function mapSellerReviewToReview(r: SellerProductReviewItem): Review {
     comment: r.comment ?? "",
     images: Array.isArray(r.imageUrls) ? r.imageUrls : [],
     date: r.createdAt,
-    sellerReply: null,
+    sellerReply: r.sellerReply ?? null,
     helpful: 0,
     orderId: "",
   }

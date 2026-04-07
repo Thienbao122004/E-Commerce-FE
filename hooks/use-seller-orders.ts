@@ -26,7 +26,7 @@ export function useSellerOrders(initialParams?: Partial<Params>) {
   const [actionLoading, setActionLoading] = useState(false)
   const [params, setParams] = useState<Params>({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     status: undefined,
     search: "",
     ...initialParams,
@@ -37,21 +37,11 @@ export function useSellerOrders(initialParams?: Partial<Params>) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchMyOrders(params.page, params.pageSize, params.status)
+      const res = await fetchMyOrders(params.page, params.pageSize, params.status, params.search)
       if (!mountedRef.current) return
       if (res.success && res.data) {
-        let filtered = res.data
-        if (params.search) {
-          const q = params.search.toLowerCase()
-          filtered = filtered.filter(
-            (o) =>
-              o.id.toLowerCase().includes(q) ||
-              o.customerName?.toLowerCase().includes(q) ||
-              o.customerPhone?.toLowerCase().includes(q)
-          )
-        }
-        setOrders(filtered)
-        setTotalCount(filtered.length)
+        setOrders(res.data)
+        setTotalCount(res.totalCount ?? res.data.length)
       } else {
         setOrders([])
         setTotalCount(0)

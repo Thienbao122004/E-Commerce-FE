@@ -27,14 +27,15 @@ function StarRating({ rating }: { rating: number }) {
 type Props = {
   target: Review | null
   replyText: string
+  submitting?: boolean
   onTextChange: (v: string) => void
   onClose: () => void
   onSubmit: () => void
 }
 
-export function ReplyDialog({ target, replyText, onTextChange, onClose, onSubmit }: Props) {
+export function ReplyDialog({ target, replyText, submitting, onTextChange, onClose, onSubmit }: Props) {
   return (
-    <Dialog open={!!target} onOpenChange={(v) => { if (!v) onClose() }}>
+    <Dialog open={!!target} onOpenChange={(v) => { if (!v && !submitting) onClose() }}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Phản hồi đánh giá</DialogTitle>
@@ -70,8 +71,10 @@ export function ReplyDialog({ target, replyText, onTextChange, onClose, onSubmit
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Hủy</Button>
-          <Button onClick={onSubmit} disabled={!replyText.trim()}>Gửi phản hồi</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>Hủy</Button>
+          <Button onClick={onSubmit} disabled={!replyText.trim() || submitting}>
+            {submitting ? "Đang gửi..." : "Gửi phản hồi"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

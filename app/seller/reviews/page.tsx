@@ -10,7 +10,8 @@ import { ReviewFilters } from "./_components/review-filters"
 import { ReviewList } from "./_components/review-list"
 import { ReplyDialog } from "./_components/reply-dialog"
 import { useDebounce } from "@/hooks/use-debounce"
-import { fetchMyProductReviews } from "@/services/seller-dashboard"
+import { fetchMyProductReviews, replyToReview } from "@/services/seller-dashboard"
+import { toast } from "sonner"
 
 const PAGE_SIZE = 10
 
@@ -29,6 +30,7 @@ export default function SellerReviewsPage() {
   const [replyTarget, setReplyTarget] = useState<Review | null>(null)
   const [replyText, setReplyText] = useState("")
   const [replies, setReplies] = useState<Record<string, string>>({})
+  const [submittingReply, setSubmittingReply] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -88,11 +90,29 @@ export default function SellerReviewsPage() {
 
   const totalPages = Math.max(1, Math.ceil(stats.totalCount / PAGE_SIZE))
 
-  const submitReply = () => {
+  const submitReply = async () => {
     if (!replyTarget || !replyText.trim()) return
-    setReplies((prev) => ({ ...prev, [replyTarget.id]: replyText.trim() }))
-    setReplyText("")
-    setReplyTarget(null)
+    setSubmittingReply(true)
+    try {
+      const res = await replyToReview(replyTarget.id, replyText.trim())
+      if (res.success) {
+        toast.success("Đã gửi phản hồi")
+        setReplies((prev) => ({ ...prev, [replyTarget.id]: replyText.trim() }))
+        setReviews((prev) =>
+          prev.map((r) =>
+            r.id === replyTarget.id ? { ...r, sellerReply: replyText.trim() } : r
+          )
+        )
+        setReplyText("")
+        setReplyTarget(null)
+      } else {
+        toast.error(res.message ?? "Lỗi gửi phản hồi")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi gửi phản hồi")
+    } finally {
+      setSubmittingReply(false)
+    }
   }
 
   return (
@@ -168,8 +188,9 @@ export default function SellerReviewsPage() {
       <ReplyDialog
         target={replyTarget}
         replyText={replyText}
+        submitting={submittingReply}
         onTextChange={setReplyText}
-        onClose={() => setReplyTarget(null)}
+        onClose={() => { if (!submittingReply) setReplyTarget(null) }}
         onSubmit={submitReply}
       />
     </div>

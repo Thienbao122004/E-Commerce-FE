@@ -33,7 +33,10 @@ export default function SellerWalletPage() {
           <IconRefresh className={`mr-1.5 size-4 ${loading || loadingWithdrawals ? "animate-spin" : ""}`} />
           Làm mới
         </Button>
-        <Button onClick={() => setDialogOpen(true)} disabled={loading}>
+        <Button
+          onClick={() => setDialogOpen(true)}
+          disabled={loading || !wallet || wallet.availableBalance <= 0}
+        >
           <IconArrowUpRight className="mr-1.5 size-4" />
           Yêu cầu rút tiền
         </Button>

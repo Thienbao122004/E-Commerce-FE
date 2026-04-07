@@ -35,7 +35,7 @@ export function fetchMyWallet() {
   return api.get<SellerWalletResponse>("/api/seller/wallet")
 }
 
-export function fetchMyWithdrawals(page = 1, pageSize = 20) {
+export function fetchMyWithdrawals(page = 1, pageSize = 10) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
   return api.get<WithdrawalsResponse>(`/api/seller/withdrawals?${params}`)
 }
@@ -100,13 +100,16 @@ export function updateMyInventory(productId: string, dto: UpdateInventoryPayload
 
 // ====== Orders ======
 
-export function fetchMyOrders(page = 1, pageSize = 20, status?: number) {
+export function fetchMyOrders(page = 1, pageSize = 10, status?: number, search?: string) {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
   })
   if (status !== undefined && status !== null) {
     params.set("status", String(status))
+  }
+  if (search?.trim()) {
+    params.set("search", search.trim())
   }
   return api.get<SellerOrdersResponse>(`/api/seller/orders?${params}`)
 }
@@ -141,5 +144,12 @@ export function fetchMyProductReviews(
     params.set("search", search.trim())
   }
   return api.get<SellerProductReviewsResponse>(`/api/seller/reviews?${params}`)
+}
+
+export function replyToReview(reviewId: string, reply: string) {
+  return api.post<{ success: boolean; message?: string }>(
+    `/api/seller/reviews/${reviewId}/reply`,
+    { reply }
+  )
 }
 

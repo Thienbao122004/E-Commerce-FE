@@ -111,6 +111,7 @@ export type SellerOrder = {
 export type SellerOrdersResponse = {
   success: boolean
   data?: SellerOrder[]
+  totalCount?: number
   message?: string
 }
 
@@ -271,6 +272,7 @@ export type SellerProductReviewItem = {
   buyerName: string | null
   rating: number
   comment: string | null
+  sellerReply: string | null
   createdAt: string
   imageUrls: string[]
 }
