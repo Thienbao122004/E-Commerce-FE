@@ -154,7 +154,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 
 const SELLERS_ITEMS = [
   { name: "Quản lý người bán", url: "/admin/dashboard/sellers", icon: IconDatabase },
-  { name: "Yêu cầu rút tiền", url: "/admin/dashboard/withdrawals", icon: IconReport },
+  { name: "Rút tiền người bán", url: "/admin/dashboard/withdrawals", icon: IconReport },
+  { name: "Rút tiền khách hàng", url: "/admin/dashboard/customer-withdrawals", icon: IconWallet },
   { name: "Phí sàn & báo cáo", url: "/admin/dashboard/platform-fees", icon: IconPercentage },
 ]
 
