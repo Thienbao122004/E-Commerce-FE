@@ -39,13 +39,6 @@ export default function SettingsPage() {
         <>
             <div className="flex flex-1 flex-col">
                 <div className="flex flex-col gap-6 p-6 md:p-8">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Cài đặt</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Quản lý cài đặt và tùy chọn của bạn.
-                        </p>
-                    </div>
-
                     <div className="border rounded-xl p-6 space-y-6">
                         <div>
                             <h2 className="text-lg font-semibold">Giao diện</h2>

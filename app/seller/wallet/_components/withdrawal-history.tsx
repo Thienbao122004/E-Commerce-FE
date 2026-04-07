@@ -56,13 +56,13 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
   return (
     <Card>
       <CardHeader className="py-3.5 px-4 lg:px-5 border-b">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex flex-wrap items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-md bg-muted">
             <IconBuildingBank className="size-3.5 text-muted-foreground" />
           </div>
           <span>Lịch sử rút tiền</span>
           {total > 0 && (
-            <Badge variant="secondary" className="ml-auto text-xs font-normal">
+            <Badge variant="secondary" className="text-xs font-normal sm:ml-auto">
               {total} yêu cầu
             </Badge>
           )}
@@ -106,38 +106,40 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
               return (
                 <div
                   key={w.id}
-                  className="flex items-center gap-3 px-4 lg:px-5 py-3.5 hover:bg-muted/30 transition-colors"
+                  className="flex flex-col gap-3 px-4 lg:px-5 py-3.5 hover:bg-muted/30 transition-colors sm:flex-row sm:items-center"
                 >
-                  <div className="flex items-center justify-center size-10 rounded-lg shrink-0 bg-muted/60">
-                    <IconArrowUpRight className="size-4.5 text-muted-foreground" />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      Rút về {w.bankName}
-                      <span className="text-muted-foreground ml-1.5">
-                        ···{w.bankAccountNumber.slice(-4)}
-                      </span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {formatDateTime(w.createdAt)}
-                      </span>
-                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-[18px] border ${s.cls}`}>
-                        <s.icon className="size-2.5 mr-0.5" />
-                        {s.label}
-                      </Badge>
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="flex items-center justify-center size-10 rounded-lg shrink-0 bg-muted/60">
+                      <IconArrowUpRight className="size-4.5 text-muted-foreground" />
                     </div>
-                    {w.note && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate italic">
-                        &ldquo;{w.note}&rdquo;
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">
+                        Rút về {w.bankName}
+                        <span className="text-muted-foreground ml-1.5">
+                          ···{w.bankAccountNumber.slice(-4)}
+                        </span>
                       </p>
-                    )}
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {formatDateTime(w.createdAt)}
+                        </span>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-[18px] border ${s.cls}`}>
+                          <s.icon className="size-2.5 mr-0.5" />
+                          {s.label}
+                        </Badge>
+                      </div>
+                      {w.note && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate italic">
+                          &ldquo;{w.note}&rdquo;
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="shrink-0 pl-[3.25rem] sm:pl-0 text-left sm:text-right">
                     <p className="font-semibold text-sm tabular-nums">-{currency(w.amount)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{w.bankAccountName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{w.bankAccountName}</p>
                   </div>
                 </div>
               )
@@ -147,7 +149,7 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
       </CardContent>
 
       {!loading && total > 0 && (
-        <div className="flex items-center justify-between px-4 lg:px-5 py-3 border-t bg-muted/20">
+        <div className="flex flex-col gap-2 px-4 lg:px-5 py-3 border-t bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
             Hiển thị <span className="font-medium text-foreground">{startItem}–{endItem}</span> trong số{" "}
             <span className="font-medium text-foreground">{total}</span>

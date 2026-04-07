@@ -1,16 +1,23 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, CircleDollarSign, ReceiptText, ShoppingBag } from 'lucide-react'
 import { formatPriceVND } from '@/lib/formatters'
 
+const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
+
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
-  const orderId = searchParams.get('orderId')
+  const orderCode = searchParams.get('orderCode')
   const amount = searchParams.get('amount')
   const amountValue = Number(amount ?? 0)
   const amountLabel = formatPriceVND(Number.isNaN(amountValue) ? 0 : amountValue)
+
+  useEffect(() => {
+    sessionStorage.removeItem(CHECKOUT_PENDING_PAYMENT_KEY)
+  }, [])
 
   return (
     <div
@@ -38,7 +45,7 @@ export default function PaymentSuccessPage() {
               <ReceiptText size={16} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
               <div className="grid gap-1">
                 <span className="text-xs text-muted-foreground">Mã đơn hàng</span>
-                <span className="text-sm font-medium break-all">{orderId ?? '—'}</span>
+                <span className="text-lg font-medium break-all">{orderCode ?? '—'}</span>
               </div>
             </div>
             <div className="flex items-start gap-2">

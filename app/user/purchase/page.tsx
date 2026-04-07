@@ -1,12 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ordersService, type OrderSummary } from '@/services/orders'
 import { usePurchaseOrders } from '@/hooks/use-purchase-orders'
 import { cartService } from '@/services/cart'
 import { paymentsService } from '@/services/payments'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { toast } from 'sonner'
@@ -52,17 +62,41 @@ const STATUS_COLORS: Record<number, string> = {
 
 const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
 const PAGE_SIZE = 10
+const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
+const PENDING_PAYMENT_TTL_MS = 100 * 60 * 1000
 
 type PayChannel = 'vnpay' | 'momo'
 
-const PAY_CHANNELS: Array<{ id: PayChannel; label: string; logo: string }> = [
-  { id: 'vnpay', label: 'VNPay', logo: '/vnpay-logo.png' },
-  { id: 'momo', label: 'MoMo', logo: '/momo-logo.png' },
-]
+interface PendingPaymentSession {
+  orderIds: string[]
+  paymentMethod: PayChannel
+  primaryOrderId?: string
+  paymentUrl?: string
+  paymentId?: string
+  createdAt: string
+}
+
+function providerToPayChannel(provider?: string | null): PayChannel | null {
+  if (!provider) return null
+  const normalized = provider.trim().toUpperCase()
+  if (normalized === 'VNPAY') return 'vnpay'
+  if (normalized === 'MOMO') return 'momo'
+  return null
+}
+
+function parseStatusFromQuery(value: string | null): number | undefined {
+  if (value === null || value.trim() === '') return undefined
+  const parsed = Number(value)
+  return Number.isInteger(parsed) ? parsed : undefined
+}
 
 export default function PurchasePage() {
   const router = useRouter()
-  const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders()
+  const searchParams = useSearchParams()
+  const initialStatus = parseStatusFromQuery(searchParams.get('status'))
+  const highlightedOrderCode = searchParams.get('orderCode')?.trim().toUpperCase() ?? ''
+
+  const { activeStatus, setActiveStatus, orders, loading, invalidateAndRefresh } = usePurchaseOrders(initialStatus)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
@@ -70,6 +104,52 @@ export default function PurchasePage() {
   const [reorderingOrderId, setReorderingOrderId] = useState<string | null>(null)
   const [reviewingOrder, setReviewingOrder] = useState<OrderSummary | null>(null)
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
+  const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelTargetOrder, setCancelTargetOrder] = useState<OrderSummary | null>(null)
+
+  const openCancelDialog = (targetOrder: OrderSummary) => {
+    if (cancelingOrderId || payingOrderId) return
+    setCancelTargetOrder(targetOrder)
+    setCancelReason('')
+    setCancelDialogOpen(true)
+  }
+
+  const submitCancelOrder = async () => {
+    if (!cancelTargetOrder) return
+
+    const reason = cancelReason.trim()
+    setCancelingOrderId(cancelTargetOrder.id)
+    try {
+      const res = await ordersService.cancelOrder(
+        cancelTargetOrder.id,
+        reason ? { reason } : undefined,
+      )
+      if (!res.success) {
+        toast.error(res.message || 'Không thể hủy đơn hàng')
+        return
+      }
+
+      toast.success(res.message || 'Đơn hàng đã được hủy')
+      setCancelDialogOpen(false)
+      setCancelTargetOrder(null)
+      setCancelReason('')
+      invalidateAndRefresh()
+    } catch {
+      toast.error('Không thể hủy đơn hàng')
+    } finally {
+      setCancelingOrderId(null)
+    }
+  }
+
+  useEffect(() => {
+    if (initialStatus === undefined) return
+    if (activeStatus !== initialStatus) {
+      setActiveStatus(initialStatus)
+      setCurrentPage(1)
+    }
+  }, [initialStatus, activeStatus, setActiveStatus])
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value)
@@ -144,6 +224,7 @@ export default function PurchasePage() {
           )
         })}
       </div>
+
       {loading ? (
         <div className="flex justify-center py-20">
           <div
@@ -165,8 +246,13 @@ export default function PurchasePage() {
               <OrderCard
                 key={order.id}
                 order={order}
+                highlighted={
+                  !!highlightedOrderCode &&
+                  (order.orderCode?.trim().toUpperCase() ?? '') === highlightedOrderCode
+                }
                 reorderingOrderId={reorderingOrderId}
                 payingOrderId={payingOrderId}
+                cancelingOrderId={cancelingOrderId}
                 onRefresh={invalidateAndRefresh}
                 onReview={(targetOrder) => setReviewingOrder(targetOrder)}
                 onReorder={async (targetOrder) => {
@@ -196,9 +282,31 @@ export default function PurchasePage() {
                   setReorderingOrderId(null)
                 }}
                 onPayNow={async (targetOrder, method) => {
+                  if (payingOrderId) return
+
+                  if (!method) {
+                    toast.error('Không xác định được cổng thanh toán của đơn này. Vui lòng tạo lại đơn hàng.')
+                    return
+                  }
+
                   setPayingOrderId(targetOrder.id)
                   const label = method === 'momo' ? 'MoMo' : 'VNPay'
                   try {
+                    // Ưu tiên dùng lại URL thanh toán đã tạo trước đó để tránh tạo thêm payment record.
+                    const rawSession = sessionStorage.getItem(CHECKOUT_PENDING_PAYMENT_KEY)
+                    if (rawSession) {
+                      const parsed = JSON.parse(rawSession) as PendingPaymentSession
+                      const createdAt = Date.parse(parsed.createdAt)
+                      const isFresh = Number.isFinite(createdAt) && Date.now() - createdAt <= PENDING_PAYMENT_TTL_MS
+                      const sameOrder = parsed.primaryOrderId === targetOrder.id
+                      const sameMethod = parsed.paymentMethod === method
+
+                      if (isFresh && sameOrder && sameMethod && parsed.paymentUrl) {
+                        window.location.href = parsed.paymentUrl
+                        return
+                      }
+                    }
+
                     const payFn =
                       method === 'momo'
                         ? paymentsService.createMoMoPayment
@@ -208,12 +316,26 @@ export default function PurchasePage() {
                       toast.error(paymentRes.message || `Không thể tạo giao dịch ${label}`)
                       return
                     }
+
+                    const resumableSession: PendingPaymentSession = {
+                      orderIds: [targetOrder.id],
+                      paymentMethod: method,
+                      primaryOrderId: targetOrder.id,
+                      paymentUrl: paymentRes.paymentUrl,
+                      paymentId: paymentRes.paymentId,
+                      createdAt: new Date().toISOString(),
+                    }
+                    sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(resumableSession))
+
                     window.location.href = paymentRes.paymentUrl
                   } catch {
                     toast.error('Không thể thanh toán đơn hàng này')
                   } finally {
                     setPayingOrderId(null)
                   }
+                }}
+                onCancelOrder={async (targetOrder) => {
+                  openCancelDialog(targetOrder)
                 }}
                 onChatShop={(o) => openShopChatWithOrderProduct(o)}
               />
@@ -307,32 +429,101 @@ export default function PurchasePage() {
           onSuccess={invalidateAndRefresh}
         />
       )}
+
+      <Dialog
+        open={cancelDialogOpen}
+        onOpenChange={(open) => {
+          if (cancelingOrderId) return
+          setCancelDialogOpen(open)
+          if (!open) {
+            setCancelTargetOrder(null)
+            setCancelReason('')
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Hủy đơn hàng</DialogTitle>
+            <DialogDescription>
+              {cancelTargetOrder?.orderCode
+                ? `Đơn #${cancelTargetOrder.orderCode}`
+                : 'Nhập lý do hủy (không bắt buộc).'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2">
+            <label htmlFor="cancel-reason" className="text-sm font-medium" style={{ color: 'var(--color-text-main)' }}>
+              Lý do hủy
+            </label>
+            <Textarea
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="Ví dụ: Đổi ý, muốn cập nhật địa chỉ giao hàng..."
+              className="min-h-24"
+              style={{ color: 'var(--color-text-main)' }}
+            />
+            <p className="text-xs text-muted-foreground text-right">{cancelReason.trim().length}/500</p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (cancelingOrderId) return
+                setCancelDialogOpen(false)
+                setCancelTargetOrder(null)
+                setCancelReason('')
+              }}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void submitCancelOrder()}
+              disabled={!cancelTargetOrder || !!cancelingOrderId}
+            >
+              {cancelingOrderId ? 'Đang hủy...' : 'Xác nhận hủy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 function OrderCard({
   order,
+  highlighted,
   onRefresh,
   onReview,
   onReorder,
   onPayNow,
+  onCancelOrder,
   onChatShop,
   reorderingOrderId,
   payingOrderId,
+  cancelingOrderId,
 }: {
   order: OrderSummary
+  highlighted: boolean
   onRefresh: () => void
   onReview: (order: OrderSummary) => void
   onReorder: (order: OrderSummary) => Promise<void>
-  onPayNow: (order: OrderSummary, method: PayChannel) => Promise<void>
+  onPayNow: (order: OrderSummary, method: PayChannel | null) => Promise<void>
+  onCancelOrder: (order: OrderSummary) => Promise<void>
   onChatShop: (order: OrderSummary) => void
   reorderingOrderId: string | null
   payingOrderId: string | null
+  cancelingOrderId: string | null
 }) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
-  const [payChannel, setPayChannel] = useState<PayChannel>('vnpay')
+  const lockedPayChannel = providerToPayChannel(order.paymentProvider)
 
   const handleConfirm = async () => {
     setConfirming(true)
@@ -350,21 +541,34 @@ function OrderCard({
   const statusLabel = STATUS_LABELS[order.status] ?? order.statusName
   const canConfirm = order.status === 4
   const canPayNow = order.status === 0
+  const canCancel = order.status >= 0 && order.status <= 3
   const canReorder = REORDERABLE_STATUSES.has(order.status)
   /** Đơn hoàn thành và còn ít nhất một sản phẩm chưa đánh giá (theo DB). */
   const canReview =
     order.status === 6 && order.items.some((i) => i.hasReviewedByUser !== true)
   const isReordering = reorderingOrderId === order.id
   const isPaying = payingOrderId === order.id
+  const isCancelling = cancelingOrderId === order.id
+  const isAnyPaymentInFlight = payingOrderId !== null || cancelingOrderId !== null
+  const effectivePayChannel = lockedPayChannel
+  const effectivePayLabel = effectivePayChannel === 'momo' ? 'MoMo' : effectivePayChannel === 'vnpay' ? 'VNPay' : 'Không xác định'
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: '#e5ded6' }}>
+    <div
+      className="bg-white rounded-lg border overflow-hidden"
+      style={{ borderColor: highlighted ? '#ec7f13' : '#e5ded6', boxShadow: highlighted ? '0 0 0 1px rgba(236,127,19,0.2)' : 'none' }}
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#e5ded6' }}>
         <div className="flex items-center gap-2 flex-wrap">
           <Store size={16} style={{ color: 'var(--color-primary)' }} />
           <span className="font-semibold text-sm" style={{ color: 'var(--color-text-main)' }}>
             {order.shopName}
           </span>
+          {order.orderCode && (
+            <span className="rounded border px-2 py-0.5 text-[11px] font-medium" style={{ borderColor: '#eadfce', color: 'var(--color-text-secondary)' }}>
+              #{order.orderCode}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => onChatShop(order)}
@@ -440,49 +644,32 @@ function OrderCard({
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {canPayNow && (
               <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground whitespace-nowrap hidden sm:inline">
-                    Thanh toán qua
-                  </span>
-                  <div
-                    className="inline-flex rounded-md border p-0.5 gap-0.5"
-                    style={{ borderColor: '#d1c9c0', background: '#faf8f5' }}
-                    role="group"
-                    aria-label="Chọn cổng thanh toán"
-                  >
-                    {PAY_CHANNELS.map((ch) => {
-                      const active = payChannel === ch.id
-                      return (
-                        <button
-                          key={ch.id}
-                          type="button"
-                          onClick={() => setPayChannel(ch.id)}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors"
-                          style={{
-                            background: active ? 'rgba(236,127,19,0.12)' : 'transparent',
-                            color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                            boxShadow: active ? 'inset 0 0 0 1px rgba(236,127,19,0.35)' : undefined,
-                          }}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={ch.logo} alt="" className="h-4 w-auto object-contain" />
-                          {ch.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                <div className="rounded border px-2.5 py-1 text-[11px]" style={{ borderColor: '#eadfce', background: '#faf8f5' }}>
+                  <span className="text-muted-foreground">Phương thức đã chọn:</span>{' '}
+                  <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>{effectivePayLabel}</span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void onPayNow(order, payChannel)}
-                  disabled={isPaying}
-                  className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60 inline-flex items-center gap-1.5"
+                  onClick={() => void onPayNow(order, effectivePayChannel)}
+                  disabled={isAnyPaymentInFlight || !effectivePayChannel}
+                  className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60 inline-flex items-center gap-1.5 cursor-pointer"
                   style={{ backgroundColor: 'var(--color-primary)' }}
                 >
                   <Wallet size={14} />
-                  <span>{isPaying ? 'Đang chuyển hướng...' : 'Thanh toán ngay'}</span>
+                  <span>{isPaying ? 'Đang chuyển hướng...' : 'Tiếp tục thanh toán'}</span>
                 </button>
               </div>
+            )}
+            {canCancel && (
+              <button
+                type="button"
+                onClick={() => void onCancelOrder(order)}
+                disabled={isAnyPaymentInFlight || isReordering}
+                className="text-sm px-4 py-1.5 rounded border transition-colors hover:bg-red-50 disabled:opacity-60 cursor-pointer"
+                style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+              >
+                {isCancelling ? 'Đang hủy...' : 'Hủy đơn hàng'}
+              </button>
             )}
             {canConfirm && (
               <button

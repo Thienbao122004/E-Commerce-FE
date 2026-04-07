@@ -11,8 +11,11 @@ import type { AddressResponse } from '@/types/profile'
 import { getProductById } from '@/services/storefront-products'
 import { formatPriceVND as formatPrice } from '@/lib/formatters'
 import { toast } from 'sonner'
+import { useGHNShippingFee } from '@/hooks/useGHNShippingFee'
 import {
+  AlertCircle,
   ChevronRight,
+  Loader2,
   MapPin,
   MessageCircle,
   ShieldCheck,
@@ -22,7 +25,7 @@ import {
 } from 'lucide-react'
 
 const CHECKOUT_SELECTED_IDS_KEY = 'checkout:selected-item-ids'
-const SHIPPING_FEE_PER_SHOP = 30000
+const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
 
 type PaymentMethod = 'vnpay' | 'momo'
 
@@ -40,6 +43,15 @@ interface ShopGroup {
   shippingFee: number
   total: number
   itemCount: number
+}
+
+interface PendingPaymentSession {
+  orderIds: string[]
+  paymentMethod: PaymentMethod
+  primaryOrderId?: string
+  paymentUrl?: string
+  paymentId?: string
+  createdAt: string
 }
 
 function formatAddress(address: AddressResponse) {
@@ -64,19 +76,19 @@ const PAYMENT_METHODS: Array<{
   desc: string
   logo: string
 }> = [
-  {
-    id: 'vnpay',
-    label: 'VNPay',
-    desc: 'Thanh toán online qua cổng VNPay bảo mật',
-    logo: '/vnpay-logo.png',
-  },
-  {
-    id: 'momo',
-    label: 'MoMo',
-    desc: 'Ví điện tử MoMo',
-    logo: '/momo-logo.png',
-  },
-]
+    {
+      id: 'vnpay',
+      label: 'VNPay',
+      desc: 'Thanh toán online qua cổng VNPay bảo mật',
+      logo: '/vnpay-logo.png',
+    },
+    {
+      id: 'momo',
+      label: 'MoMo',
+      desc: 'Ví điện tử MoMo',
+      logo: '/momo-logo.png',
+    },
+  ]
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -210,7 +222,7 @@ export default function CheckoutPage() {
         shopName: normalizedShopName,
         items: [item],
         subtotal: item.lineTotal,
-        shippingFee: SHIPPING_FEE_PER_SHOP,
+        shippingFee: 0, // sẽ được cập nhật từ GHN
         total: 0,
         itemCount: item.quantity,
       })
@@ -221,6 +233,24 @@ export default function CheckoutPage() {
       total: group.subtotal + group.shippingFee,
     }))
   }, [checkoutItems])
+
+  const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
+
+  // ── GHN Shipping Fee ─────────────────────────────────────
+  const shopInputs = useMemo(
+    () =>
+      groupedByShop.map((group) => ({
+        key: group.key,
+        totalWeightGrams: group.items.reduce((sum, item) => sum + item.quantity * 300, 0), // ước 300g/item
+        totalValue: group.subtotal,
+      })),
+    [groupedByShop],
+  )
+
+  const { shopFees, totalShippingFee, isCalculating, fallbackFee } = useGHNShippingFee(
+    shopInputs,
+    selectedAddress,
+  )
 
   const subtotalAmount = useMemo(
     () => groupedByShop.reduce((sum, group) => sum + group.subtotal, 0),
@@ -239,17 +269,16 @@ export default function CheckoutPage() {
     [checkoutItems]
   )
 
-  const shippingAmount = useMemo(
-    () => groupedByShop.reduce((sum, group) => sum + group.shippingFee, 0),
-    [groupedByShop]
-  )
+  const shippingAmount = totalShippingFee
 
   const grandTotal = subtotalAmount + shippingAmount
   const totalProductCount = checkoutItems.reduce((sum, item) => sum + item.quantity, 0)
 
-  const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
-
   const handlePlaceOrder = async () => {
+    if (placingOrder) {
+      return
+    }
+
     if (!cart?.id) {
       toast.error('Giỏ hàng không hợp lệ')
       return
@@ -267,9 +296,27 @@ export default function CheckoutPage() {
 
     setPlacingOrder(true)
     try {
+      const shippingOptions = groupedByShop.map((group) => {
+        const sf = shopFees.get(group.key)
+        const fee = sf?.fee ?? fallbackFee
+        const estimatedDeliveryDate = sf?.leadTime
+          ? new Date(sf.leadTime * 1000).toISOString()
+          : null
+
+        return {
+          shopId: group.shopId || '',
+          shippingProvider: 'GHN',
+          shippingServiceId: '53320',
+          providerShippingFee: fee,
+          shippingFee: fee,
+          estimatedDeliveryDate,
+        }
+      })
+
       const checkoutRes = await cartService.checkout({
         cartId: cart.id,
         shippingAddressId: selectedAddressId,
+        shippingOptions,
       })
 
       if (!checkoutRes.success || !checkoutRes.data?.success) {
@@ -279,6 +326,16 @@ export default function CheckoutPage() {
 
       const orderIds = checkoutRes.data.orderIds ?? []
       sessionStorage.removeItem(CHECKOUT_SELECTED_IDS_KEY)
+
+      if (orderIds.length > 0) {
+        const pendingSession: PendingPaymentSession = {
+          orderIds,
+          paymentMethod,
+          primaryOrderId: orderIds[0],
+          createdAt: new Date().toISOString(),
+        }
+        sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(pendingSession))
+      }
 
       if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
         if (orderIds.length === 0) {
@@ -301,9 +358,19 @@ export default function CheckoutPage() {
         const paymentRes = await payFn(orderIds[0])
         if (!paymentRes.success || !paymentRes.paymentUrl) {
           toast.error(paymentRes.message || `Không thể tạo giao dịch ${gatewayLabel}`)
-          router.push('/user/purchase')
+          router.push('/user/purchase?status=0&from=payment-create-failed')
           return
         }
+
+        const resumableSession: PendingPaymentSession = {
+          orderIds,
+          paymentMethod,
+          primaryOrderId: orderIds[0],
+          paymentUrl: paymentRes.paymentUrl,
+          paymentId: paymentRes.paymentId,
+          createdAt: new Date().toISOString(),
+        }
+        sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(resumableSession))
 
         window.location.href = paymentRes.paymentUrl
         return
@@ -457,10 +524,9 @@ export default function CheckoutPage() {
               {group.items.map((item) => (
                 <div key={item.id} className="px-5 py-4">
                   <div className="grid items-center gap-3 md:grid-cols-[1fr_120px_100px_140px]">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="size-16 shrink-0 overflow-hidden rounded-xl border bg-gray-50" style={{ borderColor: '#e5ded6' }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="size-12 shrink-0 overflow-hidden rounded border bg-gray-50" style={{ borderColor: '#e5ded6' }}>
                         {item.productImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={item.productImage} alt={item.productName} className="size-full object-cover" />
                         ) : (
                           <div className="grid size-full place-items-center">
@@ -495,20 +561,36 @@ export default function CheckoutPage() {
             </div>
 
             <div className="grid gap-3 border-t px-5 py-4" style={{ borderColor: '#efe8de' }}>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Truck size={15} />
-                  <span>Phương thức vận chuyển</span>
+                  <span>Phí vận chuyển</span>
                 </div>
-                <span className="font-medium" style={{ color: 'var(--color-text-main)' }}>
-                  Nhanh - {formatPrice(group.shippingFee)}
-                </span>
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <span className="text-sm text-muted-foreground">Tổng shop:</span>
-                <span className="text-xl font-semibold" style={{ color: 'var(--color-primary)' }}>
-                  {formatPrice(group.total)}
-                </span>
+                {(() => {
+                  const sf = shopFees.get(group.key)
+                  if (!sf || sf.loading) {
+                    return (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Loader2 size={12} className="animate-spin" />
+                        Đang tính...
+                      </span>
+                    )
+                  }
+                  if (sf.error) {
+                    return (
+                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-primary)' }}>
+                        <AlertCircle size={12} />
+                        {formatPrice(sf.fee ?? fallbackFee)}
+                        <span className="text-muted-foreground">(dự phòng)</span>
+                      </span>
+                    )
+                  }
+                  return (
+                    <span className="font-medium" style={{ color: 'var(--color-text-main)' }}>
+                      {formatPrice(sf.fee ?? fallbackFee)}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -573,21 +655,6 @@ export default function CheckoutPage() {
               {summaryProductLines.map((line) => (
                 <div key={line.key} className="grid grid-cols-[1fr_auto] items-center gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="size-7 shrink-0 overflow-hidden rounded border bg-white" style={{ borderColor: '#ddd5cb' }}>
-                      {line.image ? (
-                        <Image
-                          src={line.image}
-                          alt={line.label}
-                          width={28}
-                          height={28}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="grid size-full place-items-center">
-                          <span className="material-symbols-outlined text-[14px] text-muted-foreground">image</span>
-                        </div>
-                      )}
-                    </div>
                     <span className="truncate text-xs text-muted-foreground">
                       x{line.quantity} {line.label}
                     </span>
@@ -606,18 +673,14 @@ export default function CheckoutPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Phí vận chuyển</span>
-                <span style={{ color: 'var(--color-text-main)' }}>{formatPrice(shippingAmount)}</span>
-              </div>
-            </div>
-
-            <div className="grid gap-2 px-4 py-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Tổng tạm tính</span>
-                <span style={{ color: 'var(--color-text-main)' }}>{formatPrice(grandTotal)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Thuế</span>
-                <span style={{ color: 'var(--color-text-main)' }}>0đ</span>
+                {isCalculating ? (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Loader2 size={11} className="animate-spin" />
+                    Đang tính...
+                  </span>
+                ) : (
+                  <span style={{ color: 'var(--color-text-main)' }}>{formatPrice(shippingAmount)}</span>
+                )}
               </div>
             </div>
 
@@ -626,9 +689,16 @@ export default function CheckoutPage() {
                 <span className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-main)' }}>
                   Tổng thanh toán
                 </span>
-                <span className="text-3xl font-bold" style={{ color: 'var(--color-primary)' }}>
-                  {formatPrice(grandTotal)}
-                </span>
+                {isCalculating ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span className="text-xl font-bold">Đang tính...</span>
+                  </span>
+                ) : (
+                  <span className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
+                    {formatPrice(grandTotal)}
+                  </span>
+                )}
               </div>
             </div>
           </div>

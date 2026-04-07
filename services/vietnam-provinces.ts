@@ -1,50 +1,46 @@
-const BASE_URL = 'https://provinces.open-api.vn/api'
+import { ghnService } from '@/services/ghn'
 
 export interface Province {
-  code: number
-  name: string
+  code: number     // = GHN ProvinceID
+  name: string     // = GHN ProvinceName
 }
 
 export interface District {
-  code: number
-  name: string
+  code: number     // = GHN DistrictID
+  name: string     // = GHN DistrictName
 }
 
 export interface Ward {
-  code: number
-  name: string
+  code: string     // = GHN WardCode (string, ví dụ "20308")
+  name: string     // = GHN WardName
 }
 
-interface ProvinceDetailResponse {
-  code: number
-  name: string
-  districts: District[]
-}
-
-interface DistrictDetailResponse {
-  code: number
-  name: string
-  wards: Ward[]
-}
-
+// ─── Service ─────────────────────────────────────────────────
 export const vietnamProvincesService = {
+  /** Lấy danh sách Tỉnh / Thành phố từ GHN */
   getProvinces: async (): Promise<Province[]> => {
-    const res = await fetch(`${BASE_URL}/p/`)
-    if (!res.ok) throw new Error('Không thể tải danh sách tỉnh/thành phố')
-    return res.json()
+    const data = await ghnService.getProvinces()
+    return data.map((p) => ({
+      code: p.ProvinceID,
+      name: p.ProvinceName,
+    }))
   },
 
+  /** Lấy danh sách Quận / Huyện theo ProvinceID (= Province.code) */
   getDistricts: async (provinceCode: number): Promise<District[]> => {
-    const res = await fetch(`${BASE_URL}/p/${provinceCode}?depth=2`)
-    if (!res.ok) throw new Error('Không thể tải danh sách quận/huyện')
-    const data: ProvinceDetailResponse = await res.json()
-    return data.districts
+    const data = await ghnService.getDistricts(provinceCode)
+    return data.map((d) => ({
+      code: d.DistrictID,
+      name: d.DistrictName,
+    }))
   },
 
+  /** Lấy danh sách Phường / Xã theo DistrictID (= District.code) */
   getWards: async (districtCode: number): Promise<Ward[]> => {
-    const res = await fetch(`${BASE_URL}/d/${districtCode}?depth=2`)
-    if (!res.ok) throw new Error('Không thể tải danh sách phường/xã')
-    const data: DistrictDetailResponse = await res.json()
-    return data.wards
+    const data = await ghnService.getWards(districtCode)
+    return data.map((w) => ({
+      code: w.WardCode,   // GHN WardCode là string
+      name: w.WardName,
+    }))
   },
 }

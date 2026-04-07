@@ -8,7 +8,6 @@ import { OrderStatus } from "@/types/seller-dashboard"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { OrderStats } from "./_components/order-stats"
 import { OrderTable } from "./_components/order-table"
-import { OrderStatusDialog } from "./_components/order-status-dialog"
 import FilterBar from "@/components/common/filter-bar"
 import type { FilterConfig } from "@/components/common/filter-bar"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -35,7 +34,6 @@ export default function SellerOrdersPage() {
 
   const [searchInput, setSearchInput] = useState("")
   const [sort, setSort] = useState<SortConfig | null>(null)
-  const [statusDialog, setStatusDialog] = useState<{ orderId: string; currentStatus: number } | null>(null)
 
   const debouncedSearch = useDebounce(searchInput)
   useEffect(() => { setSearch(debouncedSearch) }, [debouncedSearch, setSearch])
@@ -65,7 +63,7 @@ export default function SellerOrdersPage() {
       width: "w-[180px]",
       options: [
         { value: "all", label: "Tất cả trạng thái" },
-        { value: String(OrderStatus.PendingConfirmation), label: "Chờ xác nhận" },
+        { value: String(OrderStatus.PendingPayment), label: "Chờ thanh toán" },
         { value: String(OrderStatus.Confirmed), label: "Đã xác nhận" },
         { value: String(OrderStatus.Processing), label: "Đang chuẩn bị" },
         { value: String(OrderStatus.Shipping), label: "Đang giao hàng" },
@@ -76,10 +74,8 @@ export default function SellerOrdersPage() {
     },
   ]
 
-  const handleStatusUpdate = async (newStatus: number, note: string) => {
-    if (!statusDialog) return
-    const ok = await updateStatus(statusDialog.orderId, { status: newStatus, note: note || undefined })
-    if (ok) setStatusDialog(null)
+  const handleInlineStatusUpdate = async (orderId: string, newStatus: number) => {
+    await updateStatus(orderId, { status: newStatus })
   }
 
   return (
@@ -109,21 +105,11 @@ export default function SellerOrdersPage() {
         pageSize={params.pageSize}
         sort={sort}
         onSort={(key) => setSort(getNextSort(sort, key))}
-        onOpenStatusDialog={(orderId, currentStatus) => setStatusDialog({ orderId, currentStatus })}
+        actionLoading={actionLoading}
+        onUpdateStatus={handleInlineStatusUpdate}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
-
-      {statusDialog && (
-        <OrderStatusDialog
-          open={!!statusDialog}
-          onOpenChange={(v) => { if (!v) setStatusDialog(null) }}
-          orderId={statusDialog.orderId}
-          currentStatus={statusDialog.currentStatus}
-          loading={actionLoading}
-          onConfirm={handleStatusUpdate}
-        />
-      )}
     </div>
   )
 }

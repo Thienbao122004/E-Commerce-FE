@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IconExternalLink, IconShoppingCart } from "@tabler/icons-react"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
@@ -13,10 +13,10 @@ import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
 import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
+import { cn } from "@/lib/utils"
 
 const statusColors: Record<number, string> = {
   [OrderStatus.PendingPayment]: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  [OrderStatus.PendingConfirmation]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
   [OrderStatus.Confirmed]: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   [OrderStatus.Processing]: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   [OrderStatus.Shipping]: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
@@ -49,6 +49,8 @@ type Props = {
   pageSize: number
   sort: SortConfig | null
   onSort: (key: string) => void
+  actionLoading: boolean
+  onUpdateStatus: (orderId: string, newStatus: number) => void | Promise<void>
   onPageChange: (p: number) => void
   onPageSizeChange?: (size: number) => void
 }
@@ -62,6 +64,8 @@ export function OrderTable({
   pageSize,
   sort,
   onSort,
+  actionLoading,
+  onUpdateStatus,
   onPageChange,
   onPageSizeChange,
 }: Props) {
@@ -84,7 +88,7 @@ export function OrderTable({
                 className="w-[1%] whitespace-nowrap text-center"
                 title="Xem chi tiết đơn"
               >
-                Thao tác
+                
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -121,7 +125,7 @@ export function OrderTable({
                         href={`/seller/orders/${order.id}`}
                         className="font-mono text-sm text-primary hover:underline"
                       >
-                        #{order.id.slice(0, 8).toUpperCase()}
+                        #{order.orderCode}
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -136,8 +140,11 @@ export function OrderTable({
                       {formatDate(order.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={`text-xs font-medium ${statusColors[order.status] ?? ""}`}>
-                        {OrderStatusLabels[order.status] ?? "—"}
+                      <Badge 
+                        variant="secondary"
+                        className={cn("font-medium", statusColors[order.status] ?? "")}
+                      >
+                        {OrderStatusLabels[order.status] ?? "Trạng thái lỗi"}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold text-sm tabular-nums">
@@ -173,6 +180,8 @@ export function OrderTable({
           </TableBody>
         </Table>
       </div>
+
+
 
       {!loading && (
         <TablePagination

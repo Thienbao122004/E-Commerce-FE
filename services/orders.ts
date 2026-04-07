@@ -15,6 +15,11 @@ export interface OrderItem {
 
 export interface OrderSummary {
   id: string
+  orderCode?: string
+  paymentProvider?: string | null
+  cancelReason?: string | null
+  providerShippingFee?: number | null
+  shippingFee?: number | null
   shopId: string
   shopSlug?: string
   shopName: string
@@ -54,6 +59,10 @@ export interface ConfirmOrderResponse {
   updatedAt: string
 }
 
+export interface CancelOrderRequest {
+  reason?: string
+}
+
 export const ordersService = {
   getMyOrders: (page = 1, pageSize = 50, status?: number) => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
@@ -67,6 +76,9 @@ export const ordersService = {
   confirmOrder: (orderId: string) =>
     api.post<ConfirmOrderResponse>(`/api/orders/${orderId}/confirm`),
 
-  cancelPendingOrder: (orderId: string) =>
-    api.post<{ success: boolean; message: string }>(`/api/orders/${orderId}/cancel-pending`),
+  cancelOrder: (orderId: string, payload?: CancelOrderRequest) =>
+    api.post<{ success: boolean; message: string }>(`/api/orders/${orderId}/cancel`, payload ?? {}),
+
+  cancelPendingOrder: (orderId: string, payload?: CancelOrderRequest) =>
+    api.post<{ success: boolean; message: string }>(`/api/orders/${orderId}/cancel-pending`, payload ?? {}),
 }

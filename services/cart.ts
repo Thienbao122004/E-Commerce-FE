@@ -33,9 +33,19 @@ export interface UpdateCartItemRequest {
   quantity: number
 }
 
+export interface ShopShippingOption {
+  shopId: string
+  shippingProvider?: string
+  shippingServiceId?: string
+  providerShippingFee: number
+  shippingFee: number
+  estimatedDeliveryDate?: string | null
+}
+
 export interface CheckoutRequest {
   cartId: string
   shippingAddressId: string
+  shippingOptions?: ShopShippingOption[]
 }
 
 export interface CheckoutResponse {

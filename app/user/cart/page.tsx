@@ -194,7 +194,6 @@ export default function CartPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header bảng */}
       <div
         className="hidden md:grid items-center gap-4 px-5 py-3 rounded-t-lg text-sm text-muted-foreground"
         style={{
