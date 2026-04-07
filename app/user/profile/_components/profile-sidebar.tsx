@@ -10,6 +10,7 @@ const accountLinks = [
   { href: '/user/profile', label: 'Hồ Sơ', icon: 'person' },
   { href: '/user/profile/addresses', label: 'Địa Chỉ', icon: 'location_on' },
   { href: '/user/profile/change-password', label: 'Đổi Mật Khẩu', icon: 'lock' },
+  { href: '/user/profile/wallet', label: 'Ví Của Tôi', icon: 'account_balance_wallet' },
 ]
 
 const orderLinks = [
