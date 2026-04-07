@@ -3,13 +3,13 @@ import { api } from '@/lib/api-client'
 export interface OrderItem {
   id: string
   productId: string
+  variantId?: string
   productName: string
   variantName?: string
   quantity: number
   unitPrice: number
   totalPrice: number
   thumbnailUrl?: string
-  /** Từ API: đã có đánh giá sản phẩm (theo user + product, không theo từng đơn). */
   hasReviewedByUser?: boolean
 }
 

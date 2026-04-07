@@ -264,6 +264,7 @@ export default function PurchasePage() {
                     try {
                       await cartService.addItem({
                         productId: item.productId,
+                        variantId: item.variantId ?? undefined,
                         quantity: item.quantity,
                       })
                       successCount += 1

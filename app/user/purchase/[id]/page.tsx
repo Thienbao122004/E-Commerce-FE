@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, MessageCircle, Store, StoreIcon } from 'lucide-react'
+import { ArrowLeft, Check, MessageCircle, Store, StoreIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -45,7 +45,73 @@ const STATUS_LABELS: Record<number, string> = {
   8: 'Đã hoàn tiền',
 }
 
+const STATUS_STEPS = [0, 2, 3, 4, 5, 6] as const
+
 const CANCELLABLE_STATUSES = new Set([0, 1, 2, 3])
+
+function StatusTimeline({ currentStatus }: { currentStatus: number }) {
+  const isCancelled = currentStatus === 7
+  const isRefunded = currentStatus === 8
+
+  if (isCancelled || isRefunded) {
+    const statusColor = STATUS_COLORS[currentStatus] || '#6b7280'
+    return (
+      <div
+        className="flex items-center gap-2.5 rounded-xl border px-4 py-3"
+        style={{ borderColor: `${statusColor}55`, backgroundColor: `${statusColor}14`, color: statusColor }}
+      >
+        <div className="size-2 rounded-full" style={{ backgroundColor: statusColor }} />
+        <span className="text-sm font-semibold">{STATUS_LABELS[currentStatus] ?? 'Đơn hàng đã kết thúc'}</span>
+        <span className="text-xs opacity-80 ml-1">- Đơn hàng đã kết thúc</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
+        {STATUS_STEPS.map((step, idx) => {
+          const isDone = currentStatus > step
+          const isCurrent = currentStatus === step
+          const isLast = idx === STATUS_STEPS.length - 1
+          const label = STATUS_LABELS[step] ?? `Bước ${idx + 1}`
+
+          return (
+            <div key={step} className="contents">
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div
+                  className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                    isDone
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : isCurrent
+                        ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
+                        : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
+                  }`}
+                >
+                  {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                </div>
+                <span
+                  className={`text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${
+                    isDone
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : isCurrent
+                        ? 'text-primary'
+                        : 'text-muted-foreground/50'
+                  }`}
+                >
+                  {label}
+                </span>
+              </div>
+              {!isLast && (
+                <div className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 export default function PurchaseOrderDetailPage() {
   const router = useRouter()
@@ -267,6 +333,10 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
+      <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
+        <StatusTimeline currentStatus={order.status} />
+      </div>
+
       <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
         <div className="p-4 border-b" style={{ borderColor: '#e5ded6' }}>
           <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-text-main)' }}>
@@ -327,8 +397,8 @@ export default function PurchaseOrderDetailPage() {
           ))}
         </div>
 
-        <div className="px-4 py-3 border-t flex items-center justify-between" style={{ borderColor: '#e5ded6' }}>
-          <div className="inline-flex items-center gap-1.5 text-muted-foreground text-xs">
+        <div className="px-4 py-3 border-t grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start" style={{ borderColor: '#e5ded6' }}>
+          <div className="inline-flex items-center gap-1.5 text-muted-foreground text-xs self-start">
             <Store size={14} />
             <span>{order.shopName}</span>
           </div>
