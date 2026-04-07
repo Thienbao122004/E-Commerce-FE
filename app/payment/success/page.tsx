@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, CircleDollarSign, ReceiptText, ShoppingBag } from 'lucide-react'
 import { formatPriceVND } from '@/lib/formatters'
-
-const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
+import { clearPendingPaymentSession } from '@/lib/pending-payment-session'
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams()
@@ -16,7 +15,7 @@ export default function PaymentSuccessPage() {
   const amountLabel = formatPriceVND(Number.isNaN(amountValue) ? 0 : amountValue)
 
   useEffect(() => {
-    sessionStorage.removeItem(CHECKOUT_PENDING_PAYMENT_KEY)
+    clearPendingPaymentSession()
   }, [])
 
   return (

@@ -18,6 +18,11 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
+import {
+  readPendingPaymentSession,
+  writePendingPaymentSession,
+  type PendingPaymentMethod,
+} from '@/lib/pending-payment-session'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { toast } from 'sonner'
 import { MessageCircle, RotateCcw, Star, Store, StoreIcon, Wallet } from 'lucide-react'
@@ -62,19 +67,8 @@ const STATUS_COLORS: Record<number, string> = {
 
 const REORDERABLE_STATUSES = new Set([5, 6, 7, 8])
 const PAGE_SIZE = 10
-const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
-const PENDING_PAYMENT_TTL_MS = 100 * 60 * 1000
 
-type PayChannel = 'vnpay' | 'momo'
-
-interface PendingPaymentSession {
-  orderIds: string[]
-  paymentMethod: PayChannel
-  primaryOrderId?: string
-  paymentUrl?: string
-  paymentId?: string
-  createdAt: string
-}
+type PayChannel = PendingPaymentMethod
 
 function providerToPayChannel(provider?: string | null): PayChannel | null {
   if (!provider) return null
@@ -294,16 +288,13 @@ export default function PurchasePage() {
                   const label = method === 'momo' ? 'MoMo' : 'VNPay'
                   try {
                     // Ưu tiên dùng lại URL thanh toán đã tạo trước đó để tránh tạo thêm payment record.
-                    const rawSession = sessionStorage.getItem(CHECKOUT_PENDING_PAYMENT_KEY)
-                    if (rawSession) {
-                      const parsed = JSON.parse(rawSession) as PendingPaymentSession
-                      const createdAt = Date.parse(parsed.createdAt)
-                      const isFresh = Number.isFinite(createdAt) && Date.now() - createdAt <= PENDING_PAYMENT_TTL_MS
-                      const sameOrder = parsed.primaryOrderId === targetOrder.id
-                      const sameMethod = parsed.paymentMethod === method
+                    const session = readPendingPaymentSession()
+                    if (session) {
+                      const sameOrder = session.primaryOrderId === targetOrder.id
+                      const sameMethod = session.paymentMethod === method
 
-                      if (isFresh && sameOrder && sameMethod && parsed.paymentUrl) {
-                        window.location.href = parsed.paymentUrl
+                      if (sameOrder && sameMethod && session.paymentUrl) {
+                        window.location.href = session.paymentUrl
                         return
                       }
                     }
@@ -318,15 +309,13 @@ export default function PurchasePage() {
                       return
                     }
 
-                    const resumableSession: PendingPaymentSession = {
+                    writePendingPaymentSession({
                       orderIds: [targetOrder.id],
                       paymentMethod: method,
                       primaryOrderId: targetOrder.id,
                       paymentUrl: paymentRes.paymentUrl,
                       paymentId: paymentRes.paymentId,
-                      createdAt: new Date().toISOString(),
-                    }
-                    sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(resumableSession))
+                    })
 
                     window.location.href = paymentRes.paymentUrl
                   } catch {

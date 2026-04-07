@@ -438,7 +438,7 @@ export default function PurchaseOrderDetailPage() {
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="Ví dụ: Tôi đổi địa chỉ nhận hàng, hoặc muốn đặt lại đơn khác..."
               maxLength={500}
-              className="resize-none"
+              className="resize-none mt-1"
             />
             <p className="text-xs text-muted-foreground text-right">{cancelReason.length}/500</p>
           </div>

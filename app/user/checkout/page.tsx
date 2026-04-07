@@ -10,6 +10,10 @@ import { paymentsService } from '@/services/payments'
 import type { AddressResponse } from '@/types/profile'
 import { getProductById } from '@/services/storefront-products'
 import { formatPriceVND as formatPrice } from '@/lib/formatters'
+import {
+  writePendingPaymentSession,
+  type PendingPaymentMethod,
+} from '@/lib/pending-payment-session'
 import { toast } from 'sonner'
 import { useGHNShippingFee } from '@/hooks/useGHNShippingFee'
 import {
@@ -25,9 +29,8 @@ import {
 } from 'lucide-react'
 
 const CHECKOUT_SELECTED_IDS_KEY = 'checkout:selected-item-ids'
-const CHECKOUT_PENDING_PAYMENT_KEY = 'checkout:pending-payment'
 
-type PaymentMethod = 'vnpay' | 'momo'
+type PaymentMethod = PendingPaymentMethod
 
 type CartItemWithShop = CartItem & {
   shopId?: string
@@ -43,15 +46,6 @@ interface ShopGroup {
   shippingFee: number
   total: number
   itemCount: number
-}
-
-interface PendingPaymentSession {
-  orderIds: string[]
-  paymentMethod: PaymentMethod
-  primaryOrderId?: string
-  paymentUrl?: string
-  paymentId?: string
-  createdAt: string
 }
 
 function formatAddress(address: AddressResponse) {
@@ -328,13 +322,11 @@ export default function CheckoutPage() {
       sessionStorage.removeItem(CHECKOUT_SELECTED_IDS_KEY)
 
       if (orderIds.length > 0) {
-        const pendingSession: PendingPaymentSession = {
+        writePendingPaymentSession({
           orderIds,
           paymentMethod,
           primaryOrderId: orderIds[0],
-          createdAt: new Date().toISOString(),
-        }
-        sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(pendingSession))
+        })
       }
 
       if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
@@ -362,15 +354,13 @@ export default function CheckoutPage() {
           return
         }
 
-        const resumableSession: PendingPaymentSession = {
+        writePendingPaymentSession({
           orderIds,
           paymentMethod,
           primaryOrderId: orderIds[0],
           paymentUrl: paymentRes.paymentUrl,
           paymentId: paymentRes.paymentId,
-          createdAt: new Date().toISOString(),
-        }
-        sessionStorage.setItem(CHECKOUT_PENDING_PAYMENT_KEY, JSON.stringify(resumableSession))
+        })
 
         window.location.href = paymentRes.paymentUrl
         return
