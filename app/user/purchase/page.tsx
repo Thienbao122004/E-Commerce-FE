@@ -487,7 +487,7 @@ function OrderCard({
             {canConfirm && (
               <button
                 onClick={handleConfirm}
-                disabled={confirming}ge
+                disabled={confirming}
                 className="text-sm px-4 py-1.5 rounded text-white transition-opacity disabled:opacity-60"
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
