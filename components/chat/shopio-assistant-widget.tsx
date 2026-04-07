@@ -122,8 +122,6 @@ function TypingDots() {
     </div>
   )
 }
-
-/* ─── Inline Address Form Modal ────────────────────────────────────────────── */
 function AddressFormModal({
   onSuccess,
   onClose,
@@ -140,7 +138,7 @@ function AddressFormModal({
   const [loadingWards, setLoadingWards] = useState(false)
   const [selectedProvinceCode, setSelectedProvinceCode] = useState<number | "">("")
   const [selectedDistrictCode, setSelectedDistrictCode] = useState<number | "">("")
-  const [selectedWardCode, setSelectedWardCode] = useState<number | "">("")
+  const [selectedWardCode, setSelectedWardCode] = useState<string>("")
 
   const [form, setForm] = useState<AddAddressRequest>({
     fullName: "",
@@ -227,10 +225,8 @@ function AddressFormModal({
   }, [districts])
 
   const handleSelectWard = useCallback((value: string) => {
-    const wardCode = Number(value)
-    if (!Number.isFinite(wardCode)) return
-    const selectedWard = wards.find((w) => w.code === wardCode)
-    setSelectedWardCode(wardCode)
+    const selectedWard = wards.find((w) => w.code === value)
+    setSelectedWardCode(value)
     setForm((prev) => ({ ...prev, ward: selectedWard?.name ?? "" }))
   }, [wards])
 

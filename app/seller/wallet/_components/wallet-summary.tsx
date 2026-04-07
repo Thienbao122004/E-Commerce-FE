@@ -20,9 +20,9 @@ type Props = {
 export function WalletSummary({ wallet, loading }: Props) {
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} className={i === 0 ? "md:col-span-2 lg:col-span-2" : "lg:col-span-1"}>
+          <Card key={i}>
             <CardContent className="p-4 lg:p-5">
               <div className="flex items-center gap-3">
                 <Skeleton className="size-10 rounded-lg shrink-0" />
@@ -46,8 +46,8 @@ export function WalletSummary({ wallet, loading }: Props) {
   const refunded = wallet?.totalRefunded ?? 0
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-      <Card className="md:col-span-2 lg:col-span-2 border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent transition-shadow hover:shadow-md">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
@@ -55,7 +55,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Số dư khả dụng</p>
-              <p className="text-2xl lg:text-3xl font-bold text-primary tabular-nums mt-1">
+              <p className="text-2xl 2xl:text-3xl font-bold text-primary tabular-nums mt-1">
                 {currency(available)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5">Có thể rút ngay</p>
@@ -64,7 +64,7 @@ export function WalletSummary({ wallet, loading }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="transition-shadow hover:shadow-md lg:col-span-1">
+      <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30 shrink-0">
@@ -75,13 +75,13 @@ export function WalletSummary({ wallet, loading }: Props) {
               <p className="text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400 mt-1">
                 {currency(held)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">Đã thanh toán, chờ đơn hoàn thành</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Đã thanh toán, chờ đơn hoàn thành</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="transition-shadow hover:shadow-md lg:col-span-1">
+      <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30 shrink-0">
@@ -92,13 +92,13 @@ export function WalletSummary({ wallet, loading }: Props) {
               <p className="text-xl font-bold tabular-nums text-yellow-600 dark:text-yellow-400 mt-1">
                 {currency(pending)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">Yêu cầu rút đang xử lý</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Yêu cầu rút đang xử lý</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="transition-shadow hover:shadow-md lg:col-span-1">
+      <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 shrink-0">
@@ -109,13 +109,13 @@ export function WalletSummary({ wallet, loading }: Props) {
               <p className="text-xl font-bold tabular-nums text-green-600 dark:text-green-400 mt-1">
                 {currency(earnings)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5">Tất cả thời gian</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Tất cả thời gian</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="transition-shadow hover:shadow-md lg:col-span-1">
+      <Card className="transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
             <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
@@ -125,11 +125,11 @@ export function WalletSummary({ wallet, loading }: Props) {
               <p className="text-xs font-medium text-muted-foreground">Đã rút</p>
               <p className="text-xl font-bold tabular-nums mt-1">{currency(withdrawn)}</p>
               {refunded > 0 ? (
-                <p className="text-xs text-muted-foreground mt-1.5">
+                <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
                   Hoàn tác đơn: {currency(refunded)}
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground mt-1.5">Sau khi admin duyệt</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Sau khi admin duyệt</p>
               )}
             </div>
           </div>

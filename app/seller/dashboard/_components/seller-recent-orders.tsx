@@ -11,6 +11,7 @@ import { formatDateVN, formatPriceVND as currency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { OrderStatusLabels } from "@/types/seller-dashboard"
+import Link from "next/link"
 
 type Props = {
   orders: SellerOrder[]
@@ -84,12 +85,9 @@ export function SellerRecentOrders({ orders, loading }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Đơn hàng gần đây</CardTitle>
-        <a
-          href="/seller/orders"
-          className="text-sm text-primary hover:underline"
-        >
+        <Link href="/seller/orders" className="text-sm text-primary hover:underline">
           Xem danh sách
-        </a>
+        </Link>
       </CardHeader>
       <CardContent>
         {loading ? (

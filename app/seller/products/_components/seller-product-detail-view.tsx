@@ -589,7 +589,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                 <StatCard
                   label="Ngày tạo"
                   value={fmtDate(product.createdAt).split(",")[0]}
-                  subValue={fmtDate(product.createdAt).split(",")[1]?.trim()}
                   color="default"
                   icon={<IconCalendar className="size-4" />}
                   small
@@ -689,11 +688,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
 
               {(product.variants?.length ?? 0) > 0 ? (
                 <Card className="rounded shadow-sm overflow-hidden">
-                  <CardHeader className="py-3 px-5 bg-muted/20 border-b flex flex-row items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                        <IconClipboard className="size-3.5" />
-                      </div>
+                  <CardHeader className="bg-muted/20 border-b flex flex-row items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-sm font-semibold flex items-center">
                       Phân loại sản phẩm
                     </CardTitle>
                     <div className="flex items-center gap-2 shrink-0">

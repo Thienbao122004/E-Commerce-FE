@@ -80,6 +80,7 @@ export type SellerOrderItem = {
   id: string
   productId: string
   productName: string
+  productThumbnailUrl?: string | null
   variantName: string | null
   quantity: number
   unitPrice: number
@@ -88,13 +89,21 @@ export type SellerOrderItem = {
 
 export type SellerOrder = {
   id: string
+  orderCode?: string
   customerId: string
   customerName: string | null
+  customerEmail?: string | null
   customerAvatarUrl?: string | null
   customerPhone: string | null
   totalAmount: number
   status: number
   shippingAddress: string | null
+  providerShippingFee: number
+  shippingProvider: string | null
+  shippingServiceId: string | null
+  trackingCode: string | null
+  estimatedDeliveryDate: string | null
+  actualDeliveryDate: string | null
   createdAt: string
   items: SellerOrderItem[] | null
 }
@@ -116,7 +125,6 @@ export type SellerDashboardStats = {
 
 export const OrderStatus = {
   PendingPayment: 0,
-  PendingConfirmation: 1,
   Confirmed: 2,
   Processing: 3,
   Shipping: 4,
@@ -128,7 +136,6 @@ export const OrderStatus = {
 
 export const OrderStatusLabels: Record<number, string> = {
   [OrderStatus.PendingPayment]: "Chờ thanh toán",
-  [OrderStatus.PendingConfirmation]: "Chờ xác nhận",
   [OrderStatus.Confirmed]: "Đã xác nhận",
   [OrderStatus.Processing]: "Đang chuẩn bị",
   [OrderStatus.Shipping]: "Đang giao hàng",
@@ -252,6 +259,7 @@ export type UpdateInventoryPayload = {
 export type UpdateSellerOrderStatusPayload = {
   status: number
   note?: string
+  trackingCode?: string
 }
 
 // ====== Product reviews (seller) ======

@@ -7,6 +7,7 @@ import {
   IconRefresh,
   IconUser,
   IconPhone,
+  IconMail,
   IconMapPin,
   IconCalendar,
   IconPackage,
@@ -20,6 +21,7 @@ import {
   IconChevronRight,
   IconHash,
   IconShoppingBag,
+  IconBarcode,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -70,12 +72,6 @@ const statusConfig: Record<number, StatusCfg> = {
     badgeCls: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
     icon: <IconClock className="size-4" />,
   },
-  [OrderStatus.PendingConfirmation]: {
-    label: "Chờ xác nhận",
-    dotCls: "bg-yellow-500",
-    badgeCls: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800",
-    icon: <IconClock className="size-4" />,
-  },
   [OrderStatus.Confirmed]: {
     label: "Đã xác nhận",
     dotCls: "bg-blue-500",
@@ -120,9 +116,7 @@ const statusConfig: Record<number, StatusCfg> = {
   },
 }
 
-// ── Status timeline steps ──
 const STATUS_STEPS = [
-  OrderStatus.PendingConfirmation,
   OrderStatus.Confirmed,
   OrderStatus.Processing,
   OrderStatus.Shipping,
@@ -235,9 +229,10 @@ export function OrderDetailView({ orderId }: Props) {
 
   const transitions = order ? (validTransitions[order.status] ?? []) : []
   const canUpdate = transitions.length > 0
+  const canCancel = transitions.includes(OrderStatus.Cancelled)
 
-  const handleOpenStatusDialog = () => {
-    setSelectedStatus(transitions[0] ?? null)
+  const handleOpenStatusDialog = (nextStatus?: number) => {
+    setSelectedStatus(nextStatus ?? transitions[0] ?? null)
     setNote("")
     setShowStatusDialog(true)
   }
@@ -246,9 +241,58 @@ export function OrderDetailView({ orderId }: Props) {
     if (!order || selectedStatus === null) return
     setUpdating(true)
     try {
+      let trackingCodeToSave: string | undefined = undefined
+
+      // Xử lý tạo đơn GHN trước khi update backend
+      if (selectedStatus === OrderStatus.Processing) {
+        if (!order.shippingAddress) {
+           toast.error( "Đơn hàng này thiếu thông tin địa chỉ để báo sang GHN");
+           setUpdating(false);
+           return;
+        }
+
+        toast.loading("Đang đẩy vận đơn sang phần mềm GHN...", { id: "ghn-toast" })
+        const { parseAddressToGHNIds } = await import('@/lib/ghn-utils')
+        const { ghnService } = await import('@/services/ghn')
+        
+        try {
+          const { districtId, wardCode } = await parseAddressToGHNIds(order.shippingAddress)
+          const fallbackWeight = (order.items?.length || 1) * 500;
+
+          const ghnRes = await ghnService.createOrder({
+            payment_type_id: 2,
+            required_note: 'CHOXEMHANGKHONGTHU',
+            weight: fallbackWeight,
+            length: 10,
+            width: 10,
+            height: 10,
+            to_name: order.customerName || "Khách Hàng",
+            to_phone: order.customerPhone || "0987654321",
+            to_address: order.shippingAddress,
+            to_ward_code: wardCode,
+            to_district_id: districtId,
+            service_type_id: 2,
+            items: order.items?.map(item => ({
+               name: item.productName,
+               quantity: item.quantity,
+               price: item.unitPrice,
+               weight: 500
+            })) || [{ name: "Sản phẩm", quantity: 1, weight: 500 }]
+          })
+          
+          trackingCodeToSave = ghnRes.order_code
+          toast.success("Mã vận đơn: " + trackingCodeToSave, { id: "ghn-toast" })
+        } catch (ghnErr) {
+          toast.error(ghnErr instanceof Error ? ghnErr.message : "Sự cố tạo đơn GHN Test", { id: "ghn-toast" })
+          setUpdating(false)
+          return
+        }
+      }
+
       const res = await updateMyOrderStatus(order.id, {
         status: selectedStatus,
         note: note.trim() || undefined,
+        trackingCode: trackingCodeToSave
       })
       if (res.success) {
         toast.success(res.message ?? "Cập nhật trạng thái thành công")
@@ -266,6 +310,8 @@ export function OrderDetailView({ orderId }: Props) {
 
   const cfg = order ? statusConfig[order.status] : null
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
+  const itemCount = order?.items?.reduce((s, i) => s + i.quantity, 0) ?? 0
+  const paid = order ? order.status !== OrderStatus.PendingPayment : false
 
   return (
     <>
@@ -283,7 +329,7 @@ export function OrderDetailView({ orderId }: Props) {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight">
-                  {loading ? "Đang tải..." : `Đơn hàng #${order?.id.slice(0, 8).toUpperCase()}`}
+                  {loading ? "Đang tải..." : `Đơn hàng #${order?.orderCode}`}
                 </h1>
                 {!loading && cfg && (
                   <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.badgeCls}`}>
@@ -292,12 +338,6 @@ export function OrderDetailView({ orderId }: Props) {
                   </span>
                 )}
               </div>
-              {!loading && order && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  <IconCalendar className="inline size-3 mr-1 align-middle" />
-                  {fmtDate(order.createdAt)}
-                </p>
-              )}
             </div>
           </div>
 
@@ -308,7 +348,7 @@ export function OrderDetailView({ orderId }: Props) {
                 Tải lại
               </Button>
               {canUpdate && (
-                <Button size="sm" onClick={handleOpenStatusDialog} className="gap-1.5 h-9 rounded-xl shadow-sm">
+                <Button size="sm" onClick={() => handleOpenStatusDialog()} className="gap-1.5 h-9 rounded-xl shadow-sm">
                   <IconCircleCheck className="size-3.5" />
                   Cập nhật trạng thái
                 </Button>
@@ -321,200 +361,221 @@ export function OrderDetailView({ orderId }: Props) {
           <DetailSkeleton />
         ) : order ? (
           <>
-            <Card className="rounded shadow-sm overflow-hidden">
+          <Card className="rounded shadow-sm overflow-hidden">
               <CardContent className="p-4 sm:p-5">
                 <StatusTimeline currentStatus={order.status} />
               </CardContent>
             </Card>
+            <Card className="rounded shadow-sm overflow-hidden">
+              <CardHeader className="border-b">
+                <CardTitle className="text-medium font-semibold">Thông tin đơn hàng đơn giản</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4 px-5 py-4 md:grid-cols-5">
+                <div>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Order ID</p>
+                  <p className="mt-1 font-mono text-sm font-bold">{order.id.slice(0, 12).toUpperCase()}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Ngày đặt hàng</p>
+                  <p className="mt-1 text-sm font-semibold">{fmtDate(order.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Trạng thái thanh toán</p>
+                  <p className="mt-1 text-sm font-semibold">{paid ? "Đã xử lý" : "Chưa thanh toán"}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Dự kiến giao hàng</p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {order.estimatedDeliveryDate ? fmtDate(order.estimatedDeliveryDate) : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Đối tác vận chuyển</p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {order.shippingProvider ?? "—"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-
-              <div className="flex flex-col gap-4">
-                <Card className="rounded shadow-sm overflow-hidden">
-                  <CardHeader className="py-3 px-5 bg-muted/20 border-b">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                        <IconShoppingBag className="size-3.5" />
+            <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+              <Card className="rounded shadow-sm overflow-hidden">
+                <CardHeader className="border-b">
+                  <CardTitle className="text-medium font-semibold flex items-center gap-2">
+                      Thông tin sản phẩm
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {(order.items?.length ?? 0) === 0 ? (
+                    <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
+                      <div className="size-12 rounded-2xl bg-muted/50 flex items-center justify-center">
+                        <IconShoppingBag className="size-6 opacity-30" />
                       </div>
-                      Sản phẩm đặt hàng
-                      <Badge variant="secondary" className="ml-auto rounded-lg text-[11px] font-semibold tabular-nums">
-                        {order.items?.length ?? 0} sản phẩm
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {(order.items?.length ?? 0) === 0 ? (
-                      <div className="py-12 flex flex-col items-center gap-3 text-muted-foreground">
-                        <div className="size-12 rounded-2xl bg-muted/50 flex items-center justify-center">
-                          <IconShoppingBag className="size-6 opacity-30" />
-                        </div>
-                        <p className="text-sm font-medium opacity-50">Không có sản phẩm</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-                        {order.items!.map((item, idx) => (
-                          <div key={item.id} className="flex items-start gap-4 px-5 py-4 hover:bg-muted/20 transition-colors">
-                            {/* Index */}
-                            <div className="size-7 rounded-lg bg-muted/50 text-muted-foreground flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">
-                              {idx + 1}
-                            </div>
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm leading-tight truncate" title={item.productName}>
-                                {item.productName}
-                              </p>
-                              {item.variantName && (
-                                <span className="inline-flex items-center gap-1 mt-1 text-[11px] bg-muted/60 text-muted-foreground px-2 py-0.5 rounded-lg font-medium">
-                                  {item.variantName}
-                                </span>
-                              )}
-                            </div>
-                            {/* Price breakdown */}
-                            <div className="text-right shrink-0">
-                              <p className="text-sm font-bold text-primary tabular-nums">{currency(item.totalPrice)}</p>
-                              <p className="text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                                {currency(item.unitPrice)} × {item.quantity}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* ── Totals ── */}
-                    {(order.items?.length ?? 0) > 0 && (
-                      <div className="border-t bg-muted/10 px-5 py-4 space-y-2">
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span>Tạm tính</span>
-                          <span className="tabular-nums font-medium">{currency(subtotal)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span>Phí vận chuyển</span>
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">Miễn phí</span>
-                        </div>
-                        <Separator className="my-1" />
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold">Tổng cộng</span>
-                          <span className="text-lg font-black text-primary tabular-nums">{currency(order.totalAmount)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="rounded shadow-sm overflow-hidden">
-                  <CardContent>
-                    {order.shippingAddress ? (
-                      <div className="flex items-start gap-3">
-                        <div className="size-9 rounded-xl bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-                          <IconMapPin className="size-4" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium leading-relaxed mt-2">{order.shippingAddress}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Chưa có địa chỉ giao hàng</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <Card className="rounded shadow-sm overflow-hidden">
-                  <CardHeader className="py-3 px-5 bg-muted/20 border-b">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <div className="size-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                        <IconUser className="size-3.5" />
-                      </div>
-                      Thông tin khách hàng
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="size-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-50 dark:from-blue-900/40 dark:to-blue-950/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
-                        {order.customerName ? order.customerName.charAt(0).toUpperCase() : "?"}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate">{order.customerName ?? "Chưa rõ"}</p>
-                        <p className="text-[11px] text-muted-foreground font-mono truncate">{order.customerId.slice(0, 12)}...</p>
-                      </div>
+                      <p className="text-sm font-medium opacity-50">Không có sản phẩm</p>
                     </div>
-
-                    <Separator />
-
-                    <div className="space-y-3">
-                      {order.customerPhone && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                          <div className="size-7 rounded-lg bg-muted/60 text-muted-foreground flex items-center justify-center shrink-0">
-                            <IconPhone className="size-3.5" />
-                          </div>
-                          <span className="font-medium tabular-nums">{order.customerPhone}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2.5 text-sm">
-                        <div className="size-7 rounded-lg bg-muted/60 text-muted-foreground flex items-center justify-center shrink-0">
-                          <IconCalendar className="size-3.5" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wide mb-0.5">Đặt lúc</p>
-                          <p className="font-medium">{fmtDate(order.createdAt)}</p>
-                        </div>
-                      </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px] text-sm">
+                        <thead className="bg-muted/30">
+                          <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2.5 font-semibold">Sản phẩm</th>
+                            <th className="px-3 py-2.5 font-semibold text-left">Số lượng</th>
+                            <th className="px-3 py-2.5 font-semibold text-left">Đơn giá</th>
+                            <th className="px-5 py-2.5 font-semibold text-left">Tổng</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {order.items!.map((item) => (
+                            <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                              <td className="px-3 py-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="size-10 rounded-lg border bg-muted/40 overflow-hidden shrink-0 flex items-center justify-center">
+                                    {item.productThumbnailUrl ? (
+                                      <img src={item.productThumbnailUrl} alt={item.productName} className="size-full object-cover" />
+                                    ) : (
+                                      <IconPackage className="size-4 text-muted-foreground/60" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-medium truncate">{item.productName}</p>
+                                    {item.variantName ? (
+                                      <p className="text-xs text-muted-foreground truncate">{item.variantName}</p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-left tabular-nums">x{item.quantity}</td>
+                              <td className="px-3 py-3 text-left tabular-nums">{currency(item.unitPrice)}</td>
+                              <td className="px-5 py-3 text-left font-semibold tabular-nums">{currency(item.totalPrice)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </CardContent>
+              </Card>
 
+              <Card className="rounded shadow-sm overflow-hidden">
+                <CardHeader className="border-b">
+                  <CardTitle className="text-medium font-semibold flex items-center gap-2">Thông tin khách hàng</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-8 rounded-md border bg-muted/50 text-muted-foreground flex items-center justify-center shrink-0">
+                      <IconUser className="size-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Tên khách hàng</p>
+                      <p className="text-sm font-semibold">{order.customerName ?? "Chưa rõ"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-8 rounded-md border bg-muted/50 text-muted-foreground flex items-center justify-center shrink-0">
+                      <IconPhone className="size-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Số điện thoại  </p>
+                      <p className="text-sm font-medium tabular-nums">{order.customerPhone ?? "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-8 rounded-md border bg-muted/50 text-muted-foreground flex items-center justify-center shrink-0">
+                      <IconMail className="size-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">Email</p>
+                      <p className="text-sm font-medium break-all">{order.customerEmail ?? "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="size-8 rounded-md border bg-muted/50 text-muted-foreground flex items-center justify-center shrink-0">
+                      <IconMapPin className="size-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">Địa chỉ giao hàng</p>
+                      <p className="text-sm font-medium break-words">{order.shippingAddress ?? "Chưa có địa chỉ"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+              <Card className="rounded shadow-sm overflow-hidden">
+                <CardHeader className="py-3 px-5 bg-muted/20 border-b">
+                  <CardTitle className="text-medium font-semibold flex items-center gap-2">
+                    Trạng thái thanh toán
+                    <Badge
+                      variant="outline"
+                      className={`ml-auto text-[11px] ${paid ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800" : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800"}`}
+                    >
+                      {paid ? "Đã thanh toán" : "Chưa thanh toán"}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Tổng phụ ({itemCount} sản phẩm)</span>
+                    <span className="font-medium tabular-nums">{currency(subtotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Phí vận chuyển</span>
+                    <span className="font-medium tabular-nums">{currency(order.providerShippingFee)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold">Tổng tiền</span>
+                    <span className="text-lg font-black text-primary">{currency(order.totalAmount)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {(order.trackingCode || order.shippingProvider || order.estimatedDeliveryDate || order.actualDeliveryDate) && (
                 <Card className="rounded shadow-sm overflow-hidden">
                   <CardHeader className="py-3 px-5 bg-muted/20 border-b">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <div className="size-6 rounded-lg bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-                        <IconHash className="size-3.5" />
-                      </div>
-                      Thông tin đơn hàng
+                    <CardTitle className="text-medium font-semibold flex items-center gap-2">
+                      Thông tin vận chuyển
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-muted-foreground font-medium">Mã đơn hàng</span>
-                      <span className="font-mono text-xs font-bold bg-muted/60 px-2 py-1 rounded-lg">
-                        {order.id.slice(0, 8).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-muted-foreground font-medium">Trạng thái</span>
-                      {cfg && (
-                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg border ${cfg.badgeCls}`}>
-                          {cfg.icon}
-                          {cfg.label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-muted-foreground font-medium">Số lượng SP</span>
-                      <span className="text-sm font-bold tabular-nums">{order.items?.length ?? 0}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold">Tổng tiền</span>
-                      <span className="text-base font-black text-primary tabular-nums">{currency(order.totalAmount)}</span>
-                    </div>
+                    {order.trackingCode && (
+                      <div className="flex items-start gap-2.5">
+                        <div className="size-8 rounded-md border bg-muted/50 text-muted-foreground flex items-center justify-center shrink-0">
+                          <IconBarcode className="size-3.5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Mã vận đơn</p>
+                          <p className="text-sm font-semibold font-mono">{order.trackingCode}</p>
+                        </div>
+                      </div>
+                    )}
+                    {order.actualDeliveryDate && (
+                      <div className="flex items-start gap-2.5">
+                        <div className="size-8 rounded-md border bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <IconCheck className="size-3.5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Giao thành công lúc</p>
+                          <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmtDate(order.actualDeliveryDate)}</p>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              </div>
+              )}
             </div>
           </>
         ) : null}
       </div>
 
-      {/* ── Mobile sticky bar ── */}
       {!loading && order && (
         <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-background/95 backdrop-blur-md border-t px-4 py-3 flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-9 rounded-xl aspect-square p-0">
             <IconRefresh className="size-4" />
           </Button>
           {canUpdate ? (
-            <Button size="sm" onClick={handleOpenStatusDialog} className="flex-1 gap-1.5 h-9 rounded-xl shadow-sm">
+            <Button size="sm" onClick={() => handleOpenStatusDialog()} className="flex-1 gap-1.5 h-9 rounded-xl shadow-sm">
               <IconCircleCheck className="size-3.5" />
               Cập nhật trạng thái
             </Button>
@@ -527,7 +588,6 @@ export function OrderDetailView({ orderId }: Props) {
         </div>
       )}
 
-      {/* ── Update status dialog ── */}
       <Dialog open={showStatusDialog} onOpenChange={(v) => { if (!v) setShowStatusDialog(false) }}>
         <DialogContent className="rounded-2xl max-w-md">
           <DialogHeader>
