@@ -428,6 +428,7 @@ export default function ProfilePage() {
                   src={avatarUrl}
                   alt="Avatar"
                   className="size-24 rounded-full object-cover ring-2 ring-border"
+                  onError={() => setAvatarUrl(undefined)}
                 />
               ) : (
                 <span
