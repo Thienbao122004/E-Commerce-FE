@@ -19,7 +19,6 @@ import type {
 } from '@/types/ghn'
 
 const GHN_TOKEN  = process.env.NEXT_PUBLIC_GHN_TOKEN  ?? ''
-const GHN_SHOP_ID = process.env.NEXT_PUBLIC_GHN_SHOP_ID ?? ''
 
 const GHN_ORIGIN = 'https://dev-online-gateway.ghn.vn'
 
@@ -35,8 +34,7 @@ function buildHeaders(shopId?: string | number): HeadersInit {
     'Content-Type': 'application/json',
     Token: GHN_TOKEN,
   }
-  const sid = shopId ?? GHN_SHOP_ID
-  if (sid) headers['ShopId'] = String(sid)
+  if (shopId) headers['ShopId'] = String(shopId)
   return headers
 }
 

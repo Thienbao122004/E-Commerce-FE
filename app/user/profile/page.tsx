@@ -376,26 +376,6 @@ export default function ProfilePage() {
                 />
               </div>
 
-              {profile?.shop && (
-                <div className="flex items-center">
-                  <Label className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm">
-                    Shop
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      style={{
-                        backgroundColor: 'rgba(236,127,19,0.1)',
-                        color: 'var(--color-primary)',
-                      }}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">storefront</span>
-                      {(profile.shop as any).shopName ?? (profile.shop as any).name ?? 'Shop'}
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* Save button */}
               <div className="flex items-center pt-2">
                 <div className="w-[140px] shrink-0" />

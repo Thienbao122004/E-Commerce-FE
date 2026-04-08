@@ -292,7 +292,7 @@ export function OrderDetailView({ orderId }: Props) {
                price: item.unitPrice,
                weight: 500
             })) || [{ name: "Sản phẩm", quantity: 1, weight: 500 }]
-          })
+          }, order.shopGhnShopId ?? undefined)
           
           trackingCodeToSave = ghnRes.order_code
           toast.success("Mã vận đơn: " + trackingCodeToSave, { id: "ghn-toast" })
