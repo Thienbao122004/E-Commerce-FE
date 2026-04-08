@@ -21,8 +21,9 @@ import { ChatWindow, ChatEmptyState } from "./_components/chat-window"
 import { IconLoader2 } from "@tabler/icons-react"
 
 export default function SellerChatPage() {
-  const { session } = useAuth()
+  const { session, user } = useAuth()
   const token = session?.access_token
+  const currentUserId = user?.id ?? null
 
   const [conversations, setConversations] = useState<ConversationDto[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -53,6 +54,9 @@ export default function SellerChatPage() {
   }, [activeId])
 
   const upsertConversation = useCallback((next: ConversationDto) => {
+    if (!currentUserId) return
+    if (next.sellerId !== currentUserId || next.buyerId === currentUserId) return
+
     setConversations((prev) => {
       const exists = prev.some((c) => c.id === next.id)
       const merged = exists
@@ -65,20 +69,26 @@ export default function SellerChatPage() {
         return new Date(bTime).getTime() - new Date(aTime).getTime()
       })
     })
-  }, [])
+  }, [currentUserId])
 
   // ── Load conversations ────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
-    if (!token) return
+    if (!token || !currentUserId) {
+      setLoading(false)
+      return
+    }
     try {
       const data = await fetchConversations(token)
-      setConversations(data)
+      const sellerOnly = data.filter(
+        (c) => c.sellerId === currentUserId && c.buyerId !== currentUserId
+      )
+      setConversations(sellerOnly)
     } catch {
       // silent
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, currentUserId])
 
   useEffect(() => {
     loadConversations()

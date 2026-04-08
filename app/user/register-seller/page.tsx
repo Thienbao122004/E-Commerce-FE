@@ -193,6 +193,10 @@ export default function RegisterSellerPage() {
         toast.error("Vui lòng nhập tên shop");
         return false;
       }
+      if (!form.phone.trim()) {
+        toast.error("Vui lòng nhập số điện thoại shop");
+        return false;
+      }
       if (!form.businessType) {
         toast.error("Vui lòng chọn loại hình kinh doanh");
         return false;
@@ -200,10 +204,6 @@ export default function RegisterSellerPage() {
     }
 
     if (targetStep === 2) {
-      if (!form.phone.trim()) {
-        toast.error("Vui lòng nhập số điện thoại shop");
-        return false;
-      }
       if (!form.addressLine.trim()) {
         toast.error("Vui lòng nhập địa chỉ lấy hàng");
         return false;
@@ -298,7 +298,7 @@ export default function RegisterSellerPage() {
 
   if (loadingProfile) {
     return (
-      <Card className="border" style={{ borderColor: "#e5ded6" }}>
+      <Card className="border rounded" style={{ borderColor: "#e5ded6" }}>
         <CardContent className="pt-6">
           <div className="animate-pulse space-y-4">
             <div className="h-6 w-48 bg-gray-200 rounded" />
@@ -312,7 +312,7 @@ export default function RegisterSellerPage() {
 
   if (!profile || profile.role !== "customer" || profile.shop) {
     return (
-      <Card className="border" style={{ borderColor: "#e5ded6" }}>
+      <Card className="border rounded" style={{ borderColor: "#e5ded6" }}>
         <CardHeader>
           <CardTitle>Đăng ký Seller</CardTitle>
           <CardDescription>
@@ -329,7 +329,7 @@ export default function RegisterSellerPage() {
   }
 
   return (
-    <Card className="border" style={{ borderColor: "#e5ded6" }}>
+    <Card className="border rounded" style={{ borderColor: "#e5ded6" }}>
       <CardHeader>
         <CardTitle>Đăng ký trở thành Seller</CardTitle>
         <CardDescription>
@@ -351,8 +351,8 @@ export default function RegisterSellerPage() {
 
         {step === 1 && (
           <div className="grid grid-cols-1 gap-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="space-y-2 flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="shop-name">Tên shop *</Label>
                 <Input
                   id="shop-name"
@@ -363,7 +363,20 @@ export default function RegisterSellerPage() {
                   placeholder="Ví dụ: Handmade Home"
                 />
               </div>
-              <div className="space-y-2 w-48">
+
+              <div className="space-y-2">
+                <Label htmlFor="shop-phone">Số điện thoại shop *</Label>
+                <Input
+                  id="shop-phone"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, phone: e.target.value }))
+                  }
+                  placeholder="09xxxxxxxx"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="business-type">Loại hình kinh doanh *</Label>
                 <Select
                   value={form.businessType}
@@ -405,20 +418,8 @@ export default function RegisterSellerPage() {
         )}
 
         {step === 2 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="shop-phone">Số điện thoại shop *</Label>
-              <Input
-                id="shop-phone"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, phone: e.target.value }))
-                }
-                placeholder="09xxxxxxxx"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2 md:col-span-3">
               <Label htmlFor="address-line">Địa chỉ lấy hàng *</Label>
               <Input
                 id="address-line"
@@ -497,17 +498,6 @@ export default function RegisterSellerPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="city">Thành phố</Label>
-              <Input
-                id="city"
-                value={form.city}
-                readOnly
-                disabled
-                className="bg-muted"
-              />
-            </div>
           </div>
         )}
 
@@ -581,41 +571,18 @@ export default function RegisterSellerPage() {
                 placeholder="Tùy chọn"
               />
             </div>
-
-            <div
-              className="md:col-span-2 rounded-md border p-3 text-sm"
-              style={{ borderColor: "#e5ded6" }}
-            >
-              <p
-                className="font-medium mb-2"
-                style={{ color: "var(--color-text-main)" }}
-              >
-                Thông tin sẽ gửi:
-              </p>
-              <p className="text-muted-foreground">
-                Shop: {form.shopName || "—"}
-              </p>
-              <p className="text-muted-foreground">
-                Loại hình: {form.businessType}
-              </p>
-              <p className="text-muted-foreground">
-                Địa chỉ GHN: {form.addressLine || "—"}
-                {selectedWardName ? `, ${selectedWardName}` : ""}
-                {selectedDistrictName ? `, ${selectedDistrictName}` : ""}
-                {form.city ? `, ${form.city}` : ""}
-              </p>
-            </div>
           </div>
         )}
       </CardContent>
 
-      <CardFooter className="justify-between">
-        <Button
-          variant="outline"
-          onClick={step === 1 ? () => router.push("/user/profile") : prevStep}
-        >
-          {step === 1 ? "Quay lại hồ sơ" : "Quay lại"}
-        </Button>
+      <CardFooter className="flex justify-between gap-2">
+        {step > 1 ? (
+          <Button variant="outline" onClick={prevStep}>
+            Quay lại bước trước
+          </Button>
+        ) : (
+          <div />
+        )}
 
         {step < 3 ? (
           <Button
