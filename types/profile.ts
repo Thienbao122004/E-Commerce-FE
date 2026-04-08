@@ -4,6 +4,8 @@ export interface ShopInfo {
   shopSlug: string
   shopDescription: string | null
   shopLogo: string | null
+  verificationStatus?: number   // 0=pending, 1=approved, 2=rejected
+  rejectionReason?: string | null
 }
 
 export interface UserProfileResponse {
@@ -39,6 +41,12 @@ export interface UpdateProfileRequest {
   phone?: string | null
 }
 
+export interface ShopDocumentInput {
+  /** cccd_front | cccd_back | business_license | tax_cert */
+  docType: string
+  fileUrl: string
+}
+
 export interface RegisterSellerRequest {
   shopName: string
   shopDescription?: string | null
@@ -54,6 +62,7 @@ export interface RegisterSellerRequest {
   bankName?: string | null
   bankAccountNumber?: string | null
   bankAccountName?: string | null
+  documents?: ShopDocumentInput[]
 }
 
 export interface AddAddressRequest {

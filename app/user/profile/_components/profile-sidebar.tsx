@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
@@ -21,6 +22,11 @@ const orderLinks = [
 export function ProfileSidebar() {
   const pathname = usePathname()
   const { user, profile, avatarUrl } = useAuth()
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
 
   const displayName = profile?.full_name ?? user?.email?.split('@')[0] ?? 'Người dùng'
   const initials = displayName
@@ -36,11 +42,12 @@ export function ProfileSidebar() {
     <aside className="w-[220px] shrink-0">
       {/* User Info */}
       <div className="flex items-center gap-3 pb-5">
-        {avatarUrl ? (
+        {avatarUrl && !imgError ? (
           <img
             src={avatarUrl}
             alt={displayName}
             className="size-12 rounded-full object-cover shrink-0 ring-2 ring-border"
+            onError={() => setImgError(true)}
           />
         ) : (
           <span

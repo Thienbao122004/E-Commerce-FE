@@ -258,6 +258,14 @@ export type UpdateInventoryPayload = {
   quantity: number
 }
 
+export type UpdateVariantPayload = {
+  variantName?: string
+  sku?: string | null
+  price?: number | null
+  attributes?: string | null
+  isActive?: boolean
+}
+
 export type UpdateSellerOrderStatusPayload = {
   status: number
   note?: string

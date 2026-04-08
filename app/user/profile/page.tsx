@@ -33,7 +33,7 @@ function maskEmail(email: string): string {
 }
 
 export default function ProfilePage() {
-  const { user, refreshProfile } = useAuth()
+  const { user, refreshProfile, signOut } = useAuth()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -274,8 +274,41 @@ export default function ProfilePage() {
     )
   }
 
+  // Shop đã được duyệt nhưng JWT role vẫn là customer → cần re-login
+  const needsRelogin =
+    profile?.shop &&
+    (profile.shop as any).verificationStatus === 1 &&
+    profile.role === 'customer'
+
   return (
     <>
+      {needsRelogin && (
+        <div
+          className="mb-4 flex items-start gap-3 rounded-lg border px-4 py-3"
+          style={{ borderColor: '#f59e0b', backgroundColor: '#fffbeb' }}
+        >
+          <span className="material-symbols-outlined mt-0.5 text-[20px]" style={{ color: '#f59e0b' }}>
+            info
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ color: '#92400e' }}>
+              Shop của bạn đã được duyệt!
+            </p>
+            <p className="text-sm mt-0.5" style={{ color: '#92400e' }}>
+              Vui lòng đăng xuất và đăng nhập lại để hệ thống cập nhật quyền Seller.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={signOut}
+            className="shrink-0 text-white"
+            style={{ backgroundColor: '#f59e0b' }}
+          >
+            Đăng xuất ngay
+          </Button>
+        </div>
+      )}
+
       <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
         <div className="px-6 pt-6 pb-4">
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-main)' }}>
@@ -395,6 +428,7 @@ export default function ProfilePage() {
                   src={avatarUrl}
                   alt="Avatar"
                   className="size-24 rounded-full object-cover ring-2 ring-border"
+                  onError={() => setAvatarUrl(undefined)}
                 />
               ) : (
                 <span

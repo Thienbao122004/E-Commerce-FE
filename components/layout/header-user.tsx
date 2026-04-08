@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import {
   DropdownMenu,
@@ -13,6 +14,11 @@ import { useRouter } from "next/navigation"
 export function HeaderUser() {
   const { session, user, profile, avatarUrl, isLoading, signOut } = useAuth()
   const router = useRouter()
+  const [imgError, setImgError] = useState(false)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
 
   if (isLoading) {
     return (
@@ -42,11 +48,12 @@ export function HeaderUser() {
             type="button"
             className="flex items-center gap-2 px-2 py-1 rounded-full transition-colors hover:bg-[#f0ebe4] max-w-[180px] focus:outline-none"
           >
-            {avatarUrl ? (
+            {avatarUrl && !imgError ? (
               <img
                 src={avatarUrl}
                 alt={displayName}
                 className="size-8 rounded-full object-cover shrink-0 ring-2 ring-[#f0ebe4]"
+                onError={() => setImgError(true)}
               />
             ) : (
               <span

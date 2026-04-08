@@ -57,7 +57,17 @@ export async function apiClient<T = any>(
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message)
+
+        // FluentValidation format: { title, errors: { Field: ["msg", ...] } }
+        if (errorData.errors && typeof errorData.errors === 'object') {
+            const firstMsg = Object.values(errorData.errors as Record<string, string[]>)
+                .flat()
+                .find(Boolean)
+            throw new Error(firstMsg ?? errorData.title ?? 'Dữ liệu không hợp lệ')
+        }
+
+        // Service error format: { message: "..." } hoặc { success: false, message: "..." }
+        throw new Error(errorData.message ?? errorData.title ?? 'Có lỗi xảy ra')
     }
 
     return response.json()
