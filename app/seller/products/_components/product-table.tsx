@@ -97,11 +97,6 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                       <p className="font-medium text-sm">Chưa có sản phẩm nào</p>
                       <p className="text-xs mt-0.5">Bắt đầu bằng cách thêm sản phẩm đầu tiên</p>
                     </div>
-                    <Button size="sm" asChild>
-                      <Link href="/seller/products/new">
-                        <IconPlus className="mr-1.5 size-4" />Thêm sản phẩm đầu tiên
-                      </Link>
-                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

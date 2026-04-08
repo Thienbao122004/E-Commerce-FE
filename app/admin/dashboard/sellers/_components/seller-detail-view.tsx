@@ -32,6 +32,12 @@ type Props = {
   onClose: (shopId: string, reason: string) => Promise<void>
 }
 
+const BUSINESS_TYPE_LABELS: Record<string, string> = {
+  individual: "Cá nhân",
+  household: "Hộ kinh doanh",
+  company: "Công ty",
+}
+
 export function SellerDetailView({
   shop, detailLoading, busy,
   onBack, onApprove, onReject, onActivate, onSuspend, onClose,
@@ -40,6 +46,27 @@ export function SellerDetailView({
   const [dialogType, setDialogType] = React.useState<DialogType>(null)
   const [reason, setReason] = React.useState("")
   const [note, setNote] = React.useState("")
+
+  const businessType = React.useMemo(() => {
+    const match = shop.description?.match(/Business\s*Type:\s*([A-Za-z_]+)/i)
+    return match?.[1]?.toLowerCase() ?? null
+  }, [shop.description])
+
+  const businessTypeLabel = businessType
+    ? (BUSINESS_TYPE_LABELS[businessType] ?? businessType)
+    : null
+
+  const displayDescription = React.useMemo(() => {
+    if (!shop.description) return null
+
+    return shop.description.replace(
+      /Business\s*Type:\s*([A-Za-z_]+)/gi,
+      (_, rawType: string) => {
+        const normalized = rawType.toLowerCase()
+        return `Loại hình kinh doanh: ${BUSINESS_TYPE_LABELS[normalized] ?? rawType}`
+      }
+    )
+  }, [shop.description])
 
   const closeDialog = () => { setDialogType(null); setReason(""); setNote("") }
 
@@ -151,7 +178,6 @@ export function SellerDetailView({
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {/* Shop Info */}
                 <div className="rounded-lg border p-4 space-y-3">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thông tin cửa hàng</h3>
                   <div className="flex items-center gap-3">
@@ -167,7 +193,12 @@ export function SellerDetailView({
                       <p className="text-xs text-muted-foreground">/{shop.slug}</p>
                     </div>
                   </div>
-                  {shop.description && <p className="text-sm text-muted-foreground">{shop.description}</p>}
+                  {displayDescription && (
+                    <p className="text-sm text-muted-foreground whitespace-pre-line break-words leading-relaxed">
+                      {displayDescription}
+                    </p>
+                  )}
+
                   <div className="text-sm">
                     <span className="text-muted-foreground">Ngày đăng ký: </span>
                     <span className="tabular-nums">{formatDateTimeVN(shop.createdAt, "—")}</span>
@@ -178,9 +209,18 @@ export function SellerDetailView({
                 <div className="rounded-lg border p-4 space-y-3">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Chủ cửa hàng</h3>
                   <div className="space-y-2 text-sm">
-                    <div><span className="text-muted-foreground">Họ tên: </span><span className="font-medium">{shop.ownerName ?? "—"}</span></div>
-                    <div><span className="text-muted-foreground">Email: </span><span className="font-medium">{shop.ownerEmail ?? "—"}</span></div>
-                    <div><span className="text-muted-foreground">ID: </span><span className="font-mono text-xs">{shop.ownerId}</span></div>
+                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                      <span className="text-muted-foreground">Họ tên:</span>
+                      <span className="font-medium break-words">{shop.ownerName ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium break-all">{shop.ownerEmail ?? "Chưa đồng bộ"}</span>
+                    </div>
+                    <div className="grid grid-cols-[72px_1fr] gap-2">
+                      <span className="text-muted-foreground">ID:</span>
+                      <span className="font-mono text-xs break-all">{shop.ownerId}</span>
+                    </div>
                   </div>
                 </div>
 
