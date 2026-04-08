@@ -144,7 +144,7 @@ export function CartDropdown() {
                 {previewItems.map((item) => (
                   <Link
                     key={item.id}
-                    href={`/product/${item.productId}`}
+                    href={item.productSlug ? `/products/${item.productSlug}` : `/user/cart`}
                     className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#faf8f6] transition-colors"
                   >
                     <div

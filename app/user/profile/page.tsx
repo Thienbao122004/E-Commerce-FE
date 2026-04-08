@@ -136,22 +136,77 @@ export default function ProfilePage() {
     }
   }
 
+  const compressImageToLimit = (file: File, maxBytes = 1024 * 1024): Promise<File> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+        const canvas = document.createElement('canvas')
+
+        // Giảm kích thước ảnh nếu quá lớn (tối đa 1600px cạnh dài)
+        const MAX_SIDE = 1600
+        let { width, height } = img
+        if (width > MAX_SIDE || height > MAX_SIDE) {
+          if (width >= height) {
+            height = Math.round((height * MAX_SIDE) / width)
+            width = MAX_SIDE
+          } else {
+            width = Math.round((width * MAX_SIDE) / height)
+            height = MAX_SIDE
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, width, height)
+
+        // Giảm quality dần cho đến khi < maxBytes
+        const tryQuality = (quality: number) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error('Không thể nén ảnh'))
+              if (blob.size <= maxBytes || quality <= 0.1) {
+                resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+              } else {
+                tryQuality(Math.max(quality - 0.1, 0.1))
+              }
+            },
+            'image/jpeg',
+            quality,
+          )
+        }
+        tryQuality(0.9)
+      }
+      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Không thể đọc ảnh')) }
+      img.src = objectUrl
+    })
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
     e.target.value = ''
 
-    if (file.size > 1024 * 1024) {
-      toast.error('File quá lớn. Dung lượng tối đa 1 MB')
-      return
-    }
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
       toast.error('Chỉ hỗ trợ định dạng JPEG, PNG')
       return
     }
 
-    setAvatarFile(file)
-    setAvatarUrl(URL.createObjectURL(file))
+    const MAX = 1024 * 1024
+    let finalFile = file
+
+    if (file.size > MAX) {
+      try {
+        finalFile = await compressImageToLimit(file, MAX)
+      } catch {
+        toast.error('Không thể xử lý ảnh, vui lòng chọn ảnh khác')
+        return
+      }
+    }
+
+    setAvatarFile(finalFile)
+    setAvatarUrl(URL.createObjectURL(finalFile))
     toast.success('Đã chọn ảnh. Bấm "Lưu" để hoàn tất cập nhật.')
   }
 
@@ -371,7 +426,7 @@ export default function ProfilePage() {
               onChange={handleAvatarUpload}
             />
             <div className="mt-3 text-center">
-              <p className="text-xs text-muted-foreground">Dung lượng file tối đa 1 MB</p>
+              <p className="text-xs text-muted-foreground">Ảnh lớn hơn 1 MB sẽ được nén tự động</p>
               <p className="text-xs text-muted-foreground">Định dạng: JPEG, PNG</p>
             </div>
           </div>
