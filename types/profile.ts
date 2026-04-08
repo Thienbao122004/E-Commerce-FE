@@ -4,6 +4,8 @@ export interface ShopInfo {
   shopSlug: string
   shopDescription: string | null
   shopLogo: string | null
+  verificationStatus?: number   // 0=pending, 1=approved, 2=rejected
+  rejectionReason?: string | null
 }
 
 export interface UserProfileResponse {

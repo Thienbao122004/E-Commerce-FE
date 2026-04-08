@@ -436,14 +436,111 @@ export default function RegisterSellerPage() {
     );
   }
 
-  if (!profile || profile.role !== "customer" || profile.shop) {
+  // Đã là seller / admin
+  if (!profile || profile.role === "seller" || profile.role === "admin") {
     return (
       <Card className="border" style={{ borderColor: "#e5ded6" }}>
         <CardHeader>
           <CardTitle>Đăng ký Seller</CardTitle>
-          <CardDescription>
-            Tài khoản hiện tại không cần thực hiện đăng ký seller mới.
-          </CardDescription>
+          <CardDescription>Tài khoản của bạn đã có quyền Seller hoặc Admin.</CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Button asChild style={{ backgroundColor: "var(--color-primary)" }}>
+            <Link href="/user/profile">Quay lại hồ sơ</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // Đang chờ duyệt
+  if (profile.shop && (profile.shop as any).verificationStatus === 0) {
+    return (
+      <Card className="border" style={{ borderColor: "#e5ded6" }}>
+        <CardHeader>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="size-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-amber-600">hourglass_top</span>
+            </div>
+            <div>
+              <CardTitle>Đang chờ xét duyệt</CardTitle>
+              <CardDescription className="mt-0.5">
+                Đơn đăng ký của bạn đã được gửi và đang chờ admin phê duyệt.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border p-3 text-sm text-muted-foreground" style={{ borderColor: "#e5ded6" }}>
+            <p>Tên shop: <span className="font-medium text-foreground">{(profile.shop as any).name ?? "—"}</span></p>
+            <p className="mt-1">Bạn sẽ nhận được thông báo khi có kết quả.</p>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button asChild variant="outline">
+            <Link href="/user/profile">Quay lại hồ sơ</Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // Bị từ chối → cho phép đăng ký lại
+  if (profile.shop && (profile.shop as any).verificationStatus === 2) {
+    const reason = (profile.shop as any).rejectionReason as string | null | undefined;
+    return (
+      <Card className="border" style={{ borderColor: "#e5ded6" }}>
+        <CardHeader>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="size-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-red-600">cancel</span>
+            </div>
+            <div>
+              <CardTitle>Đơn đăng ký bị từ chối</CardTitle>
+              <CardDescription className="mt-0.5">
+                Admin đã từ chối đơn đăng ký seller của bạn.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {reason && (
+            <div className="rounded-md border p-3 text-sm" style={{ borderColor: "#fca5a5", backgroundColor: "#fff5f5" }}>
+              <p className="font-medium text-red-700 mb-1">Lý do từ chối:</p>
+              <p className="text-red-600">{reason}</p>
+            </div>
+          )}
+          <div className="rounded-md border p-3 text-sm text-muted-foreground" style={{ borderColor: "#e5ded6" }}>
+            <p>Bạn có thể chỉnh sửa thông tin và gửi lại đơn đăng ký.</p>
+          </div>
+        </CardContent>
+        <CardFooter className="gap-3">
+          <Button asChild variant="outline">
+            <Link href="/user/profile">Quay lại hồ sơ</Link>
+          </Button>
+          <Button
+            onClick={() => {
+              // Xóa guard bằng cách patch profile.shop về null tạm thời
+              setProfile((prev) => prev ? { ...prev, shop: null } : prev);
+              setStep(1);
+            }}
+            style={{ backgroundColor: "var(--color-primary)" }}
+          >
+            Đăng ký lại
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
+  // Đã approved nhưng role vẫn là customer (chờ re-login) → handled by profile page banner
+  // Trường hợp shop tồn tại nhưng không phải 3 case trên
+  if (profile.shop) {
+    return (
+      <Card className="border" style={{ borderColor: "#e5ded6" }}>
+        <CardHeader>
+          <CardTitle>Đăng ký Seller</CardTitle>
+          <CardDescription>Tài khoản hiện tại không cần thực hiện đăng ký seller mới.</CardDescription>
         </CardHeader>
         <CardFooter>
           <Button asChild style={{ backgroundColor: "var(--color-primary)" }}>

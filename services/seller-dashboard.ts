@@ -98,6 +98,13 @@ export function updateMyInventory(productId: string, dto: UpdateInventoryPayload
   )
 }
 
+export function updateMyVariant(productId: string, variantId: string, dto: UpdateVariantPayload) {
+  return api.put<{ success: boolean; message?: string }>(
+    `/api/seller/products/${productId}/variants/${variantId}`,
+    dto
+  )
+}
+
 // ====== Orders ======
 
 export function fetchMyOrders(page = 1, pageSize = 10, status?: number, search?: string) {

@@ -22,6 +22,7 @@ import {
   IconAlertTriangle,
   IconCheck,
   IconX,
+  IconPencil,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -62,9 +63,11 @@ import {
   updateMyProduct,
   deleteMyProduct,
   addMyProductVariant,
+  updateMyInventory,
+  updateMyVariant,
 } from "@/services/seller-dashboard"
 import { ProductStatus } from "@/types/seller-dashboard"
-import type { SellerProductDetail, SellerProductVariantPayload } from "@/types/seller-dashboard"
+import type { SellerProductDetail, SellerProductVariant, SellerProductVariantPayload } from "@/types/seller-dashboard"
 import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
 
@@ -152,6 +155,24 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [previewOpen, setPreviewOpen] = React.useState(false)
   const [previewUrl, setPreviewUrl] = React.useState("")
 
+  // ── Inline stock editing ──────────────────────────────────────────────────
+  const [editingStockVarId, setEditingStockVarId] = React.useState<string | null>(null)
+  const [editingStockVal, setEditingStockVal] = React.useState("")
+  const [savingStockId, setSavingStockId] = React.useState<string | null>(null)
+  // For products without variants:
+  const [editingBaseStock, setEditingBaseStock] = React.useState(false)
+  const [editingBaseStockVal, setEditingBaseStockVal] = React.useState("")
+  const [savingBaseStock, setSavingBaseStock] = React.useState(false)
+
+  // ── Edit variant dialog ───────────────────────────────────────────────────
+  const [editVariant, setEditVariant] = React.useState<SellerProductVariant | null>(null)
+  const [evName, setEvName] = React.useState("")
+  const [evSku, setEvSku] = React.useState("")
+  const [evPrice, setEvPrice] = React.useState("")
+  const [evAttrs, setEvAttrs] = React.useState("")
+  const [evActive, setEvActive] = React.useState(true)
+  const [savingVariant, setSavingVariant] = React.useState(false)
+
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
@@ -195,6 +216,89 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     setVQty("0")
     setVAttrs("")
   }, [addVariantOpen])
+
+  const handleSaveVariantStock = async (variantId: string) => {
+    const qty = parseInt(editingStockVal, 10)
+    if (!Number.isFinite(qty) || qty < 0) { toast.error("Số lượng không hợp lệ"); return }
+    setSavingStockId(variantId)
+    try {
+      const res = await updateMyInventory(productId, { variantId, quantity: qty })
+      if (!res.success) throw new Error(res.message ?? "Lỗi cập nhật tồn kho")
+      setProduct(prev => {
+        if (!prev) return prev
+        const newVariants = prev.variants?.map(v => v.id === variantId ? { ...v, stock: qty } : v) ?? null
+        const newTotal = newVariants?.reduce((s, v) => s + (v.stock ?? 0), 0) ?? 0
+        return { ...prev, variants: newVariants, totalStock: newTotal }
+      })
+      toast.success("Đã cập nhật tồn kho")
+      setEditingStockVarId(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật tồn kho")
+    } finally {
+      setSavingStockId(null)
+    }
+  }
+
+  const handleSaveBaseStock = async () => {
+    const qty = parseInt(editingBaseStockVal, 10)
+    if (!Number.isFinite(qty) || qty < 0) { toast.error("Số lượng không hợp lệ"); return }
+    setSavingBaseStock(true)
+    try {
+      const res = await updateMyInventory(productId, { quantity: qty })
+      if (!res.success) throw new Error(res.message ?? "Lỗi cập nhật tồn kho")
+      setProduct(prev => prev ? { ...prev, totalStock: qty } : prev)
+      toast.success("Đã cập nhật tồn kho")
+      setEditingBaseStock(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật tồn kho")
+    } finally {
+      setSavingBaseStock(false)
+    }
+  }
+
+  const openEditVariant = (v: SellerProductVariant) => {
+    setEditVariant(v)
+    setEvName(v.variantName)
+    setEvSku(v.sku ?? "")
+    setEvPrice(v.price != null ? String(v.price) : "")
+    setEvAttrs(v.attributes ?? "")
+    setEvActive(v.isActive)
+  }
+
+  const handleUpdateVariant = async () => {
+    if (!editVariant) return
+    const name = evName.trim()
+    if (!name) { toast.error("Tên biến thể không được trống"); return }
+    setSavingVariant(true)
+    try {
+      const price = evPrice.trim() ? Number(evPrice) : null
+      const res = await updateMyVariant(productId, editVariant.id, {
+        variantName: name,
+        sku: evSku.trim() || null,
+        price,
+        attributes: evAttrs.trim() || null,
+        isActive: evActive,
+      })
+      if (!res.success) throw new Error(res.message ?? "Lỗi cập nhật biến thể")
+      setProduct(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          variants: prev.variants?.map(v =>
+            v.id === editVariant.id
+              ? { ...v, variantName: name, sku: evSku.trim() || null, price: price, attributes: evAttrs.trim() || null, isActive: evActive }
+              : v
+          ) ?? null
+        }
+      })
+      toast.success("Đã cập nhật biến thể")
+      setEditVariant(null)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi cập nhật biến thể")
+    } finally {
+      setSavingVariant(false)
+    }
+  }
 
   const handleAddVariant = async () => {
     if (!product) return
@@ -573,12 +677,25 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
 
               {/* ── Quick stats (mobile only, shown below image) ── */}
               <div className="grid grid-cols-3 gap-3 lg:hidden">
-                <StatCard
-                  label="Tồn kho"
-                  value={String(stockLevel)}
-                  color={stockLevel === 0 ? "red" : stockLevel <= 10 ? "amber" : "green"}
-                  icon={<IconPackage className="size-4" />}
-                />
+                {!(product.variants?.length) ? (
+                  <StockEditCard
+                    stockLevel={stockLevel}
+                    editing={editingBaseStock}
+                    editVal={editingBaseStockVal}
+                    saving={savingBaseStock}
+                    onStartEdit={() => { setEditingBaseStockVal(String(stockLevel)); setEditingBaseStock(true) }}
+                    onChangeVal={setEditingBaseStockVal}
+                    onSave={handleSaveBaseStock}
+                    onCancel={() => setEditingBaseStock(false)}
+                  />
+                ) : (
+                  <StatCard
+                    label="Tồn kho"
+                    value={String(stockLevel)}
+                    color={stockLevel === 0 ? "red" : stockLevel <= 10 ? "amber" : "green"}
+                    icon={<IconPackage className="size-4" />}
+                  />
+                )}
                 <StatCard
                   label="Phân loại"
                   value={String(product.variants?.length ?? 0)}
@@ -600,12 +717,25 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
 
               {/* ── Quick stats (desktop) ── */}
               <div className="hidden lg:grid grid-cols-3 gap-3">
-                <StatCard
-                  label="Tồn kho"
-                  value={String(stockLevel)}
-                  color={stockLevel === 0 ? "red" : stockLevel <= 10 ? "amber" : "green"}
-                  icon={<IconPackage className="size-4" />}
-                />
+                {!(product.variants?.length) ? (
+                  <StockEditCard
+                    stockLevel={stockLevel}
+                    editing={editingBaseStock}
+                    editVal={editingBaseStockVal}
+                    saving={savingBaseStock}
+                    onStartEdit={() => { setEditingBaseStockVal(String(stockLevel)); setEditingBaseStock(true) }}
+                    onChangeVal={setEditingBaseStockVal}
+                    onSave={handleSaveBaseStock}
+                    onCancel={() => setEditingBaseStock(false)}
+                  />
+                ) : (
+                  <StatCard
+                    label="Tồn kho"
+                    value={String(stockLevel)}
+                    color={stockLevel === 0 ? "red" : stockLevel <= 10 ? "amber" : "green"}
+                    icon={<IconPackage className="size-4" />}
+                  />
+                )}
                 <StatCard
                   label="Phân loại"
                   value={String(product.variants?.length ?? 0)}
@@ -742,37 +872,96 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                             <th className="text-left py-2.5 px-5">Tên loại</th>
                             <th className="text-right py-2.5 px-5">Giá</th>
                             <th className="text-right py-2.5 px-5">Tồn kho</th>
+                            <th className="w-10" />
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {product.variants!.map((v) => (
-                            <tr key={v.id} className="hover:bg-muted/20 transition-colors group">
-                              <td className="py-3 px-5 max-w-[160px]">
-                                <div className="font-semibold text-[12px] truncate" title={v.variantName}>
-                                  {v.variantName}
-                                </div>
-                                {v.sku && (
-                                  <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5" title={v.sku}>
-                                    {v.sku}
+                          {product.variants!.map((v) => {
+                            const isEditing = editingStockVarId === v.id
+                            const isSaving = savingStockId === v.id
+                            return (
+                              <tr key={v.id} className="hover:bg-muted/20 transition-colors group">
+                                <td className="py-3 px-5 max-w-[160px]">
+                                  <div className="font-semibold text-[12px] truncate" title={v.variantName}>
+                                    {v.variantName}
                                   </div>
-                                )}
-                              </td>
-                              <td className="py-3 px-5 text-right font-bold text-primary tabular-nums text-[12px]">
-                                {v.price != null ? currency(v.price) : "—"}
-                              </td>
-                              <td className="py-3 px-5 text-right">
-                                <span className={`inline-flex items-center justify-center min-w-[32px] h-6 rounded-lg px-2 text-[11px] font-bold tabular-nums ${
-                                  (v.stock ?? 0) === 0
-                                    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                                    : (v.stock ?? 0) <= 10
-                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                                }`}>
-                                  {v.stock ?? 0}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                                  {v.sku && (
+                                    <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5" title={v.sku}>
+                                      {v.sku}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-5 text-right font-bold text-primary tabular-nums text-[12px]">
+                                  {v.price != null ? currency(v.price) : "—"}
+                                </td>
+                                <td className="py-2 px-3 text-right">
+                                  {isEditing ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={editingStockVal}
+                                        onChange={e => setEditingStockVal(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === "Enter") handleSaveVariantStock(v.id)
+                                          if (e.key === "Escape") setEditingStockVarId(null)
+                                        }}
+                                        autoFocus
+                                        className="w-16 h-7 rounded-lg border bg-background text-right text-[12px] font-bold px-2 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                                      />
+                                      <button
+                                        onClick={() => handleSaveVariantStock(v.id)}
+                                        disabled={isSaving}
+                                        className="size-7 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 disabled:opacity-60"
+                                        title="Lưu"
+                                      >
+                                        {isSaving
+                                          ? <div className="size-3 border border-white border-t-transparent rounded-full animate-spin" />
+                                          : <IconCheck className="size-3.5" />}
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingStockVarId(null)}
+                                        disabled={isSaving}
+                                        className="size-7 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground flex items-center justify-center shrink-0"
+                                        title="Huỷ"
+                                      >
+                                        <IconX className="size-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      <span className={`inline-flex items-center justify-center min-w-[32px] h-6 rounded-lg px-2 text-[11px] font-bold tabular-nums ${
+                                        (v.stock ?? 0) === 0
+                                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                                          : (v.stock ?? 0) <= 10
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                      }`}>
+                                        {v.stock ?? 0}
+                                      </span>
+                                      <button
+                                        onClick={() => { setEditingStockVarId(v.id); setEditingStockVal(String(v.stock ?? 0)) }}
+                                        className="size-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground flex items-center justify-center transition-opacity"
+                                        title="Chỉnh tồn kho"
+                                      >
+                                        <IconPencil className="size-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
+                                {/* Edit variant button */}
+                                <td className="py-2 pr-3 text-center">
+                                  <button
+                                    onClick={() => openEditVariant(v)}
+                                    className="size-7 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary/10 text-primary flex items-center justify-center transition-opacity mx-auto"
+                                    title="Chỉnh sửa biến thể"
+                                  >
+                                    <IconEdit className="size-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -874,6 +1063,84 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           </div>
         </div>
       )}
+
+      {/* ── Edit variant dialog ── */}
+      <Dialog open={!!editVariant} onOpenChange={(open) => { if (!open) setEditVariant(null) }}>
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa biến thể</DialogTitle>
+            <DialogDescription>Cập nhật thông tin phân loại sản phẩm.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="ev-name" className="text-xs">Tên biến thể *</Label>
+              <Input
+                id="ev-name"
+                value={evName}
+                onChange={e => setEvName(e.target.value)}
+                placeholder="Ví dụ: Đỏ — M"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="ev-sku" className="text-xs">SKU</Label>
+                <Input
+                  id="ev-sku"
+                  value={evSku}
+                  onChange={e => setEvSku(e.target.value)}
+                  placeholder="Tùy chọn"
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="ev-price" className="text-xs">Giá riêng (VND)</Label>
+                <Input
+                  id="ev-price"
+                  type="number"
+                  min={0}
+                  value={evPrice}
+                  onChange={e => setEvPrice(e.target.value)}
+                  placeholder="Để trống = dùng giá gốc"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="ev-attrs" className="text-xs">Thuộc tính (JSON hoặc text)</Label>
+              <Input
+                id="ev-attrs"
+                value={evAttrs}
+                onChange={e => setEvAttrs(e.target.value)}
+                placeholder='Ví dụ: {"color":"red","size":"M"}'
+                className="rounded-xl font-mono text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="ev-active"
+                checked={evActive}
+                onChange={e => setEvActive(e.target.checked)}
+                className="size-4 rounded"
+              />
+              <Label htmlFor="ev-active" className="text-sm font-normal cursor-pointer">
+                Kích hoạt biến thể này
+              </Label>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditVariant(null)} disabled={savingVariant} className="rounded-xl">
+              Huỷ
+            </Button>
+            <Button onClick={handleUpdateVariant} disabled={savingVariant} className="rounded-xl min-w-[100px]">
+              {savingVariant
+                ? <><div className="size-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin mr-1.5" />Đang lưu...</>
+                : <><IconCheck className="size-3.5 mr-1.5" />Lưu thay đổi</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addVariantOpen} onOpenChange={setAddVariantOpen}>
         <DialogContent className="rounded-2xl max-w-md">
@@ -1048,6 +1315,75 @@ function StatCard({ label, value, subValue, color, icon, small }: StatCardProps)
           {value}
         </p>
         {subValue && <p className="text-[10px] text-muted-foreground mt-0.5">{subValue}</p>}
+      </div>
+    </div>
+  )
+}
+
+// ── Inline-editable stock card (no-variant products) ──
+type StockEditCardProps = {
+  stockLevel: number
+  editing: boolean
+  editVal: string
+  saving: boolean
+  onStartEdit: () => void
+  onChangeVal: (v: string) => void
+  onSave: () => void
+  onCancel: () => void
+}
+
+function StockEditCard({ stockLevel, editing, editVal, saving, onStartEdit, onChangeVal, onSave, onCancel }: StockEditCardProps) {
+  const color = stockLevel === 0 ? "red" : stockLevel <= 10 ? "amber" : "green"
+  const c = colorMap[color]
+  return (
+    <div className={`rounded border p-3.5 flex items-center gap-3 ${c.bg}`}>
+      <div className={`size-9 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
+        <IconPackage className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider leading-none mb-1">Tồn kho</p>
+        {editing ? (
+          <div className="flex items-center gap-1 mt-1">
+            <input
+              type="number"
+              min={0}
+              value={editVal}
+              onChange={e => onChangeVal(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel() }}
+              autoFocus
+              className="w-16 h-6 rounded-md border bg-background text-right text-sm font-bold px-1.5 tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="size-6 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center disabled:opacity-60"
+              title="Lưu"
+            >
+              {saving
+                ? <div className="size-3 border border-white border-t-transparent rounded-full animate-spin" />
+                : <IconCheck className="size-3" />}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              className="size-6 rounded-md bg-muted hover:bg-muted/80 text-muted-foreground flex items-center justify-center"
+              title="Huỷ"
+            >
+              <IconX className="size-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group/stock">
+            <p className={`font-bold tabular-nums text-lg leading-tight ${c.text}`}>{stockLevel}</p>
+            <button
+              onClick={onStartEdit}
+              className="size-5 rounded opacity-0 group-hover/stock:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground flex items-center justify-center transition-opacity"
+              title="Chỉnh tồn kho"
+            >
+              <IconPencil className="size-3" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
