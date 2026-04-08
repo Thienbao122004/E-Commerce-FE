@@ -37,6 +37,9 @@ interface ShopInput {
   key: string
   totalWeightGrams: number
   totalValue: number
+  ghnShopId?: number | null
+  fromDistrictId?: number | null
+  fromWardCode?: string | null
 }
 
 const FALLBACK_FEE = 30_000
@@ -150,21 +153,26 @@ const DEFAULT_WEIGHT = 1000
 
       const results = await Promise.allSettled(
         shops.map(async (shop) => {
+          const ghnShopId = shop.ghnShopId ?? undefined
           const feeData = await ghnService.calculateFee({
+            from_district_id: shop.fromDistrictId ?? undefined,
+            from_ward_code: shop.fromWardCode ?? undefined,
             to_district_id: matchedDistrict.DistrictID,
             to_ward_code: matchedWard.WardCode,
             weight: shop.totalWeightGrams || DEFAULT_WEIGHT,
             insurance_value: Math.min(shop.totalValue, 5_000_000),
             service_type_id: 2, // E-Commerce Standard
-          })
+          }, ghnShopId)
 
           let leadTime: number | undefined = undefined
           try {
             const leadTimeData = await ghnService.calculateLeadTime({
+              from_district_id: shop.fromDistrictId ?? undefined,
+              from_ward_code: shop.fromWardCode ?? undefined,
               to_district_id: matchedDistrict.DistrictID,
               to_ward_code: matchedWard.WardCode,
               service_id: 53320,
-            })
+            }, ghnShopId)
             leadTime = leadTimeData.leadtime
           } catch (e) {
             console.warn('Could not get lead time', e)

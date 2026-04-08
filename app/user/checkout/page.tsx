@@ -8,7 +8,6 @@ import { cartService, type Cart, type CartItem } from '@/services/cart'
 import { profileService } from '@/services/profile'
 import { paymentsService } from '@/services/payments'
 import type { AddressResponse } from '@/types/profile'
-import { getProductById } from '@/services/storefront-products'
 import { formatPriceVND as formatPrice } from '@/lib/formatters'
 import {
   writePendingPaymentSession,
@@ -32,10 +31,7 @@ const CHECKOUT_SELECTED_IDS_KEY = 'checkout:selected-item-ids'
 
 type PaymentMethod = PendingPaymentMethod
 
-type CartItemWithShop = CartItem & {
-  shopId?: string
-  shopName?: string
-}
+type CartItemWithShop = CartItem
 
 interface ShopGroup {
   key: string
@@ -46,6 +42,9 @@ interface ShopGroup {
   shippingFee: number
   total: number
   itemCount: number
+  ghnShopId?: number | null
+  fromDistrictId?: number | null
+  fromWardCode?: string | null
 }
 
 function formatAddress(address: AddressResponse) {
@@ -88,7 +87,6 @@ export default function CheckoutPage() {
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
-  const [loadingShopInfo, setLoadingShopInfo] = useState(false)
   const [placingOrder, setPlacingOrder] = useState(false)
 
   const [cart, setCart] = useState<Cart | null>(null)
@@ -97,45 +95,11 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vnpay')
   const [checkoutItems, setCheckoutItems] = useState<CartItemWithShop[]>([])
 
-  const enrichItemsWithShop = useCallback(async (items: CartItem[]): Promise<CartItemWithShop[]> => {
-    const initialItems = items.map((item) => item as CartItemWithShop)
-    const missingShopItems = initialItems.filter((item) => !item.shopId || !item.shopName)
-
-    if (missingShopItems.length === 0) {
-      return initialItems
-    }
-
-    setLoadingShopInfo(true)
-    try {
-      const uniqueProductIds = Array.from(new Set(missingShopItems.map((item) => item.productId)))
-      const resolvedMap = new Map<string, { shopId?: string; shopName?: string }>()
-
-      const results = await Promise.allSettled(
-        uniqueProductIds.map(async (productId) => {
-          const res = await getProductById(productId)
-          return { productId, product: res.product }
-        })
-      )
-
-      for (const result of results) {
-        if (result.status !== 'fulfilled' || !result.value.product) continue
-        resolvedMap.set(result.value.productId, {
-          shopId: result.value.product.shopId,
-          shopName: result.value.product.shopName,
-        })
-      }
-
-      return initialItems.map((item) => {
-        const resolved = resolvedMap.get(item.productId)
-        return {
-          ...item,
-          shopId: item.shopId ?? resolved?.shopId,
-          shopName: item.shopName ?? resolved?.shopName ?? 'Shop không xác định',
-        }
-      })
-    } finally {
-      setLoadingShopInfo(false)
-    }
+  const enrichItemsWithShop = useCallback((items: CartItem[]): CartItemWithShop[] => {
+    return items.map((item) => ({
+      ...item,
+      shopName: item.shopName ?? 'Shop không xác định',
+    }))
   }, [])
 
   const loadCheckoutData = useCallback(async () => {
@@ -179,7 +143,7 @@ export default function CheckoutPage() {
         }
       }
 
-      const enrichedItems = await enrichItemsWithShop(itemsToCheckout)
+      const enrichedItems = enrichItemsWithShop(itemsToCheckout)
       setCheckoutItems(enrichedItems)
     } catch {
       toast.error('Không thể tải thông tin checkout')
@@ -212,13 +176,16 @@ export default function CheckoutPage() {
 
       groupMap.set(key, {
         key,
-        shopId: item.shopId,
+        shopId: item.shopId ?? undefined,
         shopName: normalizedShopName,
         items: [item],
         subtotal: item.lineTotal,
-        shippingFee: 0, // sẽ được cập nhật từ GHN
+        shippingFee: 0,
         total: 0,
         itemCount: item.quantity,
+        ghnShopId: item.ghnShopId,
+        fromDistrictId: item.fromDistrictId,
+        fromWardCode: item.fromWardCode,
       })
     })
 
@@ -230,13 +197,15 @@ export default function CheckoutPage() {
 
   const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
 
-  // ── GHN Shipping Fee ─────────────────────────────────────
   const shopInputs = useMemo(
     () =>
       groupedByShop.map((group) => ({
         key: group.key,
-        totalWeightGrams: group.items.reduce((sum, item) => sum + item.quantity * 300, 0), // ước 300g/item
+        totalWeightGrams: group.items.reduce((sum, item) => sum + item.quantity * 500, 0),
         totalValue: group.subtotal,
+        ghnShopId: group.ghnShopId,
+        fromDistrictId: group.fromDistrictId,
+        fromWardCode: group.fromWardCode,
       })),
     [groupedByShop],
   )
@@ -290,22 +259,24 @@ export default function CheckoutPage() {
 
     setPlacingOrder(true)
     try {
-      const shippingOptions = groupedByShop.map((group) => {
-        const sf = shopFees.get(group.key)
-        const fee = sf?.fee ?? fallbackFee
-        const estimatedDeliveryDate = sf?.leadTime
-          ? new Date(sf.leadTime * 1000).toISOString()
-          : null
+      const shippingOptions = groupedByShop
+        .filter((group) => !!group.shopId)
+        .map((group) => {
+          const sf = shopFees.get(group.key)
+          const fee = sf?.fee ?? fallbackFee
+          const estimatedDeliveryDate = sf?.leadTime
+            ? new Date(sf.leadTime * 1000).toISOString()
+            : null
 
-        return {
-          shopId: group.shopId || '',
-          shippingProvider: 'GHN',
-          shippingServiceId: '53320',
-          providerShippingFee: fee,
-          shippingFee: fee,
-          estimatedDeliveryDate,
-        }
-      })
+          return {
+            shopId: group.shopId!,
+            shippingProvider: 'GHN',
+            shippingServiceId: '53320',
+            providerShippingFee: fee,
+            shippingFee: fee,
+            estimatedDeliveryDate,
+          }
+        })
 
       const checkoutRes = await cartService.checkout({
         cartId: cart.id,
@@ -451,13 +422,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {loadingShopInfo && (
-          <div className="rounded-xl border bg-white px-4 py-3" style={{ borderColor: '#e5ded6' }}>
-            <p className="text-xs text-muted-foreground">Đang đồng bộ thông tin shop cho sản phẩm...</p>
-          </div>
-        )}
-
-        {groupedByShop.map((group) => (
+          {groupedByShop.map((group) => (
           <div
             key={group.key}
             className="overflow-hidden rounded border bg-white"

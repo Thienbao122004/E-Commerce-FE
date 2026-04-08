@@ -13,6 +13,11 @@ export interface CartItem {
   quantity: number
   lineTotal: number
   stockAvailable: number
+  shopId?: string | null
+  shopName?: string | null
+  ghnShopId?: number | null
+  fromDistrictId?: number | null
+  fromWardCode?: string | null
 }
 
 export interface Cart {

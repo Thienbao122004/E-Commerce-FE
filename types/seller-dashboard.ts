@@ -107,6 +107,9 @@ export type SellerOrder = {
   actualDeliveryDate: string | null
   createdAt: string
   items: SellerOrderItem[] | null
+  shopGhnShopId?: number | null
+  shopFromDistrictId?: number | null
+  shopFromWardCode?: string | null
 }
 
 export type SellerOrdersResponse = {
