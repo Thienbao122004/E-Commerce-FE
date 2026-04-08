@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 
 import { MainStorefrontHeader } from '@/components/layout/main-storefront-header'
 
-const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout']
+const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout', '/user/register-seller']
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading, role } = useAuth()

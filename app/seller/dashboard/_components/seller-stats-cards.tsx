@@ -28,9 +28,9 @@ type Props = {
 }
 
 export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
-  const pendingOrders = orders.filter(
+  const processOrders = orders.filter(
     (o) =>
-      o.status === OrderStatus.PendingPayment
+      o.status === OrderStatus.Processing
   ).length
   const confirmedOrders = orders.filter(
     (o) => o.status === OrderStatus.Confirmed).length
@@ -43,6 +43,8 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
   const cancelledOrders = orders.filter(
     (o) => o.status === OrderStatus.Cancelled
   ).length
+  const totalRefunded = wallet?.totalRefunded ?? 0
+  const netRevenue = stats ? stats.totalRevenue - totalRefunded : 0
 
   if (loading || !stats) {
     return (
@@ -57,8 +59,8 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
   return (
     <StatsGrid cols={3} className="px-4 lg:px-6">
       <StatsCard
-        label="Tổng doanh thu"
-        value={currency(stats.totalRevenue)}
+        label="Doanh thu ròng"
+        value={currency(netRevenue)}
         icon={<IconCurrencyDollar />}
         iconBg="bg-primary/10"
         iconColor="text-primary"
@@ -82,9 +84,9 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
                 Rút: {wallet ? currency(wallet.totalWithdrawn) : "—"}
               </div>
             </div>
-            {wallet && (wallet.totalRefunded ?? 0) > 0 && (
+            {totalRefunded > 0 && (
               <div className="text-xs text-amber-700 dark:text-amber-400">
-                Hoàn tác đơn: {currency(wallet.totalRefunded ?? 0)}
+                Hoàn tác đơn: {currency(totalRefunded)}
               </div>
             )}
           </div>
@@ -111,7 +113,7 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
             <div className="space-y-1 text-muted-foreground">
               <div className="flex items-center gap-1">
                 <IconClock className="size-3.5 opacity-70" />
-                Chờ xử lý: {fmt(pendingOrders)}
+                Đang chuẩn bị: {fmt(processOrders)}
               </div>
               <div className="flex items-center gap-1">
                 <IconShoppingCart className="size-3.5" />

@@ -11,6 +11,7 @@ const accountLinks = [
   { href: '/user/profile/addresses', label: 'Địa Chỉ', icon: 'location_on' },
   { href: '/user/profile/change-password', label: 'Đổi Mật Khẩu', icon: 'lock' },
   { href: '/user/profile/wallet', label: 'Ví Của Tôi', icon: 'account_balance_wallet' },
+  { href: '/user/register-seller', label: 'Đăng Ký Seller', icon: 'storefront' },
 ]
 
 const orderLinks = [
@@ -72,7 +73,7 @@ export function ProfileSidebar() {
             person
           </span>
           <span className="text-sm font-semibold" style={{ color: 'var(--color-text-main)' }}>
-            Tài Khoản Của Tôi
+            Tài Khoản
           </span>
         </div>
         <nav className="flex flex-col">

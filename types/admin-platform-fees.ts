@@ -10,6 +10,7 @@ export type PlatformFeeSummary = {
 export type PlatformFeeRecordRow = {
   id: string
   orderId: string
+  orderCode: string
   paymentId: string | null
   shopId: string
   shopName: string | null

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   IconArrowLeft,
@@ -17,8 +18,6 @@ import {
   IconTruck,
   IconX,
   IconCheck,
-  IconAlertTriangle,
-  IconChevronRight,
   IconHash,
   IconShoppingBag,
   IconBarcode,
@@ -28,6 +27,14 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
@@ -56,6 +63,7 @@ import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import type { SellerOrderDetail } from "@/types/seller-dashboard"
 import { validTransitions } from "./order-status-dialog"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
+import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 // ── Status config ──
 type StatusCfg = {
@@ -124,17 +132,23 @@ const STATUS_STEPS = [
   OrderStatus.Completed,
 ]
 
-function StatusTimeline({ currentStatus }: { currentStatus: number }) {
+function StatusTimeline({ currentStatus, cancelReason }: { currentStatus: number; cancelReason?: string | null }) {
   const isCancelled = currentStatus === OrderStatus.Cancelled
   const isRefunded = currentStatus === OrderStatus.Refunded
 
   if (isCancelled || isRefunded) {
     const cfg = statusConfig[currentStatus]
+    const normalizedCancelReason = cancelReason?.trim()
     return (
-      <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border ${cfg.badgeCls}`}>
+      <div className={`flex items-center flex-wrap gap-2.5 px-4 py-3 rounded-xl border ${cfg.badgeCls}`}>
         <div className={`size-2 rounded-full ${cfg.dotCls}`} />
         <span className="text-sm font-semibold">{cfg.label}</span>
         <span className="text-xs opacity-70 ml-1">— Đơn hàng đã kết thúc</span>
+        {isCancelled && (
+          <span className="text-xs opacity-80 ml-1 break-words">
+            — Lý do: {normalizedCancelReason || "Không có lý do hủy được cung cấp."}
+          </span>
+        )}
       </div>
     )
   }
@@ -312,68 +326,71 @@ export function OrderDetailView({ orderId }: Props) {
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
   const itemCount = order?.items?.reduce((s, i) => s + i.quantity, 0) ?? 0
   const paid = order ? order.status !== OrderStatus.PendingPayment : false
+  const isEndedOrder =
+    order?.status === OrderStatus.Cancelled || order?.status === OrderStatus.Refunded
 
   return (
     <>
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6 pb-28 md:pb-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-9 shrink-0 rounded-xl border shadow-sm hover:bg-muted"
-              onClick={() => router.push("/seller/orders")}
-            >
-              <IconArrowLeft className="size-4" />
+      <SetHeaderActions>
+        <div className="hidden md:flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <IconRefresh className="mr-1.5 size-4" />
+            Làm mới
+          </Button>
+          {canUpdate && (
+            <Button size="sm" onClick={() => handleOpenStatusDialog()} className="gap-1.5 shadow-sm">
+              <IconCircleCheck className="size-4" />
+              Cập nhật trạng thái
             </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight">
-                  {loading ? "Đang tải..." : `Đơn hàng #${order?.orderCode}`}
-                </h1>
-                {!loading && cfg && (
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${cfg.badgeCls}`}>
-                    <span className={`size-1.5 rounded-full ${cfg.dotCls}`} />
-                    {cfg.label}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {!loading && order && (
-            <div className="hidden md:flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5 h-9 rounded-xl">
-                <IconRefresh className="size-3.5" />
-                Tải lại
-              </Button>
-              {canUpdate && (
-                <Button size="sm" onClick={() => handleOpenStatusDialog()} className="gap-1.5 h-9 rounded-xl shadow-sm">
-                  <IconCircleCheck className="size-3.5" />
-                  Cập nhật trạng thái
-                </Button>
-              )}
-            </div>
           )}
         </div>
+      </SetHeaderActions>
+
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6 pb-28 md:pb-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/seller/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/seller/orders">Đơn hàng</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>
+                {loading ? "Chi tiết đơn hàng" : `#${order?.orderCode ?? "—"}`}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {loading ? (
           <DetailSkeleton />
         ) : order ? (
           <>
-          <Card className="rounded shadow-sm overflow-hidden">
-              <CardContent className="p-4 sm:p-5">
-                <StatusTimeline currentStatus={order.status} />
-              </CardContent>
-            </Card>
+            {isEndedOrder ? (
+              <StatusTimeline currentStatus={order.status} cancelReason={order.cancelReason} />
+            ) : (
+              <Card className="rounded shadow-sm overflow-hidden">
+                <CardContent className="p-4 sm:p-5">
+                  <StatusTimeline currentStatus={order.status} cancelReason={order.cancelReason} />
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="rounded shadow-sm overflow-hidden">
               <CardHeader className="border-b">
                 <CardTitle className="text-medium font-semibold">Thông tin đơn hàng đơn giản</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4 px-5 py-4 md:grid-cols-5">
                 <div>
-                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Order ID</p>
-                  <p className="mt-1 font-mono text-sm font-bold">{order.id.slice(0, 12).toUpperCase()}</p>
+                  <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Mã đơn hàng</p>
+                  <p className="mt-1 font-mono text-sm font-bold">{order.orderCode}</p>
                 </div>
                 <div>
                   <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Ngày đặt hàng</p>

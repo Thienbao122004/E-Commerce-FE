@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { profileService } from '@/services/profile'
 import { supabase } from '@/lib/supabase'
@@ -198,7 +199,6 @@ export default function ProfilePage() {
     }
   }
 
-
   if (loading) {
     return (
       <div className="bg-white rounded-[5px] shadow-sm border p-6" style={{ borderColor: '#e5ded6' }}>
@@ -302,7 +302,7 @@ export default function ProfilePage() {
                       }}
                     >
                       <span className="material-symbols-outlined text-[14px]">storefront</span>
-                      {profile.shop.shopName}
+                      {(profile.shop as any).shopName ?? (profile.shop as any).name ?? 'Shop'}
                     </span>
                   </div>
                 </div>

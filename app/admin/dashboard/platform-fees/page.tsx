@@ -108,14 +108,6 @@ export default function AdminPlatformFeesPage() {
         </Button>
       </SetHeaderActions>
       <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Phí sàn & báo cáo</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Thu từ hoa hồng trên tiền hàng khi đơn thanh toán và quyết toán ví seller. Bản ghi đã hoàn tác (hủy/hoàn đơn) không
-            tính trong tổng.
-          </p>
-        </div>
-
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Lọc theo thời gian</CardTitle>
@@ -206,7 +198,7 @@ export default function AdminPlatformFeesPage() {
                     <TableHead className="text-right">%</TableHead>
                     <TableHead className="text-right">Phí sàn</TableHead>
                     <TableHead className="text-right">Net seller</TableHead>
-                    <TableHead>Đơn</TableHead>
+                    <TableHead>Mã đơn</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -236,7 +228,7 @@ export default function AdminPlatformFeesPage() {
                         <TableCell className="text-right tabular-nums">{formatPriceVND(r.netToSeller)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-mono text-xs">
-                            {r.orderId.slice(0, 8)}…
+                            {r.orderCode}
                           </Badge>
                         </TableCell>
                       </TableRow>

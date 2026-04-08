@@ -3,6 +3,7 @@ import type {
   UserProfileResponse,
   AddressResponse,
   UpdateProfileRequest,
+  RegisterSellerRequest,
   AddAddressRequest,
   UpdateAddressRequest,
 } from '@/types/profile'
@@ -19,6 +20,9 @@ export const profileService = {
 
   updateProfile: (data: UpdateProfileRequest) =>
     api.put<ApiResponse<null>>('/api/user/profile', data),
+
+  registerSeller: (data: RegisterSellerRequest) =>
+    api.post<ApiResponse<null>>('/api/user/register-seller', data),
 
   requestEmailChange: (newEmail: string) =>
     api.post<ApiResponse<null>>('/api/user/profile/request-email-change', { newEmail }),

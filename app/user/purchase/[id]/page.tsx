@@ -154,6 +154,7 @@ export default function PurchaseOrderDetailPage() {
   }, [order])
 
   const canConfirm = order?.status === 5
+  const isEndedOrder = order?.status === 7 || order?.status === 8
   const statusLabel = order ? (STATUS_LABELS[order.status] ?? order.statusName) : ''
   const subtotalAmount = useMemo(
     () => (order ? order.items.reduce((sum, item) => sum + item.totalPrice, 0) : 0),
@@ -333,9 +334,13 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
+      {isEndedOrder ? (
         <StatusTimeline currentStatus={order.status} />
-      </div>
+      ) : (
+        <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
+          <StatusTimeline currentStatus={order.status} />
+        </div>
+      )}
 
       <div className="bg-white rounded-[5px] shadow-sm border" style={{ borderColor: '#e5ded6' }}>
         <div className="p-4 border-b" style={{ borderColor: '#e5ded6' }}>
