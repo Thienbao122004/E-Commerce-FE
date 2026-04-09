@@ -134,7 +134,31 @@ export function aiSendFeedback(params: {
   })
 }
 
-/** Phan tich anh san pham bang AI vision */
+export type AnalyzeProductResponse = {
+  categories: CategorySuggestion[]
+  tags: TagSuggestion[]
+  materials: MaterialSuggestion[]
+  success: boolean
+  errorMessage?: string
+}
+
+/**
+ * Phân tích sản phẩm (text-only) — 1 Gemini call thay cho suggest-category + suggest-tags + suggest-materials.
+ * Kết quả đã được post-validate: chỉ trả về IDs thực sự tồn tại trong DB.
+ */
+export function aiAnalyzeProduct(params: {
+  title: string
+  description?: string
+  categoryId?: number | null
+}) {
+  return aiPost<AnalyzeProductResponse>("/api/ai/seller/analyze-product", {
+    title: params.title,
+    description: params.description ?? null,
+    categoryId: params.categoryId ?? null,
+  })
+}
+
+/** Phân tích ảnh sản phẩm bằng AI vision */
 export function aiAnalyzeImage(params: {
   imageUrls: string[]
   productTitle?: string
@@ -199,4 +223,4 @@ export function aiGetTagSuggestionLogs(page = 1, pageSize = 20) {
   return aiGet<TagSuggestionLogResponse>(
     `/api/ai/seller/tag-suggestions?page=${page}&pageSize=${pageSize}`
   )
-}
+}

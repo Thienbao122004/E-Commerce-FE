@@ -28,11 +28,8 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
-  aiSuggestCategory,
-  aiSuggestTags,
-  aiSuggestMaterials,
+  aiAnalyzeProduct,
   aiAnalyzeImage,
-  aiSendFeedback,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import { supabase } from "@/lib/supabase"
@@ -206,20 +203,14 @@ export default function CreateProductPage() {
   const [manualCatQuery, setManualCatQuery] = React.useState("")
   const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
-  const [catLogId, setCatLogId] = React.useState<string | null>(null)
-  const [tagLogId, setTagLogId] = React.useState<string | null>(null)
-
   const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
   const [selTagIds, setSelTagIds] = React.useState<number[]>([])
   const [selMatIds, setSelMatIds] = React.useState<string[]>([])
-  const [customTags, setCustomTags] = React.useState<string[]>([])
-  const [customTagInput, setCustomTagInput] = React.useState("")
-  const [showCustomTag, setShowCustomTag] = React.useState(false)
+  const [nameTouched, setNameTouched] = React.useState(false)
+  const [priceTouched, setPriceTouched] = React.useState(false)
 
   const hasInput = name.trim().length > 0 || description.trim().length > 0
-  const categoryReqRef = React.useRef(0)
-  const tagMatReqRef = React.useRef(0)
-  const imageAnalyzeReqRef = React.useRef(0)
+  const analysisReqRef = React.useRef(0)
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -255,29 +246,6 @@ export default function CreateProductPage() {
     }
   }, [])
 
-  const fetchTagsAndMaterials = React.useCallback(
-    async (categoryId: number) => {
-      if (!name.trim() && !description.trim()) return
-      const reqId = ++tagMatReqRef.current
-      setTagLoading(true)
-      try {
-        const [tagsRes, matsRes] = await Promise.all([
-          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId }),
-          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId }),
-        ])
-        if (reqId !== tagMatReqRef.current) return
-        setTagSuggestions(tagsRes.suggestions ?? [])
-        setMatSuggestions(matsRes.suggestions ?? [])
-        if (tagsRes.logId) setTagLogId(tagsRes.logId)
-      } catch {
-      } finally {
-        if (reqId !== tagMatReqRef.current) return
-        setTagLoading(false)
-      }
-    },
-    [name, description]
-  )
-
   const blobUrlToDataUrl = React.useCallback(async (blobUrl: string) => {
     const res = await fetch(blobUrl)
     const blob = await res.blob()
@@ -308,170 +276,148 @@ export default function CreateProductPage() {
     return normalized
   }, [imageUrls, blobUrlToDataUrl])
 
+  /** Áp dụng kết quả phân tích AI (từ text hoặc image) vào state. */
+  const applyAnalysisResult = React.useCallback((
+    categories: CategorySuggestion[],
+    tags: TagSuggestion[],
+    materials: MaterialSuggestion[],
+  ) => {
+    setCatSuggestions(categories ?? [])
+    setSelCategory((prev) =>
+      prev && (categories ?? []).some((c) => c.categoryId === prev.categoryId)
+        ? prev
+        : categories?.[0] ?? null
+    )
+    setTagSuggestions(tags ?? [])
+    setSelTagIds(
+      (tags ?? []).map((t) => t.tagId).filter((id): id is number => typeof id === "number")
+    )
+    setMatSuggestions(materials ?? [])
+    setSelMatIds(
+      (materials ?? []).map((m) => m.materialId).filter((id): id is string => typeof id === "string" && id.length > 0)
+    )
+  }, [])
+
   const runAiAnalysis = React.useCallback(async () => {
-    if (!hasInput && imageUrls.length === 0) {
+    const hasImages = imageUrls.length > 0
+    if (!hasInput && !hasImages) {
       toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích AI")
       return
     }
 
-    const catReqId = ++categoryReqRef.current
-    const tagReqId = ++tagMatReqRef.current
-    const imgReqId = ++imageAnalyzeReqRef.current
-
+    const reqId = ++analysisReqRef.current
     setCatLoading(true)
     setTagLoading(true)
     setImageAnalyzeLoading(true)
     setCatError(false)
+    setCatSuggestions([])
+    setTagSuggestions([])
+    setMatSuggestions([])
+    setSelCategory(null)
+    setSelTagIds([])
+    setSelMatIds([])
 
     try {
-      const categoryResPromise = hasInput
-        ? aiSuggestCategory({
+      const aiImageUrls = hasImages ? await normalizeAiImageUrls() : []
+      if (reqId !== analysisReqRef.current) return
+      const hasUsableImages = aiImageUrls.length > 0
+      if (hasUsableImages && hasInput) {
+        // Có cả ảnh lẫn text → chạy SONG SONG, merge kết quả
+        const [imageSettled, textSettled] = await Promise.allSettled([
+          aiAnalyzeImage({
+            imageUrls: aiImageUrls,
+            productTitle: name.trim() || undefined,
+            productDescription: description.trim() || undefined,
+          }),
+          aiAnalyzeProduct({
             title: name.trim(),
-            description: description.trim(),
-            imageUrls: imageUrls.filter((u) => u.startsWith("http")),
-          })
-        : Promise.resolve(null)
+            description: description.trim() || undefined,
+          }),
+        ])
+        if (reqId !== analysisReqRef.current) return
 
-      const [categoryRes, aiImageUrls] = await Promise.all([
-        categoryResPromise,
-        normalizeAiImageUrls(),
-      ])
+        const imageRes = imageSettled.status === "fulfilled" && imageSettled.value.success
+          ? imageSettled.value : null
+        const textRes = textSettled.status === "fulfilled" && textSettled.value.success
+          ? textSettled.value : null
 
-      if (
-        catReqId !== categoryReqRef.current ||
-        tagReqId !== tagMatReqRef.current ||
-        imgReqId !== imageAnalyzeReqRef.current
-      ) {
-        return
-      }
+        setImageAnalyzeResult(imageRes)
 
-      let nextCategories = categoryRes?.suggestions ?? []
-      if (categoryRes?.logId) setCatLogId(categoryRes.logId)
+        if (!imageRes && !textRes) { setCatError(true); return }
 
-      if (aiImageUrls.length > 0) {
+        // Merge categories: dedup theo categoryId, confidence cao nhất thắng, top 3
+        const catMap = new Map<number, CategorySuggestion>()
+        for (const cat of [...(imageRes?.suggestedCategories ?? []), ...(textRes?.categories ?? [])]) {
+          const existing = catMap.get(cat.categoryId)
+          if (!existing || cat.confidenceScore > existing.confidenceScore) catMap.set(cat.categoryId, cat)
+        }
+        const mergedCats = [...catMap.values()]
+          .sort((a, b) => b.confidenceScore - a.confidenceScore)
+          .slice(0, 3)
+
+        // Merge tags: dedup theo tagId, ưu tiên image kết quả trước, top 10
+        const tagMap = new Map<number, TagSuggestion>()
+        for (const tag of [...(imageRes?.suggestedTags ?? []), ...(textRes?.tags ?? [])]) {
+          if (tag.tagId != null && !tagMap.has(tag.tagId)) tagMap.set(tag.tagId, tag)
+        }
+        const mergedTags = [...tagMap.values()].slice(0, 10)
+
+        // Merge materials: dedup theo materialId, top 5
+        const matMap = new Map<string, MaterialSuggestion>()
+        for (const mat of [...(imageRes?.suggestedMaterials ?? []), ...(textRes?.materials ?? [])]) {
+          if (mat.materialId && !matMap.has(mat.materialId)) matMap.set(mat.materialId, mat)
+        }
+        const mergedMats = [...matMap.values()].slice(0, 5)
+
+        applyAnalysisResult(mergedCats, mergedTags, mergedMats)
+
+      } else if (hasUsableImages) {
+        // Chỉ có ảnh (không có text)
         const imageRes = await aiAnalyzeImage({
           imageUrls: aiImageUrls,
           productTitle: name.trim() || undefined,
           productDescription: description.trim() || undefined,
         })
-
-        if (
-          catReqId !== categoryReqRef.current ||
-          tagReqId !== tagMatReqRef.current ||
-          imgReqId !== imageAnalyzeReqRef.current
-        ) {
-          return
-        }
-
+        if (reqId !== analysisReqRef.current) return
         if (imageRes.success) {
           setImageAnalyzeResult(imageRes)
-
-          if (imageRes.suggestedCategories?.length) {
-            nextCategories = imageRes.suggestedCategories
-          }
-
-          if (imageRes.suggestedTags?.length) {
-            setTagSuggestions(imageRes.suggestedTags)
-            const ids = imageRes.suggestedTags
-              .map((t) => t.tagId)
-              .filter((id): id is number => typeof id === "number")
-            setSelTagIds(ids)
-          }
-
-          if (imageRes.suggestedMaterials?.length) {
-            setMatSuggestions(imageRes.suggestedMaterials)
-            const ids = imageRes.suggestedMaterials
-              .map((m) => m.materialId)
-              .filter((id): id is string => typeof id === "string" && id.length > 0)
-            setSelMatIds(ids)
-          }
+          applyAnalysisResult(imageRes.suggestedCategories, imageRes.suggestedTags, imageRes.suggestedMaterials)
         } else {
           setImageAnalyzeResult(null)
+          setCatError(true)
         }
+
       } else {
+        // Chỉ có text (hoặc ảnh không load được)
         setImageAnalyzeResult(null)
-      }
-
-      setCatSuggestions(nextCategories)
-
-      let nextSelected = selCategory
-      if (
-        !nextSelected ||
-        !nextCategories.some((c) => c.categoryId === nextSelected?.categoryId)
-      ) {
-        nextSelected = nextCategories[0] ?? null
-        setSelCategory(nextSelected)
-      }
-
-      if (nextSelected) {
-        const [tagsRes, matsRes] = await Promise.all([
-          aiSuggestTags({ title: name.trim(), description: description.trim(), categoryId: nextSelected.categoryId }),
-          aiSuggestMaterials({ title: name.trim(), description: description.trim(), categoryId: nextSelected.categoryId }),
-        ])
-
-        if (
-          catReqId !== categoryReqRef.current ||
-          tagReqId !== tagMatReqRef.current ||
-          imgReqId !== imageAnalyzeReqRef.current
-        ) {
-          return
-        }
-
-        setTagSuggestions(tagsRes.suggestions ?? [])
-        setMatSuggestions(matsRes.suggestions ?? [])
-        if (tagsRes.logId) setTagLogId(tagsRes.logId)
+        if (!hasInput) return
+        const res = await aiAnalyzeProduct({
+          title: name.trim(),
+          description: description.trim() || undefined,
+        })
+        if (reqId !== analysisReqRef.current) return
+        applyAnalysisResult(res.categories, res.tags, res.materials)
       }
     } catch {
-      if (
-        catReqId !== categoryReqRef.current ||
-        tagReqId !== tagMatReqRef.current ||
-        imgReqId !== imageAnalyzeReqRef.current
-      ) {
-        return
-      }
+      if (reqId !== analysisReqRef.current) return
       setCatError(true)
       toast.error("Không thể phân tích AI. Vui lòng thử lại")
     } finally {
-      if (
-        catReqId !== categoryReqRef.current ||
-        tagReqId !== tagMatReqRef.current ||
-        imgReqId !== imageAnalyzeReqRef.current
-      ) {
-        return
-      }
+      if (reqId !== analysisReqRef.current) return
       setCatLoading(false)
       setTagLoading(false)
       setImageAnalyzeLoading(false)
     }
-  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, selCategory])
+  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
     setSelCategory(cat)
     setSelTagIds([])
     setSelMatIds([])
-    fetchTagsAndMaterials(cat.categoryId)
-  }
-
-  const sendFeedback = async () => {
-    const logId = catLogId ?? tagLogId
-    if (!logId) return
-    try {
-      await aiSendFeedback({
-        logId,
-        chosenCategoryId: selCategory?.categoryId,
-        chosenTagIds: selTagIds,
-        chosenMaterialIds: selMatIds.filter(isPersistableMaterialId),
-        action: selCategory ? "accepted" : "skipped",
-      })
-    } catch {
-      
-    }
   }
 
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
-    await sendFeedback()
-
     setUploadingImages(true)
     let persistedImageUrls: string[] | undefined
     try {
@@ -505,7 +451,7 @@ export default function CreateProductPage() {
           variants: variantRows
             .filter((r) => r.variantName.trim().length > 0)
             .map((r) => {
-              const priceStr = r.price.trim()
+              const priceStr = r.price.replace(/[^0-9]/g, "")
               const rowPrice = priceStr ? Number(priceStr) : undefined
               return {
                 variantName: r.variantName.trim(),
@@ -583,15 +529,6 @@ export default function CreateProductPage() {
     setSelTagIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
   const toggleMat = (id: string) =>
     setSelMatIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
-  const addCustomTag = () => {
-    const t = customTagInput.trim()
-    if (t && !customTags.includes(t)) {
-      setCustomTags((p) => [...p, t])
-    }
-    setCustomTagInput("")
-    setShowCustomTag(false)
-  }
-  const removeCustomTag = (t: string) => setCustomTags((p) => p.filter((x) => x !== t))
 
   return (
     <div className="flex flex-1 flex-col">
@@ -618,8 +555,12 @@ export default function CreateProductPage() {
                     placeholder="Ví dụ: Áo sơ mi nam vải kate cao cấp – màu trắng"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-9 text-sm"
+                    onBlur={() => setNameTouched(true)}
+                    className={`h-9 text-sm ${nameTouched && !name.trim() ? "border-red-400 focus-visible:ring-red-400" : ""}`}
                   />
+                  {nameTouched && !name.trim() && (
+                    <p className="text-[11px] text-red-500">Tên sản phẩm là bắt buộc</p>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="price" className="text-xs">
@@ -633,16 +574,18 @@ export default function CreateProductPage() {
                       placeholder="299,000"
                       value={price}
                       onChange={(e) => {
-                        // Xoá ký tự không phải số
                         const digits = e.target.value.replace(/[^0-9]/g, "")
                         const num = digits === "" ? 0 : Number(digits)
                         setPriceRaw(num)
-                        // Hiển thị có dấu phẩy nghìn
                         setPrice(digits === "" ? "" : num.toLocaleString("vi-VN"))
                       }}
-                      className="h-9 pl-7 text-sm"
+                      onBlur={() => setPriceTouched(true)}
+                      className={`h-9 pl-7 text-sm ${priceTouched && priceRaw <= 0 ? "border-red-400 focus-visible:ring-red-400" : ""}`}
                     />
                   </div>
+                  {priceTouched && priceRaw <= 0 && (
+                    <p className="text-[11px] text-red-500">Giá bán phải lớn hơn 0</p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-muted-foreground/15 bg-muted/20 px-3 py-2.5">
@@ -736,18 +679,22 @@ export default function CreateProductPage() {
                           </div>
                           <div className="sm:col-span-2 grid gap-1">
                             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Giá</span>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={row.price}
-                              onChange={(e) =>
-                                setVariantRows((p) =>
-                                  p.map((r) => (r.id === row.id ? { ...r, price: e.target.value } : r))
-                                )
-                              }
-                              placeholder="Trống = giá gốc"
-                              className="h-8 text-xs"
-                            />
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-semibold">₫</span>
+                              <Input
+                                inputMode="numeric"
+                                value={row.price}
+                                onChange={(e) => {
+                                  const digits = e.target.value.replace(/[^0-9]/g, "")
+                                  const formatted = digits === "" ? "" : Number(digits).toLocaleString("vi-VN")
+                                  setVariantRows((p) =>
+                                    p.map((r) => (r.id === row.id ? { ...r, price: formatted } : r))
+                                  )
+                                }}
+                                placeholder="Trống = giá gốc"
+                                className="h-8 pl-5 text-xs"
+                              />
+                            </div>
                           </div>
                           <div className="sm:col-span-2 grid gap-1">
                             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tồn *</span>
@@ -904,6 +851,31 @@ export default function CreateProductPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 bg-white"
+                onClick={() => router.push("/seller/products")}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={actionLoading || uploadingImages || !canSubmit}
+                className="h-10"
+              >
+                {uploadingImages ? (
+                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tải ảnh...</>
+                ) : actionLoading ? (
+                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tạo...</>
+                ) : (
+                  "Đăng bán →"
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 lg:h-full">
@@ -967,11 +939,7 @@ export default function CreateProductPage() {
                     Danh mục
                   </SectionLabel>
 
-                  {!hasInput ? (
-                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
-                      Chưa phân tích
-                    </div>
-                  ) : catLoading ? (
+                  {catLoading ? (
                     <div className="flex items-center gap-2 rounded-xl border border-[#cfd8c7] bg-white p-3 text-[11px] text-[#6d7f62]">
                       <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
                       Đang phân tích danh mục...
@@ -983,7 +951,7 @@ export default function CreateProductPage() {
                     </div>
                   ) : catSuggestions.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
-                      Không có gợi ý
+                      {catError ? "Không có gợi ý" : "Chưa phân tích"}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2">
@@ -1113,12 +1081,7 @@ export default function CreateProductPage() {
                           </button>
                         )
                       })}
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-[#bcc9af] bg-white px-3 py-1 text-xs text-[#6f8161] hover:border-[#96aa84]"
-                      >
-                        <IconPlus className="size-3" />
-                      </button>
+
                     </div>
                   )}
                 </div>
@@ -1160,44 +1123,8 @@ export default function CreateProductPage() {
                         )
                       })}
 
-                      {customTags.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => removeCustomTag(t)}
-                          className="inline-flex items-center gap-1 rounded-md border border-[#e8b37f] bg-white px-2.5 py-1 text-xs font-medium text-[#b06017] hover:opacity-80"
-                        >
-                          #{t}
-                          <IconX className="size-3" />
-                        </button>
-                      ))}
-
-                      {showCustomTag ? (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            autoFocus
-                            value={customTagInput}
-                            onChange={(e) => setCustomTagInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && customTagInput.trim()) addCustomTag()
-                              if (e.key === "Escape") setShowCustomTag(false)
-                            }}
-                            placeholder="tag..."
-                            className="h-7 w-24 border-[#c8d4bd] bg-white px-2 text-[11px]"
-                          />
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomTag(true)}
-                          className="rounded-md border border-dashed border-[#bcc9af] bg-white px-2.5 py-1 text-[11px] text-[#6f8161] hover:border-[#96aa84]"
-                        >
-                          + Thêm
-                        </button>
-                      )}
-
-                      {tagSuggestions.length === 0 && customTags.length === 0 && !showCustomTag && selCategory && !tagLoading && (
-                        <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý - bạn có thể tự thêm</span>
+                      {tagSuggestions.length === 0 && selCategory && !tagLoading && (
+                        <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý tag cho category này</span>
                       )}
                     </div>
                   )}
@@ -1211,7 +1138,7 @@ export default function CreateProductPage() {
                   </div>
                 )}
 
-                {!hasInput && (
+                {!hasInput && catSuggestions.length === 0 && !catLoading && (
                   <div className="rounded-xl border border-dashed border-[#c7d2bd] bg-white p-3 text-center text-[11px] italic leading-relaxed text-[#7b8d71]">
                     Nhập tên hoặc mô tả sản phẩm để AI gợi ý danh mục
                   </div>
@@ -1219,51 +1146,6 @@ export default function CreateProductPage() {
               </CardContent>
             </Card>
 
-            <Card className="!rounded">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2 text-foreground">
-                  <span className="flex size-6 items-center justify-center rounded-md bg-primary/10">
-                    <IconPencil className="size-3.5 text-primary" />
-                  </span>
-                  Góp ý AI cải thiện
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Chia sẻ góp ý để hệ thống gợi ý danh mục, tag và chất liệu chính xác hơn cho lần đăng tiếp theo.
-                </p>
-                <Textarea
-                  rows={3}
-                  placeholder="Ý kiến của bạn về mức độ chính xác của AI ..."
-                  className="h-24 resize-none border-[#d3dbcb] bg-white text-sm"
-                />
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 bg-white"
-                onClick={() => router.push("/seller/products")}
-              >
-                Hủy bỏ
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={actionLoading || uploadingImages || !canSubmit}
-                className="h-10"
-              >
-                {uploadingImages ? (
-                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tải ảnh...</>
-                ) : actionLoading ? (
-                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang tạo...</>
-                ) : (
-                  "Đăng bán →"
-                )}
-              </Button>
-            </div>
           </div>
         </div>
       </div>
