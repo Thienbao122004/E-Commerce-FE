@@ -85,6 +85,34 @@ export async function rejectDispute(
   return res.json()
 }
 
+export async function requestSellerResponse(
+  token: string,
+  disputeId: string,
+  adminNote?: string
+): Promise<DisputeResponse> {
+  const res = await fetch(`${API}/api/admin/disputes/${disputeId}/request-seller-response`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ adminNote }),
+  })
+  if (!res.ok) throw new Error("Lỗi yêu cầu seller phản hồi")
+  return res.json()
+}
+
+export async function requestCustomerResponse(
+  token: string,
+  disputeId: string,
+  adminNote?: string
+): Promise<DisputeResponse> {
+  const res = await fetch(`${API}/api/admin/disputes/${disputeId}/request-customer-response`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ adminNote }),
+  })
+  if (!res.ok) throw new Error("Lỗi yêu cầu customer bổ sung")
+  return res.json()
+}
+
 export async function fetchSellerDisputes(
   token: string,
   page = 1,
@@ -180,12 +208,13 @@ export async function createDispute(
 export async function updateDisputeEvidence(
   token: string,
   disputeId: string,
-  evidenceUrls: string[]
+  evidenceUrls: string[],
+  customerNote?: string
 ): Promise<CustomerDisputeResponse> {
   const res = await fetch(`${API}/api/disputes/${disputeId}/evidence`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ evidenceUrls }),
+    body: JSON.stringify({ evidenceUrls, customerNote }),
   })
   if (!res.ok) throw new Error("Lỗi cập nhật bằng chứng")
   return res.json()

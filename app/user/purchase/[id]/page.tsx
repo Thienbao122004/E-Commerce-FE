@@ -157,28 +157,44 @@ export default function PurchaseOrderDetailPage() {
   const [disputeEvidenceUrls, setDisputeEvidenceUrls] = useState<string[]>([])
   const [submittingDispute, setSubmittingDispute] = useState(false)
 
-  const loadOrder = useCallback(async () => {
+  // Các trạng thái đơn đã kết thúc — không cần poll
+  const FINAL_ORDER_STATUSES = new Set([6, 7, 8]) // Completed, Cancelled, Refunded
+
+  const loadOrder = useCallback(async (silent = false) => {
     if (!orderId) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const res = await ordersService.getOrderById(orderId)
       if (!res.success || !res.order) {
-        toast.error(res.message || 'Không tìm thấy đơn hàng')
-        setOrder(null)
+        if (!silent) toast.error(res.message || 'Không tìm thấy đơn hàng')
+        if (!silent) setOrder(null)
         return
       }
-      setOrder(res.order)
+      setOrder((prev) => {
+        // Chỉ update nếu trạng thái thực sự thay đổi (tránh re-render thừa)
+        if (prev && prev.status === res.order!.status && prev.updatedAt === res.order!.updatedAt) {
+          return prev
+        }
+        return res.order!
+      })
     } catch {
-      toast.error('Không thể tải chi tiết đơn hàng')
-      setOrder(null)
+      if (!silent) toast.error('Không thể tải chi tiết đơn hàng')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [orderId])
 
   useEffect(() => {
     void loadOrder()
   }, [loadOrder])
+
+  // Auto-poll mỗi 30s khi đơn chưa kết thúc
+  useEffect(() => {
+    if (!order || FINAL_ORDER_STATUSES.has(order.status)) return
+    const timer = setInterval(() => void loadOrder(true), 30_000)
+    return () => clearInterval(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.status, loadOrder])
 
   const canCancel = useMemo(() => {
     if (!order) return false
@@ -372,6 +388,22 @@ export default function PurchaseOrderDetailPage() {
               Quay lại
             </Button>
           </Link>
+          {!FINAL_ORDER_STATUSES.has(order.status) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void loadOrder()}
+              disabled={loading}
+              className="cursor-pointer text-muted-foreground gap-1"
+              title="Làm mới trạng thái đơn hàng"
+            >
+              <span className={`material-symbols-outlined text-sm ${loading ? 'animate-spin' : ''}`}>
+                refresh
+              </span>
+              {loading ? 'Đang tải...' : 'Làm mới'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"

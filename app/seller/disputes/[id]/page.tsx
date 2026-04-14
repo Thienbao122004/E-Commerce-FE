@@ -18,8 +18,9 @@ import { Separator } from "@/components/ui/separator"
 import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
 import { fetchSellerDisputeById, respondToSellerDispute } from "@/services/disputes"
-import { DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
+import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
 import type { SellerDispute } from "@/types/dispute"
+import { EvidenceUploader } from "@/components/common/evidence-uploader"
 
 export default function SellerDisputeDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -28,6 +29,7 @@ export default function SellerDisputeDetailPage() {
   const [loading, setLoading] = React.useState(true)
   const [dlgOpen, setDlgOpen] = React.useState(false)
   const [respondText, setRespondText] = React.useState("")
+  const [respondEvidenceUrls, setRespondEvidenceUrls] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState(false)
 
   const load = React.useCallback(async () => {
@@ -47,6 +49,7 @@ export default function SellerDisputeDetailPage() {
 
   const openRespond = () => {
     setRespondText(dispute?.sellerResponse ?? "")
+    setRespondEvidenceUrls(dispute?.sellerEvidenceUrls ?? [])
     setDlgOpen(true)
   }
 
@@ -57,7 +60,10 @@ export default function SellerDisputeDetailPage() {
     const tk = data.session?.access_token
     if (!tk) { setBusy(false); return }
     try {
-      const r = await respondToSellerDispute(tk, dispute.id, respondText.trim())
+      const r = await respondToSellerDispute(
+        tk, dispute.id, respondText.trim(),
+        respondEvidenceUrls.length > 0 ? respondEvidenceUrls : undefined
+      )
       if (r.success) {
         toast.success("Đã gửi phản hồi thành công")
         setDlgOpen(false)
@@ -159,6 +165,21 @@ export default function SellerDisputeDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {/* Banner admin yêu cầu phản hồi */}
+                  {dispute.status === DisputeStatus.WaitingSeller && (
+                    <div className="flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3">
+                      <IconMessageCircle className="size-4 mt-0.5 text-orange-500 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-orange-700">Admin đang chờ phản hồi từ bạn</p>
+                        {dispute.adminNote ? (
+                          <p className="text-xs text-orange-600 mt-1 leading-relaxed">Yêu cầu: {dispute.adminNote}</p>
+                        ) : (
+                          <p className="text-xs text-orange-500 mt-0.5">Vui lòng phản hồi khiếu nại này.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-3">
                     <IconUser className="size-4 mt-0.5 text-muted-foreground shrink-0" />
                     <div>
@@ -192,6 +213,19 @@ export default function SellerDisputeDetailPage() {
                               </a>
                             ))}
                           </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {dispute.customerNote && (
+                    <>
+                      <Separator />
+                      <div className="flex items-start gap-3">
+                        <IconNote className="size-4 mt-0.5 text-indigo-400 shrink-0" />
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Phản hồi bổ sung từ khách hàng</p>
+                          <p className="text-sm bg-indigo-50 border border-indigo-100 rounded-md px-3 py-2 text-indigo-800 leading-relaxed">{dispute.customerNote}</p>
                         </div>
                       </div>
                     </>
@@ -265,15 +299,29 @@ export default function SellerDisputeDetailPage() {
               {dispute?.title} · Khách: {dispute?.customerName}
             </DialogDescription>
           </DialogHeader>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Nội dung phản hồi *</label>
-            <Textarea
-              placeholder="Mô tả rõ tình trạng đơn hàng, lý do từ phía cửa hàng... (tối thiểu 10 ký tự)"
-              value={respondText}
-              onChange={(e) => setRespondText(e.target.value)}
-              className="min-h-[120px]"
-            />
-            <p className="text-xs text-muted-foreground mt-1">{respondText.length}/2000 ký tự</p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Nội dung phản hồi *</label>
+              <Textarea
+                placeholder="Mô tả rõ tình trạng đơn hàng, lý do từ phía cửa hàng... (tối thiểu 10 ký tự)"
+                value={respondText}
+                onChange={(e) => setRespondText(e.target.value)}
+                className="min-h-[120px]"
+                disabled={busy}
+              />
+              <p className="text-xs text-muted-foreground mt-1">{respondText.length}/2000 ký tự</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Bằng chứng đính kèm
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">ảnh / video, tối đa 10</span>
+              </label>
+              <EvidenceUploader
+                urls={respondEvidenceUrls}
+                onChange={setRespondEvidenceUrls}
+                disabled={busy}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDlgOpen(false)} disabled={busy}>Hủy</Button>

@@ -88,6 +88,9 @@ export type AdminDispute = {
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+  evidenceUrls: string[]
+  sellerEvidenceUrls: string[]
+  customerNote: string | null
 }
 
 export type DisputeListResponse = {
@@ -128,6 +131,8 @@ export type SellerDispute = {
   createdAt: string
   updatedAt: string
   canRespond: boolean
+  customerNote: string | null
+  adminNote: string | null
 }
 
 export type SellerDisputeListResponse = {
@@ -167,6 +172,7 @@ export type CustomerDispute = {
   createdAt: string
   updatedAt: string
   canUpdateEvidence: boolean
+  customerNote: string | null
 }
 
 export type CustomerDisputeListResponse = {

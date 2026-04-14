@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import {
-  IconRefresh, IconEye, IconMessageCircle,
+  IconRefresh, IconEye, IconMessageCircle, IconExternalLink,
 } from "@tabler/icons-react"
+import Link from "next/link"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { supabase } from "@/lib/supabase"
 import { fetchSellerDisputes, respondToSellerDispute } from "@/services/disputes"
+import { EvidenceUploader } from "@/components/common/evidence-uploader"
 import {
   DisputeStatus, DisputeStatusLabels, DisputeStatusColors,
   DisputeType, DisputeTypeLabels,
@@ -51,6 +53,7 @@ export default function SellerDisputesPage() {
   // Detail / respond dialog
   const [selectedDispute, setSelectedDispute] = React.useState<SellerDispute | null>(null)
   const [respondText, setRespondText] = React.useState("")
+  const [respondEvidenceUrls, setRespondEvidenceUrls] = React.useState<string[]>([])
 
   React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
@@ -72,6 +75,7 @@ export default function SellerDisputesPage() {
   const openRespond = (d: SellerDispute) => {
     setSelectedDispute(d)
     setRespondText(d.sellerResponse ?? "")
+    setRespondEvidenceUrls(d.sellerEvidenceUrls ?? [])
   }
 
   const handleRespond = async () => {
@@ -81,7 +85,10 @@ export default function SellerDisputesPage() {
     const token = data.session?.access_token
     if (!token) { setActionLoading(false); return }
     try {
-      const res = await respondToSellerDispute(token, selectedDispute.id, respondText.trim())
+      const res = await respondToSellerDispute(
+        token, selectedDispute.id, respondText.trim(),
+        respondEvidenceUrls.length > 0 ? respondEvidenceUrls : undefined
+      )
       if (res.success) {
         toast.success("Đã gửi phản hồi thành công")
         setSelectedDispute(null)
@@ -243,28 +250,19 @@ export default function SellerDisputesPage() {
                               disabled={actionLoading}
                             >
                               <IconMessageCircle className="mr-1 size-3.5" />
-                              {d.sellerResponse ? "Xem / sửa" : "Phản hồi"}
+                              {d.sellerResponse ? "Sửa phản hồi" : "Phản hồi"}
                             </Button>
                           )}
-                          {!d.canRespond && d.sellerResponse && (
+                          <Link href={`/seller/disputes/${d.id}`}>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="size-8"
-                              title="Xem phản hồi"
-                              onClick={() => openRespond(d)}
+                              title="Xem chi tiết"
                             >
-                              <IconEye className="size-4" />
+                              <IconExternalLink className="size-4" />
                             </Button>
-                          )}
-                          {d.resolution && (
-                            <span
-                              className="text-xs text-muted-foreground max-w-[120px] truncate inline-block"
-                              title={d.resolution}
-                            >
-                              {d.resolution}
-                            </span>
-                          )}
+                          </Link>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -303,7 +301,7 @@ export default function SellerDisputesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <div>
               <label className="text-sm font-medium mb-1.5 block">Nội dung phản hồi *</label>
               <Textarea
@@ -311,9 +309,20 @@ export default function SellerDisputesPage() {
                 value={respondText}
                 onChange={(e) => setRespondText(e.target.value)}
                 className="min-h-[100px]"
-                disabled={!selectedDispute?.canRespond}
+                disabled={!selectedDispute?.canRespond || actionLoading}
               />
               <p className="text-xs text-muted-foreground mt-1">{respondText.length}/2000 ký tự</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Bằng chứng đính kèm
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">ảnh / video, tối đa 10</span>
+              </label>
+              <EvidenceUploader
+                urls={respondEvidenceUrls}
+                onChange={setRespondEvidenceUrls}
+                disabled={!selectedDispute?.canRespond || actionLoading}
+              />
             </div>
           </div>
 

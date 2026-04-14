@@ -15,6 +15,7 @@ import {
   DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { fetchMyDisputeById, cancelMyDispute, updateDisputeEvidence } from "@/services/disputes"
 import {
   DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels,
@@ -51,9 +52,10 @@ export default function CustomerDisputeDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false)
   const [canceling, setCanceling] = useState(false)
 
-  // Update evidence
+  // Update evidence / respond
   const [evidenceOpen, setEvidenceOpen] = useState(false)
   const [evidenceUrls, setEvidenceUrls] = useState<string[]>([])
+  const [customerNote, setCustomerNote] = useState("")
   const [updatingEvidence, setUpdatingEvidence] = useState(false)
 
   useEffect(() => {
@@ -98,16 +100,29 @@ export default function CustomerDisputeDetailPage() {
 
   const handleUpdateEvidence = async () => {
     if (!session?.access_token || !dispute) return
-    if (evidenceUrls.length === 0) { toast.error("Vui lòng thêm ít nhất 1 bằng chứng"); return }
+    const isWaitingCustomer = dispute.status === DisputeStatus.WaitingCustomer
+    if (isWaitingCustomer && !customerNote.trim() && evidenceUrls.length === 0) {
+      toast.error("Vui lòng nhập phản hồi hoặc đính kèm bằng chứng")
+      return
+    }
+    if (!isWaitingCustomer && evidenceUrls.length === 0) {
+      toast.error("Vui lòng thêm ít nhất 1 bằng chứng")
+      return
+    }
     setUpdatingEvidence(true)
     try {
-      const res = await updateDisputeEvidence(session.access_token, dispute.id, evidenceUrls)
+      const res = await updateDisputeEvidence(
+        session.access_token,
+        dispute.id,
+        evidenceUrls,
+        customerNote.trim() || undefined
+      )
       if (res.success) {
-        toast.success("Đã cập nhật bằng chứng")
+        toast.success(isWaitingCustomer ? "Đã gửi phản hồi" : "Đã cập nhật bằng chứng")
         setEvidenceOpen(false)
         load()
       } else {
-        toast.error(res.message ?? "Lỗi cập nhật bằng chứng")
+        toast.error(res.message ?? "Lỗi cập nhật")
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi")
@@ -208,18 +223,45 @@ export default function CustomerDisputeDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-xs h-8 gap-1"
+                    className={`text-xs h-8 gap-1 ${dispute.status === DisputeStatus.WaitingCustomer ? "border-indigo-300 text-indigo-600 hover:bg-indigo-50" : ""}`}
                     onClick={() => {
                       setEvidenceUrls([...dispute.evidenceUrls])
+                      setCustomerNote(dispute.customerNote ?? "")
                       setEvidenceOpen(true)
                     }}
                   >
-                    <span className="material-symbols-outlined text-sm">add_photo_alternate</span>
-                    Cập nhật bằng chứng
+                    <span className="material-symbols-outlined text-sm">
+                      {dispute.status === DisputeStatus.WaitingCustomer ? "reply" : "add_photo_alternate"}
+                    </span>
+                    {dispute.status === DisputeStatus.WaitingCustomer ? "Gửi phản hồi" : "Cập nhật bằng chứng"}
                   </Button>
                 )}
               </div>
               <p className="text-sm text-gray-600 leading-relaxed mb-4">{dispute.reason}</p>
+
+              {/* Banner khi admin đang chờ phản hồi */}
+              {dispute.status === DisputeStatus.WaitingCustomer && (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                  <span className="material-symbols-outlined text-indigo-500 text-base mt-0.5 shrink-0">info</span>
+                  <div>
+                    <p className="text-sm font-medium text-indigo-700">Admin đang chờ phản hồi từ bạn</p>
+                    <p className="text-xs text-indigo-500 mt-0.5">
+                      Vui lòng nhấn &ldquo;Gửi phản hồi&rdquo; để cung cấp thêm thông tin hoặc bằng chứng bổ sung.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Phản hồi bổ sung đã gửi */}
+              {dispute.customerNote && (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Phản hồi bổ sung của bạn
+                  </p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{dispute.customerNote}</p>
+                </div>
+              )}
+
               {dispute.evidenceUrls.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
@@ -325,27 +367,53 @@ export default function CustomerDisputeDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Update evidence dialog */}
+      {/* Update evidence / respond dialog */}
       <Dialog open={evidenceOpen} onOpenChange={(v) => { if (!v) setEvidenceOpen(false) }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Cập nhật bằng chứng</DialogTitle>
+            <DialogTitle>
+              {dispute?.status === DisputeStatus.WaitingCustomer
+                ? "Gửi phản hồi bổ sung"
+                : "Cập nhật bằng chứng"}
+            </DialogTitle>
             <DialogDescription>
-              Tải lên ảnh hoặc video từ thiết bị của bạn (tối đa 10 file).
+              {dispute?.status === DisputeStatus.WaitingCustomer
+                ? "Admin đang chờ thêm thông tin từ bạn. Bạn có thể viết giải thích và/hoặc đính kèm ảnh, video."
+                : "Tải lên ảnh hoặc video từ thiết bị của bạn (tối đa 10 file)."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label>Bằng chứng đính kèm</Label>
-            <EvidenceUploader
-              urls={evidenceUrls}
-              onChange={setEvidenceUrls}
-              disabled={updatingEvidence}
-            />
+          <div className="space-y-4">
+            {dispute?.status === DisputeStatus.WaitingCustomer && (
+              <div className="space-y-1.5">
+                <Label>Nội dung phản hồi</Label>
+                <Textarea
+                  placeholder="Viết thêm giải thích, thông tin bổ sung cho admin..."
+                  rows={4}
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  disabled={updatingEvidence}
+                  maxLength={2000}
+                />
+                <p className="text-xs text-gray-400 text-right">{customerNote.length}/2000</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Bằng chứng đính kèm</Label>
+              <EvidenceUploader
+                urls={evidenceUrls}
+                onChange={setEvidenceUrls}
+                disabled={updatingEvidence}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEvidenceOpen(false)} disabled={updatingEvidence}>Hủy</Button>
             <Button onClick={handleUpdateEvidence} disabled={updatingEvidence}>
-              {updatingEvidence ? "Đang cập nhật..." : "Lưu bằng chứng"}
+              {updatingEvidence
+                ? "Đang gửi..."
+                : dispute?.status === DisputeStatus.WaitingCustomer
+                  ? "Gửi phản hồi"
+                  : "Lưu bằng chứng"}
             </Button>
           </DialogFooter>
         </DialogContent>

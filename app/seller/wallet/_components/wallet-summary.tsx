@@ -55,7 +55,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Số dư khả dụng</p>
-              <p className="text-2xl 2xl:text-3xl font-bold text-primary tabular-nums mt-1">
+              <p className="text-lg xl:text-xl 2xl:text-2xl font-bold text-primary tabular-nums mt-1 break-all leading-tight">
                 {currency(available)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5">Có thể rút ngay</p>
@@ -72,7 +72,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Tạm giữ (escrow)</p>
-              <p className="text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400 mt-1">
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400 mt-1 break-all leading-tight">
                 {currency(held)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Đã thanh toán, chờ đơn hoàn thành</p>
@@ -89,7 +89,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Chờ duyệt rút</p>
-              <p className="text-xl font-bold tabular-nums text-yellow-600 dark:text-yellow-400 mt-1">
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-yellow-600 dark:text-yellow-400 mt-1 break-all leading-tight">
                 {currency(pending)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Yêu cầu rút đang xử lý</p>
@@ -106,7 +106,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Tổng thu nhập</p>
-              <p className="text-xl font-bold tabular-nums text-green-600 dark:text-green-400 mt-1">
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-green-600 dark:text-green-400 mt-1 break-all leading-tight">
                 {currency(earnings)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Tất cả thời gian</p>
@@ -123,7 +123,7 @@ export function WalletSummary({ wallet, loading }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-muted-foreground">Đã rút</p>
-              <p className="text-xl font-bold tabular-nums mt-1">{currency(withdrawn)}</p>
+              <p className="text-lg xl:text-xl font-bold tabular-nums mt-1 break-all leading-tight">{currency(withdrawn)}</p>
               {refunded > 0 ? (
                 <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
                   Hoàn tác đơn: {currency(refunded)}

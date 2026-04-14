@@ -2,16 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { notificationsService, type NotificationItem } from '@/services/notifications'
 import { useAuth } from '@/contexts/auth-context'
 import { formatRelativeTimeVN as formatRelativeTime } from '@/lib/formatters'
+
+/** Trả về URL điều hướng dựa trên referenceType + referenceId từ BE */
+function getNotificationUrl(item: NotificationItem): string | null {
+  const { referenceType, referenceId } = item
+  if (!referenceType || !referenceId) return null
+  const type = referenceType.toLowerCase()
+  if (type === 'order') return `/user/purchase/${referenceId}`
+  if (type === 'payment') return `/user/purchase/${referenceId}`
+  if (type === 'dispute') return `/user/disputes/${referenceId}`
+  if (type === 'shop') return '/seller/profile'
+  if (type === 'withdrawal') return '/user/profile/wallet'
+  return null
+}
 
 const ANIM_DURATION = 150
 const STALE_MS = 30_000
 
 export function NotificationDropdown() {
   const { session } = useAuth()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -39,6 +54,13 @@ export function NotificationDropdown() {
   useEffect(() => {
     fetchNotifications()
   }, [fetchNotifications])
+
+  // Poll ngầm mỗi 20s để cập nhật badge số thông báo chưa đọc
+  useEffect(() => {
+    if (!session) return
+    const timer = setInterval(() => fetchNotifications(true), 20_000)
+    return () => clearInterval(timer)
+  }, [session, fetchNotifications])
 
   const clearAnimTimer = () => {
     if (!animTimerRef.current) return
@@ -69,19 +91,22 @@ export function NotificationDropdown() {
     return () => clearAnimTimer()
   }, [])
 
-  const handleMarkAsRead = async (item: NotificationItem) => {
-    if (item.isRead) return
+  const handleNotificationClick = async (item: NotificationItem) => {
+    // Đánh dấu đã đọc (optimistic)
+    if (!item.isRead) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+      )
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+      notificationsService.markAsRead(item.id).catch(() => fetchNotifications())
+    }
 
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
-    )
-    setUnreadCount((prev) => Math.max(0, prev - 1))
-
-    try {
-      await notificationsService.markAsRead(item.id)
-    } catch {
-      toast.error('Không thể cập nhật trạng thái thông báo')
-      fetchNotifications()
+    // Điều hướng nếu có URL liên quan
+    const url = getNotificationUrl(item)
+    if (url) {
+      setOpen(false)
+      setClosing(false)
+      router.push(url)
     }
   }
 
@@ -221,36 +246,50 @@ export function NotificationDropdown() {
                   </div>
                 ) : (
                   <div className="max-h-105 overflow-y-auto">
-                    {notifications.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleMarkAsRead(item)}
-                        className="w-full text-left px-4 py-3 border-b hover:bg-[#faf8f6] transition-colors"
-                        style={{ borderColor: '#f1ece6' }}
-                      >
-                        <div className="flex items-start gap-3">
-                          <span
-                            className="mt-1 size-2 rounded-full shrink-0"
-                            style={{ backgroundColor: item.isRead ? '#d8d2cb' : 'var(--color-primary)' }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="text-sm font-semibold truncate"
-                              style={{ color: 'var(--color-text-main)' }}
-                            >
-                              {item.title}
-                            </p>
-                            <p className="text-sm text-muted-foreground truncate mt-0.5">
-                              {item.content}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1.5">
-                              {formatRelativeTime(item.createdAt)}
-                            </p>
+                    {notifications.map((item) => {
+                      const url = getNotificationUrl(item)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleNotificationClick(item)}
+                          className="w-full text-left px-4 py-3 border-b hover:bg-[#faf8f6] transition-colors group"
+                          style={{ borderColor: '#f1ece6' }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span
+                              className="mt-1 size-2 rounded-full shrink-0"
+                              style={{ backgroundColor: item.isRead ? '#d8d2cb' : 'var(--color-primary)' }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-sm font-semibold truncate"
+                                style={{ color: 'var(--color-text-main)' }}
+                              >
+                                {item.title}
+                              </p>
+                              <p className="text-sm text-muted-foreground truncate mt-0.5">
+                                {item.content}
+                              </p>
+                              <div className="flex items-center justify-between mt-1.5">
+                                <p className="text-xs text-muted-foreground">
+                                  {formatRelativeTime(item.createdAt)}
+                                </p>
+                                {url && (
+                                  <span
+                                    className="text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
+                                    style={{ color: 'var(--color-primary)' }}
+                                  >
+                                    Xem chi tiết
+                                    <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </>
