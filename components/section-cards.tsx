@@ -6,7 +6,6 @@ import {
   IconCurrencyDollar,
   IconAlertTriangle,
   IconBuildingStore,
-  IconPackage,
   IconPercentage,
 } from "@tabler/icons-react"
 
@@ -50,7 +49,7 @@ export function SectionCards({ stats, loading }: Props) {
   if (loading || !stats) {
     return (
       <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-        {Array.from({ length: 7 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
@@ -68,6 +67,11 @@ export function SectionCards({ stats, loading }: Props) {
     settledOrdersCount: 0,
   }
 
+  const ord = stats.orders
+  const confirmed = ord.confirmed ?? 0
+  const delivered = ord.delivered ?? 0
+  const refunded = ord.refunded ?? 0
+
   const cards = [
     {
       icon: IconCurrencyDollar,
@@ -84,8 +88,8 @@ export function SectionCards({ stats, loading }: Props) {
       value: fmt(stats.orders.total),
       badge: `+${fmt(stats.orders.todayOrders)} hôm nay`,
       badgePositive: true,
-      footer: `Tháng này: ${fmt(stats.orders.thisMonthOrders)} · Đang xử lý: ${fmt(stats.orders.processing)}`,
-      sub: `Hoàn thành: ${fmt(stats.orders.completed)} · Hủy: ${fmt(stats.orders.cancelled)}`,
+      footer: `Tháng này: ${fmt(stats.orders.thisMonthOrders)} · Chờ: ${fmt(ord.pending)} · Đang xử lý: ${fmt(ord.processing)} · Đã xác nhận: ${fmt(confirmed)}`,
+      sub: `Đã giao: ${fmt(delivered)} · Hoàn thành: ${fmt(ord.completed)} · Hủy: ${fmt(ord.cancelled)} · Hoàn tiền: ${fmt(refunded)}`,
     },
     {
       icon: IconUsers,
@@ -111,7 +115,7 @@ export function SectionCards({ stats, loading }: Props) {
       value: fmt(stats.shops.total),
       badge: `+${fmt(stats.shops.newThisMonth)} tháng này`,
       badgePositive: true,
-      footer: `Hoạt động: ${fmt(stats.shops.active)} · Chờ duyệt: ${fmt(stats.shops.pendingVerification)}`,
+      footer: `Đang bán (đã duyệt): ${fmt(stats.shops.active)} · Chờ duyệt: ${fmt(stats.shops.pendingVerification)}`,
       sub: `Tạm khóa: ${fmt(stats.shops.suspended)}`,
     },
     {

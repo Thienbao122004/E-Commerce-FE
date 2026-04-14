@@ -15,7 +15,8 @@ export async function fetchDisputes(
   page = 1,
   pageSize = 20,
   status?: number | null,
-  type?: number | null
+  type?: number | null,
+  customerId?: string | null
 ): Promise<DisputeListResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -23,6 +24,7 @@ export async function fetchDisputes(
   })
   if (status !== null && status !== undefined) params.set("status", String(status))
   if (type !== null && type !== undefined) params.set("type", String(type))
+  if (customerId) params.set("customerId", customerId)
 
   const res = await fetch(`${API}/api/admin/disputes?${params}`, {
     headers: { Authorization: `Bearer ${token}` },

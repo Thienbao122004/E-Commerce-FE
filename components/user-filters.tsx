@@ -68,6 +68,9 @@ export default function UserFilters({
                         <SelectItem value={String(UserStatus.Active)}>
                             {UserStatusLabels[UserStatus.Active]}
                         </SelectItem>
+                        <SelectItem value={String(UserStatus.Inactive)}>
+                            {UserStatusLabels[UserStatus.Inactive]}
+                        </SelectItem>
                         <SelectItem value={String(UserStatus.Suspended)}>
                             {UserStatusLabels[UserStatus.Suspended]}
                         </SelectItem>

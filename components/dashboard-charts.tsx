@@ -164,19 +164,47 @@ export function DashboardCharts({ stats }: Props) {
     },
   }
 
+  const o = stats.orders
   const ordersChartData: ChartData<"bar"> = {
-    labels: ["Chờ xác nhận", "Đang xử lý", "Hoàn thành", "Đã hủy"],
+    labels: [
+      "Chờ (TT/XN)",
+      "Đang xử lý",
+      "Đã xác nhận",
+      "Đã giao",
+      "Hoàn thành",
+      "Đã hủy",
+      "Hoàn tiền",
+    ],
     datasets: [
       {
         label: "Số đơn hàng",
         data: [
-          stats.orders.pending,
-          stats.orders.processing,
-          stats.orders.completed,
-          stats.orders.cancelled,
+          o.pending,
+          o.processing,
+          o.confirmed ?? 0,
+          o.delivered ?? 0,
+          o.completed,
+          o.cancelled,
+          o.refunded ?? 0,
         ],
-        backgroundColor: ["#c49052", "#5b8db8", "#4a9e6f", "#b85c5c"],
-        borderColor: ["#c49052", "#5b8db8", "#4a9e6f", "#b85c5c"],
+        backgroundColor: [
+          "#c49052",
+          "#5b8db8",
+          "#0ea5e9",
+          "#14b8a6",
+          "#4a9e6f",
+          "#b85c5c",
+          "#78716c",
+        ],
+        borderColor: [
+          "#c49052",
+          "#5b8db8",
+          "#0ea5e9",
+          "#14b8a6",
+          "#4a9e6f",
+          "#b85c5c",
+          "#78716c",
+        ],
         borderWidth: 0,
         borderRadius: 6,
         borderSkipped: false,

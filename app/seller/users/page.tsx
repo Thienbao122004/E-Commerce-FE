@@ -21,7 +21,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
 import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
-import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
+import {
+  UserStatus,
+  UserStatusLabels,
+  userStatusBadgeClass,
+  userStatusLabel,
+} from "@/types/user"
 import type { AdminUser } from "@/types/user"
 
 export default function UsersPage() {
@@ -143,6 +148,7 @@ export default function UsersPage() {
                 <SelectContent>
                   <SelectItem value="all">Tất cả trạng thái</SelectItem>
                   <SelectItem value={String(UserStatus.Active)}>Hoạt động</SelectItem>
+                  <SelectItem value={String(UserStatus.Inactive)}>Vô hiệu hóa</SelectItem>
                   <SelectItem value={String(UserStatus.Suspended)}>Bị khóa</SelectItem>
                 </SelectContent>
               </Select>
@@ -181,8 +187,8 @@ export default function UsersPage() {
                     <TableCell className="text-sm">{u.phone ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{u.role}</Badge></TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={`text-xs ${UserStatusColors[u.status] ?? ""}`}>
-                        {UserStatusLabels[u.status] ?? u.statusName}
+                      <Badge variant="secondary" className={`text-xs ${userStatusBadgeClass(u)}`}>
+                        {userStatusLabel(u)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm tabular-nums">{fmtDate(u.createdAt)}</TableCell>
@@ -196,7 +202,7 @@ export default function UsersPage() {
                             <IconLock className="mr-1 size-3.5" />Khóa
                           </Button>
                         )}
-                        {u.status === UserStatus.Suspended && (
+                        {u.status !== UserStatus.Active && (
                           <Button variant="outline" size="sm" className="h-8 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" onClick={() => handleUnsuspend(u)} disabled={busy}>
                             <IconLockOpen className="mr-1 size-3.5" />Mở khóa
                           </Button>

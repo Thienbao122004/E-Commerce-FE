@@ -330,14 +330,18 @@ export function DataTable({
 
   const orderOverview: OrderOverviewRow[] = React.useMemo(() => {
     if (!stats) return []
+    const o = stats.orders
     return [
-      { label: "Tổng đơn hàng", value: stats.orders.total, color: "#6366f1" },
-      { label: "Chờ xác nhận", value: stats.orders.pending, color: "#f59e0b" },
-      { label: "Đang xử lý", value: stats.orders.processing, color: "#3b82f6" },
-      { label: "Hoàn thành", value: stats.orders.completed, color: "#22c55e" },
-      { label: "Đã hủy", value: stats.orders.cancelled, color: "#ef4444" },
-      { label: "Đơn hôm nay", value: stats.orders.todayOrders, color: "#8b5cf6" },
-      { label: "Đơn tháng này", value: stats.orders.thisMonthOrders, color: "#06b6d4" },
+      { label: "Tổng đơn hàng", value: o.total, color: "#6366f1" },
+      { label: "Chờ (TT/XN)", value: o.pending, color: "#f59e0b" },
+      { label: "Đang xử lý", value: o.processing, color: "#3b82f6" },
+      { label: "Đã xác nhận", value: o.confirmed ?? 0, color: "#0ea5e9" },
+      { label: "Đã giao", value: o.delivered ?? 0, color: "#14b8a6" },
+      { label: "Hoàn thành", value: o.completed, color: "#22c55e" },
+      { label: "Đã hủy", value: o.cancelled, color: "#ef4444" },
+      { label: "Hoàn tiền", value: o.refunded ?? 0, color: "#78716c" },
+      { label: "Đơn hôm nay", value: o.todayOrders, color: "#8b5cf6" },
+      { label: "Đơn tháng này", value: o.thisMonthOrders, color: "#06b6d4" },
     ]
   }, [stats])
 

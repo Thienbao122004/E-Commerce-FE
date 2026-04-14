@@ -23,7 +23,12 @@ import { useTableData } from "@/hooks/use-table-data"
 import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
 import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
-import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
+import {
+  UserStatus,
+  UserStatusLabels,
+  userStatusBadgeClass,
+  userStatusLabel,
+} from "@/types/user"
 import type { AdminUser } from "@/types/user"
 
 export default function UsersPage() {
@@ -129,6 +134,7 @@ export default function UsersPage() {
       options: [
         { value: "all", label: "Tất cả trạng thái" },
         { value: String(UserStatus.Active), label: UserStatusLabels[UserStatus.Active] },
+        { value: String(UserStatus.Inactive), label: UserStatusLabels[UserStatus.Inactive] },
         { value: String(UserStatus.Suspended), label: UserStatusLabels[UserStatus.Suspended] },
       ],
     },
@@ -178,22 +184,22 @@ export default function UsersPage() {
                     <TableCell className="text-sm truncate">{u.phone ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{u.role}</Badge></TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className={`text-xs ${UserStatusColors[u.status] ?? ""}`}>
-                        {UserStatusLabels[u.status] ?? u.statusName}
+                      <Badge variant="secondary" className={`text-xs ${userStatusBadgeClass(u)}`}>
+                        {userStatusLabel(u)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm tabular-nums truncate">{fmtDate(u.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                         <Button variant="ghost" size="icon" className="size-8" asChild>
-                          <Link href={`/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
+                          <Link href={`/admin/dashboard/users/${u.id}`}><IconExternalLink className="size-4" /></Link>
                         </Button>
-                        {u.status === UserStatus.Active && (
+                        {u.status === UserStatus.Active && u.role !== "admin" && (
                           <Button variant="ghost" size="icon" className="h-8 text-xs text-red-600 hover:bg-red-50" onClick={() => { setSuspendTarget(u); setReason("") }} disabled={busy}>
                             <IconLock className="mr-1 size-3.5" />
                           </Button>
                         )}
-                        {u.status === UserStatus.Suspended && (
+                        {u.status !== UserStatus.Active && u.role !== "admin" && (
                           <Button variant="ghost" size="icon" className="h-8 text-xs text-green-600 hover:bg-green-50" onClick={() => handleUnsuspend(u)} disabled={busy}>
                             <IconLockOpen className="mr-1 size-3.5" />
                           </Button>

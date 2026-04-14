@@ -367,7 +367,7 @@ export default function AdminMaterialsPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex flex-col gap-5 py-6">
+          <div className="flex flex-col gap-5 py-6 px-6">
             <div className="space-y-1.5">
               <Label htmlFor="mat-name">
                 Tên chất liệu <span className="text-red-500">*</span>

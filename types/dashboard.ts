@@ -26,8 +26,13 @@ export type DashboardStats = {
     total: number
     pending: number
     processing: number
+    /** Đã xác nhận (seller đã nhận đơn) */
+    confirmed: number
+    /** Đã giao đến khách, chưa hoàn tất */
+    delivered: number
     completed: number
     cancelled: number
+    refunded: number
     todayOrders: number
     thisMonthOrders: number
   }

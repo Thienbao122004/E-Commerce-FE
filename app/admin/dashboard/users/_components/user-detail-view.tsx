@@ -14,7 +14,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
-import { UserStatus, UserStatusLabels, UserStatusColors } from "@/types/user"
+import {
+  UserStatus,
+  userStatusBadgeClass,
+  userStatusLabel,
+} from "@/types/user"
 import type { AdminUser, UserAuditLog } from "@/types/user"
 
 type Props = {
@@ -64,7 +68,7 @@ export function UserDetailView({ user, logs, detailLoading, busy, onBack, onSusp
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Trạng thái</span>
-                    <Badge variant="secondary" className={UserStatusColors[user.status] ?? ""}>{UserStatusLabels[user.status]}</Badge>
+                    <Badge variant="secondary" className={userStatusBadgeClass(user)}>{userStatusLabel(user)}</Badge>
                   </div>
                   <Separator />
                   <div className="flex items-start gap-3">
@@ -108,7 +112,7 @@ export function UserDetailView({ user, logs, detailLoading, busy, onBack, onSusp
                         <IconLock className="mr-1.5 size-4" />Khóa tài khoản
                       </Button>
                     )}
-                    {user.status === UserStatus.Suspended && (
+                    {user.status !== UserStatus.Active && (
                       <Button className="flex-1" onClick={() => onUnsuspend(user.id)} disabled={busy}>
                         <IconLockOpen className="mr-1.5 size-4" />Mở khóa
                       </Button>
