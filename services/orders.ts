@@ -27,6 +27,7 @@ export interface OrderSummary {
   status: number
   statusName: string
   createdAt: string
+  updatedAt?: string
   items: OrderItem[]
 }
 

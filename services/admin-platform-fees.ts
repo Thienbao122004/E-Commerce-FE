@@ -1,16 +1,21 @@
 import type {
   PlatformFeeRecordsApiResponse,
   PlatformFeeSummaryApiResponse,
+  PlatformFeeSettingsApiResponse,
+  PlatformFeeSettingsHistoryApiResponse,
+  UpdatePlatformFeeSettingsRequest,
 } from "@/types/admin-platform-fees"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
-async function fetchJson<T>(path: string, token: string): Promise<T> {
+async function fetchJson<T>(path: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
     cache: "no-store",
+    ...options,
   })
 
   if (!res.ok) {
@@ -60,6 +65,36 @@ export function fetchPlatformFeeRecords(
   if (shopId) q.set("shopId", shopId)
   return fetchJson<PlatformFeeRecordsApiResponse>(
     `/api/admin/platform-fees/records?${q}`,
+    token
+  )
+}
+
+export function fetchPlatformFeeSettings(token: string) {
+  return fetchJson<PlatformFeeSettingsApiResponse>(
+    "/api/admin/platform-fees/settings",
+    token
+  )
+}
+
+export function updatePlatformFeeSettings(
+  token: string,
+  request: UpdatePlatformFeeSettingsRequest
+) {
+  return fetchJson<PlatformFeeSettingsApiResponse>(
+    "/api/admin/platform-fees/settings",
+    token,
+    { method: "PUT", body: JSON.stringify(request) }
+  )
+}
+
+export function fetchPlatformFeeSettingsHistory(
+  token: string,
+  page: number,
+  pageSize: number
+) {
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  return fetchJson<PlatformFeeSettingsHistoryApiResponse>(
+    `/api/admin/platform-fees/settings/history?${q}`,
     token
   )
 }

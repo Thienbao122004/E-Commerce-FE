@@ -16,10 +16,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { ordersService, type OrderDetail } from '@/services/orders'
+import { createDispute } from '@/services/disputes'
+import { DisputeType } from '@/types/dispute'
+import { EvidenceUploader } from '@/components/common/evidence-uploader'
 
 const STATUS_COLORS: Record<number, string> = {
   0: '#d97706',
@@ -48,6 +56,19 @@ const STATUS_LABELS: Record<number, string> = {
 const STATUS_STEPS = [0, 2, 3, 4, 5, 6] as const
 
 const CANCELLABLE_STATUSES = new Set([0, 1, 2, 3])
+// Có thể khiếu nại: Đã giao (5) hoặc Hoàn thành (6), trong vòng 7 ngày
+const DISPUTE_WINDOW_DAYS = 7
+const DISPUTE_ALLOWED_STATUSES = new Set([5, 6])
+
+const DISPUTE_TYPE_OPTIONS = [
+  { value: String(DisputeType.Refund), label: 'Hoàn tiền' },
+  { value: String(DisputeType.Return), label: 'Trả hàng' },
+  { value: String(DisputeType.Damaged), label: 'Hàng hư hỏng' },
+  { value: String(DisputeType.NotReceived), label: 'Không nhận được hàng' },
+  { value: String(DisputeType.WrongItem), label: 'Giao sai hàng' },
+  { value: String(DisputeType.QualityIssue), label: 'Chất lượng không đảm bảo' },
+  { value: String(DisputeType.Other), label: 'Khác' },
+]
 
 function StatusTimeline({ currentStatus }: { currentStatus: number }) {
   const isCancelled = currentStatus === 7
@@ -125,6 +146,17 @@ export default function PurchaseOrderDetailPage() {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
+  // Dispute dialog
+  const [disputeDialogOpen, setDisputeDialogOpen] = useState(false)
+  const [disputeForm, setDisputeForm] = useState({
+    type: String(DisputeType.Refund),
+    title: '',
+    reason: '',
+    requestedAmount: '',
+  })
+  const [disputeEvidenceUrls, setDisputeEvidenceUrls] = useState<string[]>([])
+  const [submittingDispute, setSubmittingDispute] = useState(false)
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return
     setLoading(true)
@@ -151,6 +183,21 @@ export default function PurchaseOrderDetailPage() {
   const canCancel = useMemo(() => {
     if (!order) return false
     return CANCELLABLE_STATUSES.has(order.status)
+  }, [order])
+
+  // Có thể khiếu nại: status Delivered(5)/Completed(6) và trong vòng 7 ngày kể từ updatedAt
+  const canDispute = useMemo(() => {
+    if (!order) return false
+    if (!DISPUTE_ALLOWED_STATUSES.has(order.status)) return false
+    const daysSince = (Date.now() - new Date(order.updatedAt ?? order.createdAt).getTime()) / 86400000
+    return daysSince <= DISPUTE_WINDOW_DAYS
+  }, [order])
+
+  const disputeDeadline = useMemo(() => {
+    if (!order) return null
+    const base = new Date(order.updatedAt ?? order.createdAt)
+    base.setDate(base.getDate() + DISPUTE_WINDOW_DAYS)
+    return base
   }, [order])
 
   const canConfirm = order?.status === 5
@@ -203,6 +250,44 @@ export default function PurchaseOrderDetailPage() {
       return
     }
     router.push(`/shop/${encodeURIComponent(slug)}`)
+  }
+
+  const openDisputeDialog = () => {
+    setDisputeForm({ type: String(DisputeType.Refund), title: '', reason: '', requestedAmount: '' })
+    setDisputeEvidenceUrls([])
+    setDisputeDialogOpen(true)
+  }
+
+  const handleSubmitDispute = async () => {
+    if (!order) return
+    if (!disputeForm.title.trim()) { toast.error('Vui lòng nhập tiêu đề'); return }
+    if (disputeForm.reason.trim().length < 20) { toast.error('Lý do phải có ít nhất 20 ký tự'); return }
+
+    setSubmittingDispute(true)
+    try {
+      const { data } = await import('@/lib/supabase').then((m) => m.supabase.auth.getSession())
+      const tk = data.session?.access_token
+      if (!tk) { toast.error('Phiên đăng nhập hết hạn'); return }
+      const res = await createDispute(tk, {
+        orderId: order.id,
+        type: Number(disputeForm.type),
+        title: disputeForm.title.trim(),
+        reason: disputeForm.reason.trim(),
+        requestedAmount: disputeForm.requestedAmount ? Number(disputeForm.requestedAmount) : 0,
+        evidenceUrls: disputeEvidenceUrls.length > 0 ? disputeEvidenceUrls : undefined,
+      })
+      if (res.success) {
+        toast.success('Đã tạo khiếu nại thành công')
+        setDisputeDialogOpen(false)
+        router.push('/user/disputes')
+      } else {
+        toast.error(res.message ?? 'Lỗi tạo khiếu nại')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Lỗi tạo khiếu nại')
+    } finally {
+      setSubmittingDispute(false)
+    }
   }
 
   const openCancelDialog = () => {
@@ -331,6 +416,21 @@ export default function PurchaseOrderDetailPage() {
               {confirming ? 'Đang xử lý...' : 'Đã nhận được hàng'}
             </Button>
           )}
+          {canDispute && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openDisputeDialog}
+              className="cursor-pointer border-orange-300 text-orange-600 hover:bg-orange-50"
+            >
+              <span className="mr-1">⚠</span>
+              Khiếu nại đơn hàng
+            </Button>
+          )}
+          {!canDispute && DISPUTE_ALLOWED_STATUSES.has(order.status) && (
+            <span className="text-xs text-gray-400 self-center">Hết hạn khiếu nại</span>
+          )}
         </div>
       </div>
 
@@ -423,6 +523,97 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Dispute Dialog */}
+      <Dialog open={disputeDialogOpen} onOpenChange={(v) => { if (!v) setDisputeDialogOpen(false) }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Khiếu nại đơn hàng {order.orderCode ? `#${order.orderCode}` : ''}</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 text-xs">
+                {disputeDeadline && (
+                  <p className="text-amber-700 font-medium">
+                    ⏳ Hạn khiếu nại: {formatDate(disputeDeadline.toISOString())}
+                  </p>
+                )}
+                <p>Mỗi đơn hàng chỉ được khiếu nại một lần. Vui lòng cung cấp bằng chứng rõ ràng.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="d-type">Loại khiếu nại <span className="text-red-500">*</span></Label>
+              <Select value={disputeForm.type} onValueChange={(v) => setDisputeForm((f) => ({ ...f, type: v }))}>
+                <SelectTrigger id="d-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DISPUTE_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="d-title">Tiêu đề <span className="text-red-500">*</span></Label>
+              <Input
+                id="d-title"
+                placeholder="Ví dụ: Sản phẩm bị hỏng khi nhận hàng"
+                value={disputeForm.title}
+                onChange={(e) => setDisputeForm((f) => ({ ...f, title: e.target.value }))}
+                maxLength={255}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="d-reason">Lý do chi tiết <span className="text-red-500">*</span></Label>
+              <Textarea
+                id="d-reason"
+                placeholder="Mô tả rõ tình trạng sản phẩm, thời điểm phát hiện vấn đề... (tối thiểu 20 ký tự)"
+                value={disputeForm.reason}
+                onChange={(e) => setDisputeForm((f) => ({ ...f, reason: e.target.value }))}
+                className="min-h-[90px]"
+                maxLength={2000}
+              />
+              <p className={`text-xs ${disputeForm.reason.length > 0 && disputeForm.reason.length < 20 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                {disputeForm.reason.length}/2000 {disputeForm.reason.length > 0 && disputeForm.reason.length < 20 && `(còn thiếu ${20 - disputeForm.reason.length})`}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>
+                Bằng chứng
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">ảnh / video từ thiết bị, tối đa 10</span>
+              </Label>
+              <EvidenceUploader
+                urls={disputeEvidenceUrls}
+                onChange={setDisputeEvidenceUrls}
+                disabled={submittingDispute}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="d-amount">Số tiền yêu cầu hoàn (₫)</Label>
+              <Input
+                id="d-amount"
+                type="number"
+                min={0}
+                placeholder="0"
+                value={disputeForm.requestedAmount}
+                onChange={(e) => setDisputeForm((f) => ({ ...f, requestedAmount: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Để trống nếu chỉ yêu cầu đổi/trả hàng</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDisputeDialogOpen(false)} disabled={submittingDispute}>
+              Hủy
+            </Button>
+            <Button
+              onClick={() => void handleSubmitDispute()}
+              disabled={submittingDispute}
+              style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}
+            >
+              {submittingDispute ? 'Đang gửi...' : 'Gửi khiếu nại'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>

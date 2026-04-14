@@ -3,6 +3,9 @@ import type {
   DisputeResponse,
   SellerDisputeListResponse,
   SellerDisputeResponse,
+  CustomerDisputeListResponse,
+  CustomerDisputeResponse,
+  CreateDisputeRequest,
 } from "@/types/dispute"
 
 const API = process.env.NEXT_PUBLIC_API_URL
@@ -129,5 +132,73 @@ export async function respondToSellerDispute(
     body: JSON.stringify({ response, evidenceUrls }),
   })
   if (!res.ok) throw new Error("Lỗi gửi phản hồi")
+  return res.json()
+}
+
+// ---------- Customer Dispute APIs ----------
+
+export async function fetchMyDisputes(
+  token: string,
+  page = 1,
+  pageSize = 10,
+  status?: number | null
+): Promise<CustomerDisputeListResponse> {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (status !== null && status !== undefined) params.set("status", String(status))
+  const res = await fetch(`${API}/api/disputes?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Lỗi tải danh sách khiếu nại")
+  return res.json()
+}
+
+export async function fetchMyDisputeById(
+  token: string,
+  disputeId: string
+): Promise<CustomerDisputeResponse> {
+  const res = await fetch(`${API}/api/disputes/${disputeId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Lỗi tải chi tiết khiếu nại")
+  return res.json()
+}
+
+export async function createDispute(
+  token: string,
+  data: CreateDisputeRequest
+): Promise<CustomerDisputeResponse> {
+  const res = await fetch(`${API}/api/disputes`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  })
+  const json = await res.json().catch(() => ({ success: false, message: "Lỗi không xác định" }))
+  if (!res.ok) throw new Error(json?.message ?? "Lỗi tạo khiếu nại")
+  return json
+}
+
+export async function updateDisputeEvidence(
+  token: string,
+  disputeId: string,
+  evidenceUrls: string[]
+): Promise<CustomerDisputeResponse> {
+  const res = await fetch(`${API}/api/disputes/${disputeId}/evidence`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ evidenceUrls }),
+  })
+  if (!res.ok) throw new Error("Lỗi cập nhật bằng chứng")
+  return res.json()
+}
+
+export async function cancelMyDispute(
+  token: string,
+  disputeId: string
+): Promise<CustomerDisputeResponse> {
+  const res = await fetch(`${API}/api/disputes/${disputeId}/cancel`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Lỗi hủy khiếu nại")
   return res.json()
 }

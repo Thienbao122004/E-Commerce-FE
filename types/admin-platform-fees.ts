@@ -1,3 +1,34 @@
+export type PlatformFeeConfigDto = {
+  id: string
+  commissionPercent: number
+  changedBy: string
+  changedByName: string | null
+  note: string | null
+  createdAt: string
+}
+
+export type UpdatePlatformFeeSettingsRequest = {
+  commissionPercent: number
+  note?: string | null
+}
+
+export type PlatformFeeSettingsApiResponse = {
+  success: boolean
+  data?: PlatformFeeConfigDto | null
+  message?: string
+}
+
+export type PlatformFeeSettingsHistoryApiResponse = {
+  success: boolean
+  data?: {
+    items: PlatformFeeConfigDto[]
+    totalCount: number
+    page: number
+    pageSize: number
+  }
+  message?: string
+}
+
 export type PlatformFeeSummary = {
   totalFeeAmount: number
   totalGrossSubtotal: number

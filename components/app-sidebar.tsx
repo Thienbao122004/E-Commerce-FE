@@ -18,6 +18,7 @@ import {
   IconPlus,
   IconReport,
   IconSearch,
+  IconSettings,
   IconShoppingBag,
   IconShoppingCart,
   IconStar,
@@ -132,13 +133,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    title: "Danh mục và tags",
+    title: "Danh mục, Tags & Chất liệu",
     url: "/dashboard/categories",
     icon: IconListDetails,
     roles: ['admin'],
     items: [
       { title: "Danh mục", url: "/dashboard/categories", icon: IconFolderOpen },
       { title: "Tags", url: "/dashboard/tags", icon: IconTag },
+      { title: "Chất liệu", url: "/dashboard/materials", icon: IconPackage },
     ],
   },
   {
@@ -157,6 +159,7 @@ const SELLERS_ITEMS = [
   { name: "Rút tiền người bán", url: "/admin/dashboard/withdrawals", icon: IconReport },
   { name: "Rút tiền khách hàng", url: "/admin/dashboard/customer-withdrawals", icon: IconWallet },
   { name: "Phí sàn & báo cáo", url: "/admin/dashboard/platform-fees", icon: IconPercentage },
+  { name: "Cấu hình phí sàn", url: "/admin/dashboard/platform-fee-config", icon: IconSettings },
 ]
 
 const NAV_SECONDARY = [
