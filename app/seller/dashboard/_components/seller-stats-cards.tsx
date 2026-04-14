@@ -43,6 +43,9 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
   const cancelledOrders = orders.filter(
     (o) => o.status === OrderStatus.Cancelled
   ).length
+  const refundedOrders = orders.filter(
+    (o) => o.status === OrderStatus.Refunded
+  ).length
   const totalRefunded = wallet?.totalRefunded ?? 0
   const netRevenue = stats ? stats.totalRevenue - totalRefunded : 0
 
@@ -124,9 +127,9 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
                 Hoàn thành: {fmt(completedOrders)}
               </div>
             </div>
-            {cancelledOrders > 0 && (
+            {cancelledOrders + refundedOrders > 0 && (
               <div className="text-xs text-amber-700 dark:text-amber-400">
-                Đơn hủy/hoàn tiền: {fmt(cancelledOrders)}
+                Đơn hủy/hoàn tiền: {fmt(cancelledOrders + refundedOrders)}
               </div>
             )}
           </div>

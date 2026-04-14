@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { Separator } from "@/components/ui/separator"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
+import { StorefrontFooter } from "@/components/layout/storefront-footer"
 import { StorefrontProductCard } from "@/components/common/storefront-product-card"
 import { formatPriceVND as formatPrice } from "@/lib/formatters"
 
@@ -645,55 +646,7 @@ export default function LandingPage() {
       </main>
 
       <Separator className="bg-gray-200 mt-12" />
-      <footer className="pt-8 pb-8 mt-auto">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-3xl" style={{ color: "var(--color-primary)" }}>local_florist</span>
-                <h2 className="text-2xl font-bold">EcomViet</h2>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Kết nối bạn với trái tim Việt Nam. Khám phá hàng thủ công xác thực, thời trang và đặc sản từ khắp mọi miền đất nước.
-              </p>
-            </div>
-            {[
-              { title: "Mua sắm", links: ["Thời trang & Lụa", "Trang trí nhà", "Cà phê đặc sản", "Thực phẩm khô", "Flash Sales"] },
-              { title: "Hỗ trợ khách hàng", links: ["Trung tâm trợ giúp", "Chính sách giao hàng", "Đổi trả & hoàn tiền", "Trở thành người bán", "Liên hệ chúng tôi"] },
-            ].map((col) => (
-              <div key={col.title}>
-                <h3 className="font-bold text-lg mb-4">{col.title}</h3>
-                <ul className="flex flex-col gap-2 text-sm text-gray-400">
-                  {col.links.map((link) => (
-                    <li key={link}><a href="#" className="hover:text-[var(--color-primary)] transition-colors">{link}</a></li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            <div>
-              <h3 className="font-bold text-lg mb-4">Cập nhật mới nhất</h3>
-              <p className="text-gray-400 text-sm mb-4">Đăng ký nhận thông tin về sản phẩm mới và ưu đãi độc quyền.</p>
-              <div className="flex flex-col gap-2">
-                <input
-                  type="email"
-                  placeholder="Địa chỉ email của bạn"
-                  className="border-gray-400 border rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
-                />
-                <button className="text-white font-bold py-3 px-4 rounded-lg transition-colors" style={{ backgroundColor: "var(--color-primary)" }}>
-                  Đăng ký
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-            <p>© 2025 EcomViet Marketplace. Tất cả quyền được bảo lưu.</p>
-            <div className="flex gap-6">
-              <a href="#" className="hover:text-black transition-colors">Chính sách bảo mật</a>
-              <a href="#" className="hover:text-black transition-colors">Điều khoản dịch vụ</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <StorefrontFooter />
     </div>
   )
 }
