@@ -115,15 +115,6 @@ export function SectionCards({ stats, loading }: Props) {
       sub: `Tạm khóa: ${fmt(stats.shops.suspended)}`,
     },
     {
-      icon: IconPackage,
-      label: "Sản phẩm",
-      value: fmt(stats.products.total),
-      badge: `+${fmt(stats.products.newThisMonth)} tháng này`,
-      badgePositive: true,
-      footer: `Đăng bán: ${fmt(stats.products.active)} · Hết hàng: ${fmt(stats.products.outOfStock)}`,
-      sub: `Bản nháp: ${fmt(stats.products.draft)} · Đã ẩn: ${fmt(stats.products.hidden)}`,
-    },
-    {
       icon: IconPercentage,
       label: "Phí sàn (tích lũy)",
       value: currency(pf.totalFees),
