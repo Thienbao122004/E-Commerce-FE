@@ -83,14 +83,10 @@ export function WithdrawalDialogs({
               <label className="text-sm font-medium mb-1.5 block">Lý do từ chối *</label>
               <Textarea placeholder="Nhập lý do..." value={reason} onChange={(e) => setReason(e.target.value)} className="min-h-[60px]" />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Ghi chú admin (tùy chọn)</label>
-              <Textarea placeholder="Ghi chú..." value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className="min-h-[60px]" />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={busy}>Hủy</Button>
-            <Button variant="destructive" onClick={() => onReject(reason, adminNote)} disabled={busy || !reason}>
+            <Button variant="destructive" onClick={() => onReject(reason, "")} disabled={busy || !reason}>
               {busy ? "Đang xử lý..." : "Từ chối"}
             </Button>
           </DialogFooter>
