@@ -5,8 +5,6 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -34,8 +32,8 @@ import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3 py-2.5 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-500 shrink-0 w-36">{label}</span>
-      <div className="text-sm font-medium text-right flex-1">{children}</div>
+      <span className="text-sm text-gray-500 shrink-0 w-28 sm:w-36">{label}</span>
+      <div className="text-sm font-medium text-right flex-1 min-w-0">{children}</div>
     </div>
   )
 }
@@ -136,10 +134,8 @@ export default function CustomerDisputeDetailPage() {
   if (authLoading || !session) return null
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-background-light)" }}>
-      <header><MainStorefrontHeader /></header>
-
-      <main className="flex-grow w-full max-w-[860px] mx-auto px-4 md:px-6 py-8">
+    <div className="w-full max-w-[860px] mx-auto">
+      <div className="py-2 md:py-0">
         {/* Breadcrumb / back */}
         <div className="flex items-center gap-2 mb-6">
           <button
@@ -177,18 +173,18 @@ export default function CustomerDisputeDetailPage() {
           <div className="space-y-4">
             {/* Status banner */}
             <div
-              className="rounded-xl border p-4 flex items-center justify-between gap-4"
+              className="rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               style={{ background: "rgba(255,255,255,0.8)" }}
             >
-              <div>
-                <h1 className="font-bold text-lg" style={{ color: "var(--color-text-main)" }}>
+              <div className="min-w-0 flex-1">
+                <h1 className="font-bold text-base sm:text-lg leading-snug" style={{ color: "var(--color-text-main)" }}>
                   {dispute.title}
                 </h1>
-                <p className="text-sm text-gray-400 mt-0.5">
+                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
                   Tại {dispute.shopName} · {formatDateTimeVN(dispute.createdAt)}
                 </p>
               </div>
-              <Badge variant="secondary" className={`text-sm px-3 py-1.5 shrink-0 ${DisputeStatusColors[dispute.status] ?? ""}`}>
+              <Badge variant="secondary" className={`text-xs sm:text-sm px-3 py-1.5 self-start sm:self-auto shrink-0 ${DisputeStatusColors[dispute.status] ?? ""}`}>
                 {DisputeStatusLabels[dispute.status] ?? dispute.statusName}
               </Badge>
             </div>
@@ -342,12 +338,7 @@ export default function CustomerDisputeDetailPage() {
             )}
           </div>
         )}
-      </main>
-
-      <Separator className="bg-gray-200 mt-8" />
-      <footer className="py-5">
-        <p className="text-center text-xs text-gray-400">© 2025 EcomViet Marketplace</p>
-      </footer>
+      </div>
 
       {/* Cancel dialog */}
       <Dialog open={cancelOpen} onOpenChange={(v) => { if (!v) setCancelOpen(false) }}>

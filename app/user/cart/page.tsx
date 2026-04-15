@@ -226,127 +226,78 @@ export default function CartPage() {
             className="bg-white rounded-lg border overflow-hidden transition-shadow hover:shadow-sm"
             style={{ borderColor: '#e5ded6' }}
           >
+            {/* ── Desktop layout ── */}
             <div
-              className="grid items-center gap-4 px-5 py-4"
-              style={{
-                gridTemplateColumns: '40px 1fr 140px 140px 140px 140px 80px',
-              }}
+              className="hidden md:grid items-center gap-4 px-5 py-4"
+              style={{ gridTemplateColumns: '40px 1fr 140px 140px 140px 80px' }}
             >
-              {/* Checkbox */}
               <div className="flex justify-center">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(item.id)}
-                  onChange={() => toggleSelect(item.id)}
-                  className="size-4 accent-[var(--color-primary)] cursor-pointer"
-                />
+                <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)}
+                  className="size-4 accent-[var(--color-primary)] cursor-pointer" />
               </div>
-
-              {/* Sản phẩm */}
               <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="size-16 shrink-0 rounded border bg-gray-50 overflow-hidden"
-                  style={{ borderColor: '#e5ded6' }}
-                >
-                  {item.productImage ? (
+                <div className="size-16 shrink-0 rounded border bg-gray-50 overflow-hidden" style={{ borderColor: '#e5ded6' }}>
+                  {item.productImage
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.productImage}
-                      alt={item.productName}
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <div className="size-full flex items-center justify-center">
-                      <span className="material-symbols-outlined text-muted-foreground text-[28px]">
-                        image
-                      </span>
-                    </div>
-                  )}
+                    ? <img src={item.productImage} alt={item.productName} className="size-full object-cover" />
+                    : <div className="size-full flex items-center justify-center"><span className="material-symbols-outlined text-muted-foreground text-[28px]">image</span></div>
+                  }
                 </div>
                 <div className="min-w-0">
-                  <Link
-                    href={`/product/${item.productId}`}
-                    className="text-sm font-medium truncate hover:text-[var(--color-primary)] transition-colors"
-                    style={{ color: 'var(--color-text-main)' }}
-                  >
-                    {item.productName}
-                  </Link>
-                  {item.variantName && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Phân loại: {item.variantName}
-                    </p>
-                  )}
+                  <Link href={`/products/${item.productId}`} className="text-sm font-medium line-clamp-2 hover:text-[var(--color-primary)] transition-colors" style={{ color: 'var(--color-text-main)' }}>{item.productName}</Link>
+                  {item.variantName && <p className="text-xs text-muted-foreground mt-0.5">Phân loại: {item.variantName}</p>}
                 </div>
               </div>
-
-              {/* Đơn giá */}
-              <div className="text-center text-sm" style={{ color: 'var(--color-text-main)' }}>
-                {formatPrice(item.unitPrice)}
-              </div>
-
-              {/* Số lượng */}
+              <div className="text-center text-sm" style={{ color: 'var(--color-text-main)' }}>{formatPrice(item.unitPrice)}</div>
               <div className="flex items-center justify-center">
                 <div className="flex items-center border rounded" style={{ borderColor: '#d1c9c0' }}>
-                  <button
-                    onClick={() => updateQuantity(item, -1)}
-                    disabled={item.quantity <= 1 || updatingIds.has(item.id)}
-                    className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={quantityDrafts[item.id] ?? String(item.quantity)}
-                    onChange={(e) => {
-                      const safeValue = getSafeQuantityInput(e.target.value, item.stockAvailable)
-                      setQuantityDrafts((prev) => ({ ...prev, [item.id]: safeValue }))
-                    }}
-                    onBlur={() => {
-                      const draft = quantityDrafts[item.id] ?? String(item.quantity)
-                      const safeDraft = getSafeQuantityInput(draft, item.stockAvailable)
-                      setQuantityDrafts((prev) => ({ ...prev, [item.id]: safeDraft }))
-                      void updateItemQuantity(item, Number(safeDraft))
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur()
-                      }
-                    }}
-                    disabled={updatingIds.has(item.id)}
-                    className="w-12 h-8 text-center text-sm border-x bg-transparent focus:outline-none disabled:opacity-60"
-                    style={{ borderColor: '#d1c9c0', color: 'var(--color-text-main)' }}
-                    aria-label={`Số lượng của ${item.productName}`}
-                  />
-                  <button
-                    onClick={() => updateQuantity(item, 1)}
-                    disabled={updatingIds.has(item.id) || (item.stockAvailable > 0 && item.quantity >= item.stockAvailable)}
-                    className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40 transition-colors"
-                  >
-                    +
-                  </button>
+                  <button onClick={() => updateQuantity(item, -1)} disabled={item.quantity <= 1 || updatingIds.has(item.id)} className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40">−</button>
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" value={quantityDrafts[item.id] ?? String(item.quantity)}
+                    onChange={(e) => setQuantityDrafts((prev) => ({ ...prev, [item.id]: getSafeQuantityInput(e.target.value, item.stockAvailable) }))}
+                    onBlur={() => { const d = getSafeQuantityInput(quantityDrafts[item.id] ?? String(item.quantity), item.stockAvailable); setQuantityDrafts((p) => ({ ...p, [item.id]: d })); void updateItemQuantity(item, Number(d)) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                    disabled={updatingIds.has(item.id)} className="w-12 h-8 text-center text-sm border-x bg-transparent focus:outline-none disabled:opacity-60" style={{ borderColor: '#d1c9c0', color: 'var(--color-text-main)' }} />
+                  <button onClick={() => updateQuantity(item, 1)} disabled={updatingIds.has(item.id) || (item.stockAvailable > 0 && item.quantity >= item.stockAvailable)} className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40">+</button>
                 </div>
               </div>
-
-              {/* Số tiền */}
-              <div className="text-center text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>
-                {formatPrice(item.lineTotal)}
-              </div>
-
-              {/* Thao tác */}
+              <div className="text-center text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>{formatPrice(item.lineTotal)}</div>
               <div className="text-center">
-                <button
-                  onClick={() => removeItem(item.id)}
-                  disabled={updatingIds.has(item.id)}
-                  className="text-sm hover:text-[var(--color-primary)] transition-colors disabled:opacity-40"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  Xóa
-                </button>
+                <button onClick={() => removeItem(item.id)} disabled={updatingIds.has(item.id)} className="text-sm hover:text-[var(--color-primary)] transition-colors disabled:opacity-40" style={{ color: 'var(--color-text-secondary)' }}>Xóa</button>
               </div>
+            </div>
 
-              <div />
+            {/* ── Mobile layout (card) ── */}
+            <div className="md:hidden flex gap-3 px-3 py-3">
+              <div className="flex flex-col items-center gap-2 pt-0.5">
+                <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} className="size-4 accent-[var(--color-primary)] cursor-pointer" />
+                <div className="size-20 rounded border bg-gray-50 overflow-hidden shrink-0" style={{ borderColor: '#e5ded6' }}>
+                  {item.productImage
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={item.productImage} alt={item.productName} className="size-full object-cover" />
+                    : <div className="size-full flex items-center justify-center"><span className="material-symbols-outlined text-muted-foreground text-[24px]">image</span></div>
+                  }
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+                <Link href={`/products/${item.productId}`} className="text-sm font-medium line-clamp-2 leading-snug hover:text-[var(--color-primary)]" style={{ color: 'var(--color-text-main)' }}>{item.productName}</Link>
+                {item.variantName && <p className="text-xs text-muted-foreground">Phân loại: {item.variantName}</p>}
+                <p className="text-xs text-muted-foreground">Đơn giá: {formatPrice(item.unitPrice)}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center border rounded" style={{ borderColor: '#d1c9c0' }}>
+                    <button onClick={() => updateQuantity(item, -1)} disabled={item.quantity <= 1 || updatingIds.has(item.id)} className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40">−</button>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={quantityDrafts[item.id] ?? String(item.quantity)}
+                      onChange={(e) => setQuantityDrafts((prev) => ({ ...prev, [item.id]: getSafeQuantityInput(e.target.value, item.stockAvailable) }))}
+                      onBlur={() => { const d = getSafeQuantityInput(quantityDrafts[item.id] ?? String(item.quantity), item.stockAvailable); setQuantityDrafts((p) => ({ ...p, [item.id]: d })); void updateItemQuantity(item, Number(d)) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                      disabled={updatingIds.has(item.id)} className="w-10 h-8 text-center text-sm border-x bg-transparent focus:outline-none disabled:opacity-60" style={{ borderColor: '#d1c9c0', color: 'var(--color-text-main)' }} />
+                    <button onClick={() => updateQuantity(item, 1)} disabled={updatingIds.has(item.id) || (item.stockAvailable > 0 && item.quantity >= item.stockAvailable)} className="w-8 h-8 flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-40">+</button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>{formatPrice(item.lineTotal)}</span>
+                    <button onClick={() => removeItem(item.id)} disabled={updatingIds.has(item.id)} className="text-xs hover:text-red-500 transition-colors disabled:opacity-40" style={{ color: 'var(--color-text-secondary)' }}>Xóa</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ))}

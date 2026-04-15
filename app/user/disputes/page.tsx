@@ -5,8 +5,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
-import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -180,10 +178,8 @@ export default function MyDisputesPage() {
   if (authLoading || !session) return null
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-background-light)" }}>
-      <header><MainStorefrontHeader /></header>
-
-      <main className="flex-grow w-full max-w-[900px] mx-auto px-4 md:px-6 py-8">
+    <div className="w-full max-w-[900px] mx-auto">
+      <div className="py-2 md:py-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -212,13 +208,13 @@ export default function MyDisputesPage() {
           </Button>
         </div>
 
-        {/* Filter */}
-        <div className="flex items-center gap-3 mb-5">
+        {/* Filter — cuộn ngang trên mobile */}
+        <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
           {STATUS_FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setStatusFilter(opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap shrink-0 ${
                 statusFilter === opt.value
                   ? "border-[var(--color-primary)] text-[var(--color-primary)] bg-[rgba(236,127,19,0.08)]"
                   : "border-gray-200 text-gray-500 bg-white hover:border-gray-300"
@@ -255,7 +251,7 @@ export default function MyDisputesPage() {
                 key={d.id}
                 className="bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <Badge variant="outline" className="text-xs">{DisputeTypeLabels[d.type] ?? d.typeName}</Badge>
@@ -271,15 +267,13 @@ export default function MyDisputesPage() {
                       {d.title}
                     </Link>
                     <p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.reason}</p>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
-                      <span>{d.shopName}</span>
-                      <span>·</span>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-2 text-xs text-gray-400">
+                      <span className="truncate max-w-[140px]">{d.shopName}</span>
                       <span className="font-semibold text-orange-600">{formatPriceVND(d.requestedAmount)}</span>
-                      <span>·</span>
                       <span>{formatDateVN(d.createdAt)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 sm:shrink-0">
                     {canCancel(d) && (
                       <Button
                         variant="ghost"
@@ -314,16 +308,11 @@ export default function MyDisputesPage() {
             </Button>
           </div>
         )}
-      </main>
-
-      <Separator className="bg-gray-200 mt-8" />
-      <footer className="py-5">
-        <p className="text-center text-xs text-gray-400">© 2025 EcomViet Marketplace</p>
-      </footer>
+      </div>
 
       {/* Create Dispute Dialog */}
       <Dialog open={createOpen} onOpenChange={(v) => { if (!v) setCreateOpen(false) }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
           <DialogHeader>
             <DialogTitle>Tạo khiếu nại mới</DialogTitle>
             <DialogDescription asChild>

@@ -150,12 +150,16 @@ export function NotificationDropdown() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Trigger button */}
+        {/* Trigger button — click toggle cho mobile, hover cho desktop */}
         <button
           type="button"
           className="flex items-center justify-center size-10 rounded-full transition-colors hover:bg-[#f0ebe4] relative"
           style={{ color: 'var(--color-text-main)' }}
           title="Thông báo"
+          onClick={() => {
+            if (open) { setClosing(true); setTimeout(() => { setOpen(false); setClosing(false) }, ANIM_DURATION) }
+            else { setOpen(true); setClosing(false); if (session && Date.now() - lastFetchedAtRef.current > STALE_MS) fetchNotifications(true) }
+          }}
         >
           <span className="material-symbols-outlined">notifications</span>
           {session && unreadCount > 0 && (

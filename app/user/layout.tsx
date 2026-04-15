@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 
 import { MainStorefrontHeader } from '@/components/layout/main-storefront-header'
 
-const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout']
+const FULL_WIDTH_PATHS = ['/user/cart', '/user/ai-chat', '/user/checkout', '/user/disputes']
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading, role } = useAuth()
@@ -45,14 +45,23 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background-light)', color: 'var(--color-text-main)' }}>
       <MainStorefrontHeader />
 
-      <main className="flex-grow w-full max-w-[1200px] mx-auto px-4 md:px-10 py-6">
+      <main className="flex-grow w-full max-w-[1200px] mx-auto px-4 md:px-10 py-4 md:py-6">
         {isFullWidth ? (
           <div className="w-full">{children}</div>
         ) : (
-          <div className="flex gap-6">
-            <ProfileSidebar />
-            <div className="flex-1 min-w-0">{children}</div>
-          </div>
+          <>
+            {/* Mobile: tab bar ngang thay sidebar */}
+            <div className="md:hidden mb-4">
+              <ProfileSidebar mobile />
+            </div>
+            {/* Desktop: sidebar + content */}
+            <div className="flex gap-6">
+              <div className="hidden md:block">
+                <ProfileSidebar />
+              </div>
+              <div className="flex-1 min-w-0">{children}</div>
+            </div>
+          </>
         )}
       </main>
     </div>
