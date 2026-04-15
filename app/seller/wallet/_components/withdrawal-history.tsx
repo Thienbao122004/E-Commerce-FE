@@ -129,16 +129,15 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
                           {s.label}
                         </Badge>
                       </div>
-                      {w.rejectionReason && (
+                      {w.rejectionReason ? (
                         <p className="text-xs text-red-500 mt-1 truncate italic">
                           <span>Từ chối:</span> &ldquo;{w.rejectionReason}&rdquo;
                         </p>
-                      )}
-                      {w.adminNote && (
-                        <p className="text-xs text-green-600 dark:text-green-500 mt-1 truncate italic">
-                          &ldquo;{w.adminNote}&rdquo;
+                      ) : w.adminNote ? (
+                        <p className="text-xs mt-1 truncate italic text-green-600 dark:text-green-500">
+                          Ghi chú: &ldquo;{w.adminNote}&rdquo;
                         </p>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
