@@ -13,6 +13,7 @@ import type {
   AddProductVariantResponse,
   UpdateSellerProductPayload,
   UpdateInventoryPayload,
+  UpdateVariantPayload,
   UpdateSellerOrderStatusPayload,
   WithdrawalsResponse,
   CreateWithdrawalPayload,
