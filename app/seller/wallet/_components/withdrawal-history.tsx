@@ -122,18 +122,22 @@ export function WithdrawalHistory({ withdrawals, total, page, pageSize, loading,
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {formatDateTime(w.createdAt)}
+                          {formatDateTime(w.requestedAt)}
                         </span>
                         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-[18px] border ${s.cls}`}>
                           <s.icon className="size-2.5 mr-0.5" />
                           {s.label}
                         </Badge>
                       </div>
-                      {w.note && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate italic">
-                          &ldquo;{w.note}&rdquo;
+                      {w.rejectionReason ? (
+                        <p className="text-xs text-red-500 mt-1 truncate italic">
+                          <span>Từ chối:</span> &ldquo;{w.rejectionReason}&rdquo;
                         </p>
-                      )}
+                      ) : w.adminNote ? (
+                        <p className="text-xs mt-1 truncate italic text-green-600 dark:text-green-500">
+                          Ghi chú: &ldquo;{w.adminNote}&rdquo;
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 

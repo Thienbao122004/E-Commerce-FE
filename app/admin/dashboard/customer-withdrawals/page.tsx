@@ -137,7 +137,7 @@ export default function CustomerWithdrawalsPage() {
   }, [])
 
   const tableFilters = React.useMemo(() => [
-    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
+    { key: "status", value: statusFilter, match: (r: CustomerWithdrawalRequestDto) => r.status },
   ], [statusFilter])
 
   const { filtered: sorted } = useTableData<CustomerWithdrawalRequestDto>({
@@ -192,7 +192,8 @@ export default function CustomerWithdrawalsPage() {
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <SortableTableHead sortKey="customerName" currentSort={sort} onSort={handleSort}>Khách hàng</SortableTableHead>
-                  <SortableTableHead sortKey="amount" currentSort={sort} onSort={handleSort}>Số tiền</SortableTableHead>
+                  <SortableTableHead sortKey="amount" currentSort={sort} onSort={handleSort}>Số tiền rút</SortableTableHead>
+                  <TableHead>Số dư ví</TableHead>
                   <SortableTableHead sortKey="bankName" currentSort={sort} onSort={handleSort}>Ngân hàng</SortableTableHead>
                   <TableHead>Số TK</TableHead>
                   <TableHead>Chủ TK</TableHead>
@@ -213,7 +214,7 @@ export default function CustomerWithdrawalsPage() {
                   ))
                 ) : sorted.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
                       Không có yêu cầu rút tiền nào.
                     </TableCell>
                   </TableRow>
@@ -224,7 +225,13 @@ export default function CustomerWithdrawalsPage() {
                     </TableCell>
                     <TableCell className="text-sm font-medium">{r.customerName ?? "—"}</TableCell>
                     <TableCell className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                      {fmtMoney(r.amount, r.currency)}
+                      {fmtMoney(r.amount)}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {r.availableBalance != null
+                        ? <span className="font-medium text-blue-600 dark:text-blue-400">{fmtMoney(r.availableBalance)}</span>
+                        : <span className="text-muted-foreground">—</span>
+                      }
                     </TableCell>
                     <TableCell className="text-sm">{r.bankName}</TableCell>
                     <TableCell className="text-sm font-mono">{r.bankAccountNumber}</TableCell>
@@ -245,34 +252,49 @@ export default function CustomerWithdrawalsPage() {
                     </TableCell>
                     <TableCell>
                       {r.status === 0 && (
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 text-xs text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                            className="h-8 shadow-sm text-xs text-green-700 bg-green-50/50 hover:bg-green-100 dark:bg-green-950/20 dark:hover:bg-green-900/40 dark:text-green-400 border-green-200 dark:border-green-900"
                             onClick={() => openDialog("approve", r)}
                             disabled={busy}
                           >
-                            <IconCheck className="mr-1 size-3.5" />Duyệt
+                            <IconCheck className="mr-1.5 size-3.5" />Duyệt
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="h-8 shadow-sm text-xs text-red-700 bg-red-50/50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/40 dark:text-red-400 border-red-200 dark:border-red-900"
                             onClick={() => openDialog("reject", r)}
                             disabled={busy}
                           >
-                            <IconX className="mr-1 size-3.5" />Từ chối
+                            <IconX className="mr-1.5 size-3.5" />Từ chối
                           </Button>
                         </div>
                       )}
-                      {r.status === 2 && r.rejectionReason && (
-                        <span
-                          className="text-xs text-red-500 max-w-[120px] truncate inline-block"
-                          title={r.rejectionReason}
-                        >
-                          {r.rejectionReason}
-                        </span>
+                      {r.status === 2 && (
+                        <div className="flex flex-col items-end gap-1.5">
+                          {r.rejectionReason && (
+                            <div className="flex items-center gap-1.5 max-w-[160px] truncate rounded-full bg-red-50 px-2.5 py-1 w-fit border border-red-100 dark:bg-red-950/30 dark:border-red-900/50" title={r.rejectionReason}>
+                              <IconX className="size-3.5 shrink-0 text-red-500" />
+                              <span className="text-[11px] font-medium text-red-600 dark:text-red-400 truncate">{r.rejectionReason}</span>
+                            </div>
+                          )}
+                          {r.adminNote && (
+                            <span className="text-[11px] text-muted-foreground italic max-w-[160px] truncate" title={r.adminNote}>
+                              {r.adminNote}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {(r.status === 1 || r.status === 3) && r.adminNote && (
+                        <div className="flex justify-end">
+                          <div className="flex items-center gap-1.5 max-w-[160px] truncate rounded-full bg-green-50 px-2.5 py-1 w-fit border border-green-100 dark:bg-green-950/30 dark:border-green-900/50" title={r.adminNote}>
+                            <IconCheck className="size-3.5 shrink-0 text-green-500" />
+                            <span className="text-[11px] font-medium text-green-700 dark:text-green-400 truncate">{r.adminNote}</span>
+                          </div>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>

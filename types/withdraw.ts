@@ -26,6 +26,7 @@ export type WithdrawRequest = {
   sellerName: string | null
   amount: number
   currency: string
+  availableBalance?: number | null
   bankName: string
   bankAccountNumber: string
   bankAccountName: string

@@ -98,21 +98,12 @@ export function CustomerWithdrawalDialogs({
                 className="min-h-[60px]"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Ghi chú admin (tùy chọn)</label>
-              <Textarea
-                placeholder="Ghi chú..."
-                value={adminNote}
-                onChange={(e) => setAdminNote(e.target.value)}
-                className="min-h-[60px]"
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={busy}>Hủy</Button>
             <Button
               variant="destructive"
-              onClick={() => onReject(reason, adminNote)}
+              onClick={() => onReject(reason, "")}
               disabled={busy || !reason.trim()}
             >
               {busy ? "Đang xử lý..." : "Từ chối"}

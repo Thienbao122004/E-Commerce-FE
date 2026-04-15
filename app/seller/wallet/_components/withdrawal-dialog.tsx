@@ -143,7 +143,9 @@ export function WithdrawalDialog({ open, onOpenChange, availableBalance, submitt
                   value={form.amount}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/\D/g, "")
-                    setForm((f) => ({ ...f, amount: raw ? Number(raw).toLocaleString("vi-VN") : "" }))
+                    if (!raw) { setForm((f) => ({ ...f, amount: "" })); return }
+                    const num = Math.min(Number(raw), availableBalance)
+                    setForm((f) => ({ ...f, amount: num.toLocaleString("vi-VN") }))
                   }}
                   className="text-sm pl-7 tabular-nums"
                 />
@@ -172,9 +174,6 @@ export function WithdrawalDialog({ open, onOpenChange, availableBalance, submitt
               </div>
               {amountNum > 0 && amountNum < 100_000 && (
                 <p className="text-xs text-red-500">Số tiền tối thiểu là 100.000 ₫</p>
-              )}
-              {amountNum > availableBalance && (
-                <p className="text-xs text-red-500">Số tiền vượt quá số dư khả dụng</p>
               )}
             </div>
           </div>

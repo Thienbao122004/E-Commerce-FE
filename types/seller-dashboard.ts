@@ -197,9 +197,10 @@ export type WithdrawalRecord = {
   bankAccountNumber: string
   bankAccountName: string
   status: number
-  note: string | null
-  createdAt: string
-  processedAt: string | null
+  rejectionReason: string | null
+  adminNote: string | null
+  requestedAt: string
+  reviewedAt: string | null
 }
 
 export type WithdrawalsResponse = {
