@@ -36,6 +36,7 @@ export interface CustomerWithdrawalRequestDto {
   id: string
   amount: number
   currency?: string
+  availableBalance?: number
   customerName?: string
   bankName: string
   bankAccountNumber: string

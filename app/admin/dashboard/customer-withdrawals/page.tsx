@@ -192,7 +192,8 @@ export default function CustomerWithdrawalsPage() {
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <SortableTableHead sortKey="customerName" currentSort={sort} onSort={handleSort}>Khách hàng</SortableTableHead>
-                  <SortableTableHead sortKey="amount" currentSort={sort} onSort={handleSort}>Số tiền</SortableTableHead>
+                  <SortableTableHead sortKey="amount" currentSort={sort} onSort={handleSort}>Số tiền rút</SortableTableHead>
+                  <TableHead>Số dư ví</TableHead>
                   <SortableTableHead sortKey="bankName" currentSort={sort} onSort={handleSort}>Ngân hàng</SortableTableHead>
                   <TableHead>Số TK</TableHead>
                   <TableHead>Chủ TK</TableHead>
@@ -213,7 +214,7 @@ export default function CustomerWithdrawalsPage() {
                   ))
                 ) : sorted.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
                       Không có yêu cầu rút tiền nào.
                     </TableCell>
                   </TableRow>
@@ -224,7 +225,13 @@ export default function CustomerWithdrawalsPage() {
                     </TableCell>
                     <TableCell className="text-sm font-medium">{r.customerName ?? "—"}</TableCell>
                     <TableCell className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                      {fmtMoney(r.amount, r.currency)}
+                      {fmtMoney(r.amount)}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {r.availableBalance != null
+                        ? <span className="font-medium text-blue-600 dark:text-blue-400">{fmtMoney(r.availableBalance)}</span>
+                        : <span className="text-muted-foreground">—</span>
+                      }
                     </TableCell>
                     <TableCell className="text-sm">{r.bankName}</TableCell>
                     <TableCell className="text-sm font-mono">{r.bankAccountNumber}</TableCell>
