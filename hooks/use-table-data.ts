@@ -1,22 +1,22 @@
 import * as React from "react"
 import type { SortConfig } from "@/components/common/table-sorting"
 
-type FilterDef = {
+type FilterDef<T = Record<string, unknown>> = {
     key: string
     value: string
-    match: (row: Record<string, unknown>) => unknown
+    match: (row: T) => unknown
 }
 
 type Options<T> = {
     data: T[]
     search?: string
     searchKeys?: (keyof T)[]
-    filters?: FilterDef[]
+    filters?: FilterDef<T>[]
     sort?: SortConfig | null
     sortAccessor?: (row: T, key: string) => string | number
 }
 
-export function useTableData<T extends Record<string, unknown>>({
+export function useTableData<T extends object>({
     data,
     search,
     searchKeys = [],
@@ -31,7 +31,7 @@ export function useTableData<T extends Record<string, unknown>>({
             const q = search.toLowerCase()
             result = result.filter((row) =>
                 searchKeys.some((k) => {
-                    const v = row[k]
+                    const v = (row as Record<string, unknown>)[k as string]
                     return typeof v === "string" && v.toLowerCase().includes(q)
                 })
             )

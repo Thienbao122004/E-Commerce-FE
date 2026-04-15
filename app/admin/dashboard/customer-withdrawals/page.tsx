@@ -137,7 +137,7 @@ export default function CustomerWithdrawalsPage() {
   }, [])
 
   const tableFilters = React.useMemo(() => [
-    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
+    { key: "status", value: statusFilter, match: (r: CustomerWithdrawalRequestDto) => r.status },
   ], [statusFilter])
 
   const { filtered: sorted } = useTableData<CustomerWithdrawalRequestDto>({
