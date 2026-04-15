@@ -35,6 +35,8 @@ export interface CreateCustomerWithdrawalDto {
 export interface CustomerWithdrawalRequestDto {
   id: string
   amount: number
+  currency?: string
+  customerName?: string
   bankName: string
   bankAccountNumber: string
   bankAccountName: string

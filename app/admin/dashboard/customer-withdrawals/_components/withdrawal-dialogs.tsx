@@ -38,7 +38,7 @@ export function CustomerWithdrawalDialogs({
           <DialogHeader>
             <DialogTitle>Duyệt yêu cầu rút tiền</DialogTitle>
             <DialogDescription>
-              Xác nhận duyệt rút {target ? fmtMoney(target.amount, target.currency) : ""} cho khách hàng{" "}
+              Xác nhận duyệt rút {target ? fmtMoney(target.amount) : ""} cho khách hàng{" "}
               <strong>{target?.customerName ?? "—"}</strong>?
             </DialogDescription>
           </DialogHeader>
@@ -53,7 +53,7 @@ export function CustomerWithdrawalDialogs({
                 <span className="text-muted-foreground">Chủ TK:</span>
                 <span className="font-medium">{target.bankAccountName}</span>
                 <span className="text-muted-foreground">Số tiền:</span>
-                <span className="font-bold text-emerald-600">{fmtMoney(target.amount, target.currency)}</span>
+                <span className="font-bold text-emerald-600">{fmtMoney(target.amount)}</span>
               </div>
             </div>
           )}
@@ -84,7 +84,7 @@ export function CustomerWithdrawalDialogs({
           <DialogHeader>
             <DialogTitle>Từ chối yêu cầu rút tiền</DialogTitle>
             <DialogDescription>
-              Từ chối rút {target ? fmtMoney(target.amount, target.currency) : ""} của khách hàng{" "}
+              Từ chối rút {target ? fmtMoney(target.amount) : ""} của khách hàng{" "}
               <strong>{target?.customerName ?? "—"}</strong>? Tiền sẽ được hoàn trả vào ví.
             </DialogDescription>
           </DialogHeader>
