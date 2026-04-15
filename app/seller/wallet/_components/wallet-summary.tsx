@@ -1,0 +1,140 @@
+"use client"
+
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  IconArrowDownRight,
+  IconClock,
+  IconLock,
+  IconTrendingUp,
+  IconWallet,
+} from "@tabler/icons-react"
+import type { SellerWallet } from "@/types/seller-dashboard"
+import { formatPriceVND as currency } from "@/lib/formatters"
+
+type Props = {
+  wallet: SellerWallet | null
+  loading: boolean
+}
+
+export function WalletSummary({ wallet, loading }: Props) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4 lg:p-5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-10 rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-7 w-28" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  const available = wallet?.availableBalance ?? 0
+  const held = wallet?.heldBalance ?? 0
+  const pending = wallet?.pendingBalance ?? 0
+  const earnings = wallet?.totalEarnings ?? 0
+  const withdrawn = wallet?.totalWithdrawn ?? 0
+  const refunded = wallet?.totalRefunded ?? 0
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+              <IconWallet className="size-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Số dư khả dụng</p>
+              <p className="text-lg xl:text-xl 2xl:text-2xl font-bold text-primary tabular-nums mt-1 break-all leading-tight">
+                {currency(available)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5">Có thể rút ngay</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30 shrink-0">
+              <IconLock className="size-5 text-amber-700 dark:text-amber-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Tạm giữ (escrow)</p>
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-amber-700 dark:text-amber-400 mt-1 break-all leading-tight">
+                {currency(held)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Đã thanh toán, chờ đơn hoàn thành</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30 shrink-0">
+              <IconClock className="size-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Chờ duyệt rút</p>
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-yellow-600 dark:text-yellow-400 mt-1 break-all leading-tight">
+                {currency(pending)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Yêu cầu rút đang xử lý</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30 shrink-0">
+              <IconTrendingUp className="size-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Tổng thu nhập</p>
+              <p className="text-lg xl:text-xl font-bold tabular-nums text-green-600 dark:text-green-400 mt-1 break-all leading-tight">
+                {currency(earnings)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Tất cả thời gian</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0">
+              <IconArrowDownRight className="size-5 text-slate-600 dark:text-slate-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Đã rút</p>
+              <p className="text-lg xl:text-xl font-bold tabular-nums mt-1 break-all leading-tight">{currency(withdrawn)}</p>
+              {refunded > 0 ? (
+                <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                  Hoàn tác đơn: {currency(refunded)}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Sau khi admin duyệt</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
