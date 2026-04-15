@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 
 const validTransitions: Record<number, number[]> = {
-  [OrderStatus.PendingPayment]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
+  [OrderStatus.PendingPayment]: [],
   [OrderStatus.Confirmed]: [OrderStatus.Processing, OrderStatus.Cancelled],
   [OrderStatus.Processing]: [OrderStatus.Shipping, OrderStatus.Cancelled],
   [OrderStatus.Shipping]: [OrderStatus.Delivered],

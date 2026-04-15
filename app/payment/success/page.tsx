@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { BadgeCheck, CircleDollarSign, ReceiptText, ShoppingBag } from 'lucide-react'
 import { formatPriceVND } from '@/lib/formatters'
 import { clearPendingPaymentSession } from '@/lib/pending-payment-session'
 
-export default function PaymentSuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams()
   const orderCode = searchParams.get('orderCode')
   const amount = searchParams.get('amount')
@@ -90,5 +90,13 @@ export default function PaymentSuccessPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen grid place-items-center">Đang tải...</div>}>
+      <SuccessContent />
+    </Suspense>
   )
 }
