@@ -1,11 +1,7 @@
 import { api } from '@/lib/api-client'
+import type { CreatePaymentResponse } from '@/types/payment'
 
-export interface CreatePaymentResponse {
-  success: boolean
-  message?: string
-  paymentUrl?: string
-  paymentId?: string
-}
+export type { CreatePaymentResponse } from '@/types/payment'
 
 export const paymentsService = {
   createVNPayPayment: (orderId: string) =>

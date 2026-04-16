@@ -73,44 +73,28 @@ export function HeaderUser() {
             )}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent>
           <DropdownMenuItem asChild>
             <Link href="/user/profile" className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base" style={{ color: "#6b7280" }}>
-                person
-              </span>
               Hồ sơ của tôi
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/user/purchase" className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base" style={{ color: "#3b82f6" }}>
-                shopping_bag
-              </span>
               Đơn mua
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/favorites" className="flex items-center gap-2">
-              <span
-                className="material-symbols-outlined text-base"
-                style={{ fontVariationSettings: "'FILL' 1", color: "#ef4444" }}
-              >
-                favorite
-              </span>
               Sản phẩm yêu thích
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/user/disputes" className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-base" style={{ color: "#f59e0b" }}>
-                report
-              </span>
               Khiếu nại của tôi
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 text-red-500 focus:text-red-500">
-            <span className="material-symbols-outlined text-base">logout</span>
             Đăng xuất
           </DropdownMenuItem>
         </DropdownMenuContent>

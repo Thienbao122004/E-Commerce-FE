@@ -3,89 +3,26 @@ import { getAccessToken } from "@/lib/auth"
 const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || "http://localhost:5001"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
 
-export interface AiChatMessage {
-  id: number
-  role: "user" | "assistant"
-  content: string
-  createdAt?: string
-}
+import type {
+  AiChatSessionResponse,
+  AiChatSendResponse,
+  AiChatConfirmOrderResponse,
+  AiSessionsResponse,
+  AiSessionMessagesResponse,
+} from "@/types/ai-chat"
 
-export interface ProductToAdd {
-  productId?: string
-  variantId?: string
-  quantity: number
-}
-
-export interface ProductSuggestion {
-  id: string
-  slug?: string
-  name: string
-  basePrice: number
-  imageUrl?: string
-  categoryName?: string
-  matchScore?: number
-  matchReason?: string
-}
-
-export interface AiChatSessionResponse {
-  sessionId: string
-  status: string
-  history: AiChatMessage[]
-}
-
-export interface AiChatSendResponse {
-  reply: string
-  intent: string
-  products: ProductSuggestion[]
-  needsConfirmation: boolean
-  cartUpdated: boolean
-  cartId?: string
-  sessionId: string
-  productToAdd?: ProductToAdd | null
-}
-
-export interface AiChatConfirmOrderResponse {
-  success: boolean
-  orderId?: string
-  message: string
-}
-
-export interface AiSessionSummary {
-  sessionId: string
-  status: string
-  createdAt?: string
-  updatedAt?: string
-  isMuted?: boolean
-  unreadCount?: number
-  title: string
-  lastMessage?: {
-    role: string
-    content: string
-    createdAt?: string
-  } | null
-  messageCount: number
-}
-
-export interface AiSessionsResponse {
-  success: boolean
-  sessions: AiSessionSummary[]
-  totalCount: number
-  page: number
-  pageSize: number
-}
-
-export interface AiSessionMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  createdAt?: string
-}
-
-export interface AiSessionMessagesResponse {
-  success: boolean
-  sessionId: string
-  messages: AiSessionMessage[]
-}
+export type {
+  AiChatMessage,
+  ProductToAdd,
+  ProductSuggestion,
+  AiChatSessionResponse,
+  AiChatSendResponse,
+  AiChatConfirmOrderResponse,
+  AiSessionSummary,
+  AiSessionsResponse,
+  AiSessionMessage,
+  AiSessionMessagesResponse,
+} from "@/types/ai-chat"
 
 async function aiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAccessToken()
@@ -127,7 +64,6 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 }
 
 export const aiChatService = {
-  // ── Python AI service ──────────────────────────────────────────────────────
   getOrCreateSession: () =>
     aiRequest<AiChatSessionResponse>("/api/ai/chat/session", { method: "POST" }),
 
@@ -149,7 +85,6 @@ export const aiChatService = {
       body: JSON.stringify({ sessionId, cartId, shippingAddressId }),
     }),
 
-  // ── ECommerceAPI (đọc lịch sử từ DB) ──────────────────────────────────────
   listSessions: (page = 1, pageSize = 20) =>
     apiRequest<AiSessionsResponse>(`/api/ai/sessions?page=${page}&pageSize=${pageSize}`),
 

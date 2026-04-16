@@ -1,3 +1,5 @@
+import type { ApiDataResponse } from "./api"
+
 export interface CustomerWalletDto {
   id?: string
   availableBalance: number
@@ -5,6 +7,9 @@ export interface CustomerWalletDto {
   totalWithdrawn: number
   updatedAt: string
 }
+
+/** Response `getWallet` — bọc `CustomerWalletDto` trong `data` */
+export type CustomerWalletApiResponse = ApiDataResponse<CustomerWalletDto>
 
 export interface CustomerWalletLedgerItem {
   id: string

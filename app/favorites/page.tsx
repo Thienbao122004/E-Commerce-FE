@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -35,6 +35,11 @@ export default function FavoritesPage() {
   const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [loading, setLoading] = useState(true)
 
+  const favoriteIdsRef = useRef(favoriteIds)
+  favoriteIdsRef.current = favoriteIds
+
+  const favoriteIdsKey = useMemo(() => [...favoriteIds].sort().join(","), [favoriteIds])
+
   useEffect(() => {
     if (authLoading) return
     if (!session) {
@@ -43,9 +48,9 @@ export default function FavoritesPage() {
   }, [authLoading, session, router])
 
   const fetchProducts = useCallback(async () => {
-    if (favLoading || !session) return
+    if (favLoading || !session?.user?.id) return
     setLoading(true)
-    const ids = Array.from(favoriteIds)
+    const ids = Array.from(favoriteIdsRef.current)
     if (ids.length === 0) {
       setProducts([])
       setLoading(false)
@@ -64,7 +69,7 @@ export default function FavoritesPage() {
     } finally {
       setLoading(false)
     }
-  }, [favoriteIds, favLoading, session])
+  }, [favoriteIdsKey, favLoading, session?.user?.id])
 
   useEffect(() => {
     fetchProducts()

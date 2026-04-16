@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 
-import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 import { fetchProductById, hideProduct, unhideProduct, removeProduct } from "@/services/products"
 import {
@@ -52,21 +51,10 @@ export default function ProductDetailPage() {
   }>({ type: null })
   const [reason, setReason] = React.useState("")
 
-  const getToken = React.useCallback(async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token ?? null
-  }, [])
-
   const load = React.useCallback(async () => {
     setLoading(true)
-    const token = await getToken()
-    if (!token) {
-      toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.")
-      setLoading(false)
-      return
-    }
     try {
-      const res = await fetchProductById(token, params.id)
+      const res = await fetchProductById(params.id)
       if (res.success && res.product) {
         setProduct(res.product)
       } else {
@@ -78,7 +66,7 @@ export default function ProductDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [getToken, params.id, router])
+  }, [params.id, router])
 
   React.useEffect(() => {
     load()
@@ -87,17 +75,14 @@ export default function ProductDetailPage() {
   const handleAction = async () => {
     if (!product || !dialogState.type) return
     setActionLoading(true)
-    const token = await getToken()
-    if (!token) { setActionLoading(false); return }
-
     try {
       let res
       if (dialogState.type === "hide") {
-        res = await hideProduct(token, product.id, reason)
+        res = await hideProduct(product.id, reason)
       } else if (dialogState.type === "unhide") {
-        res = await unhideProduct(token, product.id)
+        res = await unhideProduct(product.id)
       } else {
-        res = await removeProduct(token, product.id, reason)
+        res = await removeProduct(product.id, reason)
       }
       if (res.success) {
         toast.success(res.message ?? "Thao tác thành công")

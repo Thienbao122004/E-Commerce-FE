@@ -1,31 +1,10 @@
 import { api } from '@/lib/api-client'
+import type {
+  NotificationListResponse,
+  NotificationActionResult,
+} from '@/types/notification'
 
-export interface NotificationItem {
-  id: string
-  type: string
-  title: string
-  content: string
-  referenceType?: string | null
-  referenceId?: string | null
-  isRead: boolean
-  createdAt: string
-}
-
-export interface NotificationListResponse {
-  success: boolean
-  message?: string
-  notifications: NotificationItem[]
-  totalCount: number
-  unreadCount: number
-  page: number
-  pageSize: number
-}
-
-export interface NotificationActionResult {
-  success: boolean
-  message: string
-  updatedCount: number
-}
+export type { NotificationItem, NotificationListResponse, NotificationActionResult } from '@/types/notification'
 
 export const notificationsService = {
   getNotifications: (page = 1, pageSize = 10, isRead?: boolean) => {

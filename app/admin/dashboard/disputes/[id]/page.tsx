@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
-import { supabase } from "@/lib/supabase"
 import { fetchDisputeById, approveRefund, rejectDispute, requestSellerResponse, requestCustomerResponse } from "@/services/disputes"
 import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
@@ -36,11 +35,8 @@ export default function DisputeDetailPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchDisputeById(tk, id)
+      const r = await fetchDisputeById(id)
       if (r.success && r.dispute) setDispute(r.dispute)
       else toast.error(r.message ?? "Không tìm thấy")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -65,19 +61,16 @@ export default function DisputeDetailPage() {
       if (amt > dispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
     }
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
       let r
       if (dlgType === "approve") {
-        r = await approveRefund(tk, dispute.id, amount ? Number(amount) : undefined, resolution, adminNote || undefined)
+        r = await approveRefund(dispute.id, amount ? Number(amount) : undefined, resolution, adminNote || undefined)
       } else if (dlgType === "reject") {
-        r = await rejectDispute(tk, dispute.id, resolution, adminNote || undefined)
+        r = await rejectDispute(dispute.id, resolution, adminNote || undefined)
       } else if (dlgType === "seller") {
-        r = await requestSellerResponse(tk, dispute.id, adminNote || undefined)
+        r = await requestSellerResponse(dispute.id, adminNote || undefined)
       } else {
-        r = await requestCustomerResponse(tk, dispute.id, adminNote || undefined)
+        r = await requestCustomerResponse(dispute.id, adminNote || undefined)
       }
       if (r.success) {
         toast.success(r.message ?? "Thành công")

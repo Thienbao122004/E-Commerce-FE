@@ -1,20 +1,15 @@
 import { api } from '@/lib/api-client'
 import type {
-  CustomerWalletDto,
   CustomerWalletLedgerResponse,
   CreateCustomerWithdrawalDto,
   CustomerWithdrawalResponse,
   CustomerWithdrawalListResponse,
+  CustomerWalletApiResponse,
 } from '@/types/customer-wallet'
-
-interface WalletApiResponse {
-  success: boolean
-  data: CustomerWalletDto
-}
 
 export const customerWalletService = {
   getWallet: () =>
-    api.get<WalletApiResponse>('/api/customer-wallet'),
+    api.get<CustomerWalletApiResponse>('/api/customer-wallet'),
 
   getTransactions: (page = 1, pageSize = 20) =>
     api.get<CustomerWalletLedgerResponse>(

@@ -10,6 +10,7 @@ export interface ShopInfo {
 
 export interface UserProfileResponse {
   id: string
+  userCode: string
   email: string | null
   fullName: string | null
   phone: string | null

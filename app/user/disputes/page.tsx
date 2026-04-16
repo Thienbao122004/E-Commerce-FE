@@ -97,11 +97,10 @@ export default function MyDisputesPage() {
   }, [authLoading, session, router])
 
   const load = useCallback(async () => {
-    if (!session?.access_token) return
     setLoading(true)
     try {
       const statusVal = statusFilter !== "all" ? Number(statusFilter) : undefined
-      const res = await fetchMyDisputes(session.access_token, page, PAGE_SIZE, statusVal)
+      const res = await fetchMyDisputes(page, PAGE_SIZE, statusVal)
       if (res.success) {
         setDisputes(res.disputes)
         setTotal(res.totalCount)
@@ -111,7 +110,7 @@ export default function MyDisputesPage() {
     } finally {
       setLoading(false)
     }
-  }, [session?.access_token, page, statusFilter])
+  }, [page, statusFilter])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { setPage(1) }, [statusFilter])
@@ -124,14 +123,13 @@ export default function MyDisputesPage() {
   }
 
   const handleCreate = async () => {
-    if (!session?.access_token) return
     if (!form.orderId.trim()) { toast.error("Vui lòng nhập mã đơn hàng"); return }
     if (!form.title.trim()) { toast.error("Vui lòng nhập tiêu đề"); return }
     if (form.reason.trim().length < 20) { toast.error("Lý do phải có ít nhất 20 ký tự"); return }
 
     setCreating(true)
     try {
-      const res = await createDispute(session.access_token, {
+      const res = await createDispute({
         orderId: form.orderId.trim(),
         type: Number(form.type),
         title: form.title.trim(),
@@ -155,10 +153,10 @@ export default function MyDisputesPage() {
   }
 
   const handleCancel = async () => {
-    if (!session?.access_token || !cancelTarget) return
+    if (!cancelTarget) return
     setCanceling(true)
     try {
-      const res = await cancelMyDispute(session.access_token, cancelTarget.id)
+      const res = await cancelMyDispute(cancelTarget.id)
       if (res.success) {
         toast.success("Đã hủy khiếu nại")
         setCancelTarget(null)

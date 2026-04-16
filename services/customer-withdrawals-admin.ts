@@ -1,48 +1,33 @@
+import { api } from "@/lib/api-client"
 import type { CustomerWithdrawalListResponse, CustomerWithdrawalResponse } from "@/types/customer-wallet"
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
-export async function fetchCustomerWithdrawals(
-  token: string,
+export function fetchCustomerWithdrawals(
   page = 1,
   pageSize = 10,
   status?: number | null
 ): Promise<CustomerWithdrawalListResponse> {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
   if (status !== null && status !== undefined) params.set("status", String(status))
-
-  const res = await fetch(`${API}/api/admin/customer-withdrawals?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh sách yêu cầu rút tiền khách hàng")
-  return res.json()
+  return api.get<CustomerWithdrawalListResponse>(`/api/admin/customer-withdrawals?${params}`)
 }
 
-export async function approveCustomerWithdrawal(
-  token: string,
+export function approveCustomerWithdrawal(
   requestId: string,
   adminNote?: string
 ): Promise<CustomerWithdrawalResponse> {
-  const res = await fetch(`${API}/api/admin/customer-withdrawals/${requestId}/approve`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ adminNote }),
-  })
-  if (!res.ok) throw new Error("Lỗi duyệt yêu cầu")
-  return res.json()
+  return api.post<CustomerWithdrawalResponse>(
+    `/api/admin/customer-withdrawals/${requestId}/approve`,
+    { adminNote }
+  )
 }
 
-export async function rejectCustomerWithdrawal(
-  token: string,
+export function rejectCustomerWithdrawal(
   requestId: string,
   reason: string,
   adminNote?: string
 ): Promise<CustomerWithdrawalResponse> {
-  const res = await fetch(`${API}/api/admin/customer-withdrawals/${requestId}/reject`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ reason, adminNote }),
-  })
-  if (!res.ok) throw new Error("Lỗi từ chối yêu cầu")
-  return res.json()
+  return api.post<CustomerWithdrawalResponse>(
+    `/api/admin/customer-withdrawals/${requestId}/reject`,
+    { reason, adminNote }
+  )
 }

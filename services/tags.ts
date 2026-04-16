@@ -1,10 +1,8 @@
+import { api } from "@/lib/api-client"
 import type { TagListResponse, TagResponse } from "@/types/tag"
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
 // ---------- List ----------
-export async function fetchTags(
-  token: string,
+export function fetchTags(
   page = 1,
   pageSize = 20,
   search?: string | null
@@ -14,70 +12,25 @@ export async function fetchTags(
     pageSize: String(pageSize),
   })
   if (search) params.set("search", search)
-
-  const res = await fetch(`${API}/api/admin/tags?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh sách tags")
-  return res.json()
+  return api.get<TagListResponse>(`/api/admin/tags?${params}`)
 }
 
 // ---------- Detail ----------
-export async function fetchTagById(
-  token: string,
-  id: number
-): Promise<TagResponse> {
-  const res = await fetch(`${API}/api/admin/tags/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải chi tiết tag")
-  return res.json()
+export function fetchTagById(id: number): Promise<TagResponse> {
+  return api.get<TagResponse>(`/api/admin/tags/${id}`)
 }
 
 // ---------- Create ----------
-export async function createTag(
-  token: string,
-  name: string
-): Promise<TagResponse> {
-  const res = await fetch(`${API}/api/admin/tags`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
-  })
-  if (!res.ok) throw new Error("Lỗi tạo tag")
-  return res.json()
+export function createTag(name: string): Promise<TagResponse> {
+  return api.post<TagResponse>("/api/admin/tags", { name })
 }
 
 // ---------- Update ----------
-export async function updateTag(
-  token: string,
-  id: number,
-  name: string
-): Promise<TagResponse> {
-  const res = await fetch(`${API}/api/admin/tags/${id}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
-  })
-  if (!res.ok) throw new Error("Lỗi cập nhật tag")
-  return res.json()
+export function updateTag(id: number, name: string): Promise<TagResponse> {
+  return api.put<TagResponse>(`/api/admin/tags/${id}`, { name })
 }
 
 // ---------- Delete ----------
-export async function deleteTag(
-  token: string,
-  id: number
-): Promise<TagResponse> {
-  const res = await fetch(`${API}/api/admin/tags/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi xóa tag")
-  return res.json()
+export function deleteTag(id: number): Promise<TagResponse> {
+  return api.delete<TagResponse>(`/api/admin/tags/${id}`)
 }

@@ -62,10 +62,10 @@ export default function CustomerDisputeDetailPage() {
   }, [authLoading, session, router])
 
   const load = useCallback(async () => {
-    if (!session?.access_token || !id) return
+    if (!id) return
     setLoading(true)
     try {
-      const res = await fetchMyDisputeById(session.access_token, id)
+      const res = await fetchMyDisputeById(id)
       if (res.success && res.dispute) setDispute(res.dispute)
       else toast.error(res.message ?? "Không tìm thấy khiếu nại")
     } catch (e) {
@@ -78,10 +78,10 @@ export default function CustomerDisputeDetailPage() {
   useEffect(() => { load() }, [load])
 
   const handleCancel = async () => {
-    if (!session?.access_token || !dispute) return
+    if (!dispute) return
     setCanceling(true)
     try {
-      const res = await cancelMyDispute(session.access_token, dispute.id)
+      const res = await cancelMyDispute(dispute.id)
       if (res.success) {
         toast.success("Đã hủy khiếu nại")
         setCancelOpen(false)
@@ -110,7 +110,6 @@ export default function CustomerDisputeDetailPage() {
     setUpdatingEvidence(true)
     try {
       const res = await updateDisputeEvidence(
-        session.access_token,
         dispute.id,
         evidenceUrls,
         customerNote.trim() || undefined
@@ -136,7 +135,6 @@ export default function CustomerDisputeDetailPage() {
   return (
     <div className="w-full max-w-[860px] mx-auto">
       <div className="py-2 md:py-0">
-        {/* Breadcrumb / back */}
         <div className="flex items-center gap-2 mb-6">
           <button
             onClick={() => router.back()}

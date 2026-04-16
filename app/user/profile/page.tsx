@@ -2,7 +2,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { profileService } from '@/services/profile'
 import { supabase } from '@/lib/supabase'
@@ -235,6 +234,13 @@ export default function ProfilePage() {
     }
   }
 
+  const copyUserCode = () => {
+    const code = profile?.userCode
+    if (!code) return
+    void navigator.clipboard.writeText(code)
+    toast.success('Đã sao chép mã người dùng')
+  }
+
   const handleVerifyOtp = async () => {
     if (otpValue.length !== 6) return
     try {
@@ -324,6 +330,30 @@ export default function ProfilePage() {
           <div className="flex-1 px-6 py-6">
             <div className="space-y-5 max-w-lg">
               <div className="flex items-center">
+                <Label className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm">
+                  Mã người dùng
+                </Label>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <p
+                    className="text-sm font-mono tracking-wide truncate"
+                    style={{ color: 'var(--color-text-main)' }}
+                    title={profile?.userCode ?? undefined}
+                  >
+                    {profile?.userCode ?? '—'}
+                  </p>
+                  {profile?.userCode ? (
+                    <button
+                      type="button"
+                      onClick={copyUserCode}
+                      className="shrink-0 flex items-center justify-center size-8 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                      aria-label="Sao chép mã người dùng"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center">
                 <Label
                   htmlFor="fullName"
                   className="w-[140px] shrink-0 text-right pr-4 text-muted-foreground text-sm"
@@ -359,7 +389,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Phone */}
               <div className="flex items-center">
                 <Label
                   htmlFor="phone"

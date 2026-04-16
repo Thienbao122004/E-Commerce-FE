@@ -1,34 +1,10 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
-export interface ShopPublicDto {
-  id: string
-  name: string
-  slug: string
-  description: string | null
-  logoUrl: string | null
-  coverUrl: string | null
-  productCount: number
-  followerCount: number
-  averageRating: number
-  reviewCount: number
-  createdAt: string
-  isFollowing: boolean
-}
 
-export interface ShopPublicDetailResponse {
-  success: boolean
-  message?: string | null
-  shop?: ShopPublicDto
-}
+import type { StorefrontProductsResponse } from "@/types/storefront-product"
+import type { ShopPublicDto, ShopPublicDetailResponse, ShopCategoriesApiResponse } from "@/types/storefront-shop"
 
-import type { StorefrontProductsResponse } from "./storefront-products"
-
-export interface ShopCategoryDto {
-  id: number
-  name: string
-  slug: string | null
-  productCount: number
-}
-
+export type { ShopPublicDto, ShopPublicDetailResponse, ShopCategoryDto } from "@/types/storefront-shop"
+export type { StorefrontProductsResponse } from "@/types/storefront-product"
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { cache: "no-store", ...options })
@@ -94,22 +70,16 @@ export function getShopProducts(
   return fetchJson<StorefrontProductsResponse>(`/api/shops/${shopId}/products${query ? `?${query}` : ""}`)
 }
 
-export function getShopCategories(shopId: string): Promise<{ success: boolean; categories: ShopCategoryDto[] }> {
-  return fetchJson<{ success: boolean; categories: ShopCategoryDto[] }>(`/api/shops/${shopId}/categories`)
+export function getShopCategories(shopId: string): Promise<ShopCategoriesApiResponse> {
+  return fetchJson<ShopCategoriesApiResponse>(`/api/shops/${shopId}/categories`)
 }
 
-export async function followShop(token: string, shopId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/shops/${shopId}/follow`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi theo dõi shop")
+export async function followShop(shopId: string): Promise<void> {
+  const { api } = await import("@/lib/api-client")
+  await api.post(`/api/shops/${shopId}/follow`)
 }
 
-export async function unfollowShop(token: string, shopId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/shops/${shopId}/follow`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi hủy theo dõi shop")
+export async function unfollowShop(shopId: string): Promise<void> {
+  const { api } = await import("@/lib/api-client")
+  await api.delete(`/api/shops/${shopId}/follow`)
 }

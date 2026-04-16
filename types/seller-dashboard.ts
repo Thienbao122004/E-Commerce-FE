@@ -1,3 +1,6 @@
+import type { MaterialDto } from "@/types/material"
+import type { Tag } from "@/types/tag"
+
 // ====== Shop Info ======
 export type SellerShopInfo = {
   id: string
@@ -296,7 +299,6 @@ export type SellerProductReviewsData = {
   page: number
   pageSize: number
   averageRating: number
-  /** Số lượng theo sao: [5★, 4★, 3★, 2★, 1★] */
   ratingDistribution: number[]
   pendingReplyCount: number
 }
@@ -305,4 +307,20 @@ export type SellerProductReviewsResponse = {
   success: boolean
   data?: SellerProductReviewsData
   message?: string
+}
+
+export type SellerMaterialListResponse = {
+  success: boolean
+  materials: MaterialDto[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type SellerTagListResponse = {
+  success: boolean
+  tags: Tag[]
+  totalCount: number
+  page: number
+  pageSize: number
 }

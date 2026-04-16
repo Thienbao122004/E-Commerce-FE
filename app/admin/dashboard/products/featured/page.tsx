@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchTopProducts } from "@/services/dashboard"
 import type { TopProduct } from "@/types/dashboard"
 
@@ -40,15 +39,8 @@ export default function FeaturedProductsPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) {
-      toast.error("Phiên đăng nhập hết hạn.")
-      setLoading(false)
-      return
-    }
     try {
-      const res = await fetchTopProducts(token)
+      const res = await fetchTopProducts()
       if (res.success) setProducts(res.products)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi tải dữ liệu")

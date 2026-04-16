@@ -34,10 +34,8 @@ import { ordersService } from "@/services/orders"
 import type { AddressResponse, AddAddressRequest } from "@/types/profile"
 import {
   vietnamProvincesService,
-  type Province,
-  type District,
-  type Ward,
 } from "@/services/vietnam-provinces"
+import type { Province, District, Ward } from "@/types/vietnam-provinces"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -537,13 +535,9 @@ function ShopioAvatar({ size = "sm" }: { size?: "xs" | "sm" | "md" }) {
 }
 
 export function ShopioAssistantWidget() {
-  const { session, isLoading: authLoading } = useAuth()
-  const token = session?.access_token
-
+  const {isLoading: authLoading } = useAuth()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<"list" | "chat">("list")
-
-  // Sessions list state
   const [sessions, setSessions] = useState<AiSessionSummary[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionSearch, setSessionSearch] = useState("")
@@ -1059,7 +1053,7 @@ export function ShopioAssistantWidget() {
     setShowAddressModal(false)
   }, [])
 
-  if (authLoading || !token) return null
+  if (authLoading) return null
 
   return (
     <>

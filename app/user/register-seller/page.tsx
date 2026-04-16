@@ -7,17 +7,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { profileService } from "@/services/profile";
-import {
-  vietnamProvincesService,
-  type District,
-  type Province,
-  type Ward,
-} from "@/services/vietnam-provinces";
+import { vietnamProvincesService } from "@/services/vietnam-provinces";
 import type {
   RegisterSellerRequest,
   ShopDocumentInput,
   UserProfileResponse,
 } from "@/types/profile";
+import type { Province, District, Ward } from "@/types/vietnam-provinces";
 import { createClient } from "@/lib/supabase";
 
 import { Badge } from "@/components/ui/badge";

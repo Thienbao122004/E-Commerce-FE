@@ -9,7 +9,6 @@ import {
   fetchTopProducts,
   fetchTopShops,
 } from "@/services/dashboard"
-import { supabase } from "@/lib/supabase"
 import type {
   DashboardStats,
   RecentActivity,
@@ -40,33 +39,7 @@ export function useDashboard(): DashboardData {
   const mountedRef = useRef(true)
 
   const load = useCallback(async () => {
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.getSession()
-
-    if (sessionError) {
-      toast.error(sessionError.message)
-      if (mountedRef.current) {
-        setStatsLoading(false)
-        setActivitiesLoading(false)
-        setShopsLoading(false)
-        setProductsLoading(false)
-      }
-      return
-    }
-
-    const token = sessionData.session?.access_token
-    if (!token) {
-      toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.")
-      if (mountedRef.current) {
-        setStatsLoading(false)
-        setActivitiesLoading(false)
-        setShopsLoading(false)
-        setProductsLoading(false)
-      }
-      return
-    }
-
-    fetchStats(token)
+    fetchStats()
       .then((res) => {
         if (!mountedRef.current) return
         if (res.success && res.stats) {
@@ -86,7 +59,7 @@ export function useDashboard(): DashboardData {
         if (mountedRef.current) setStatsLoading(false)
       })
 
-    fetchActivities(token)
+    fetchActivities()
       .then((res) => {
         if (!mountedRef.current) return
         if (res.success) setActivities(res.activities)
@@ -102,7 +75,7 @@ export function useDashboard(): DashboardData {
         if (mountedRef.current) setActivitiesLoading(false)
       })
 
-    fetchTopShops(token)
+    fetchTopShops()
       .then((res) => {
         if (!mountedRef.current) return
         if (res.success) setShops(res.shops)
@@ -118,7 +91,7 @@ export function useDashboard(): DashboardData {
         if (mountedRef.current) setShopsLoading(false)
       })
 
-    fetchTopProducts(token)
+    fetchTopProducts()
       .then((res) => {
         if (!mountedRef.current) return
         if (res.success) setProducts(res.products)

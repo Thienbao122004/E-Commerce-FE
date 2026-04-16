@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
 import { fetchSellerDisputes, respondToSellerDispute } from "@/services/disputes"
 import { EvidenceUploader } from "@/components/common/evidence-uploader"
 import {
@@ -59,11 +58,8 @@ export default function SellerDisputesPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setLoading(false); return }
     try {
-      const res = await fetchSellerDisputes(token, pg, ps)
+      const res = await fetchSellerDisputes(pg, ps)
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
       else toast.error(res.message ?? "Lỗi tải dữ liệu")
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
@@ -81,12 +77,9 @@ export default function SellerDisputesPage() {
   const handleRespond = async () => {
     if (!selectedDispute || !respondText.trim()) return
     setActionLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setActionLoading(false); return }
     try {
       const res = await respondToSellerDispute(
-        token, selectedDispute.id, respondText.trim(),
+        selectedDispute.id, respondText.trim(),
         respondEvidenceUrls.length > 0 ? respondEvidenceUrls : undefined
       )
       if (res.success) {

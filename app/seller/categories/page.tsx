@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
 import {
   fetchCategories,
   createCategory,
@@ -67,11 +66,8 @@ export default function CategoriesPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setLoading(false); return }
     try {
-      const res = await fetchCategories(token, page, pageSize)
+      const res = await fetchCategories(page, pageSize)
       if (res.success) {
         setCategories(res.categories)
         setTotalCount(res.totalCount)
@@ -104,14 +100,11 @@ export default function CategoriesPage() {
   const handleSave = async () => {
     if (!formCode || !formName) return
     setActionLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setActionLoading(false); return }
     try {
       const parentId = formParentId ? Number(formParentId) : null
       const res = editCat
-        ? await updateCategory(token, editCat.id, { code: formCode, name: formName, parentId })
-        : await createCategory(token, { code: formCode, name: formName, parentId })
+        ? await updateCategory(editCat.id, { code: formCode, name: formName, parentId })
+        : await createCategory({ code: formCode, name: formName, parentId })
       if (res.success) {
         toast.success(res.message ?? (editCat ? "Cập nhật thành công" : "Tạo thành công"))
         setDialogOpen(false)
@@ -128,13 +121,10 @@ export default function CategoriesPage() {
 
   const handleToggle = async (c: Category) => {
     setActionLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setActionLoading(false); return }
     try {
       const res = c.isActive
-        ? await deactivateCategory(token, c.id)
-        : await activateCategory(token, c.id)
+        ? await deactivateCategory(c.id)
+        : await activateCategory(c.id)
       if (res.success) {
         toast.success(res.message ?? "Thành công")
         load()
@@ -151,11 +141,8 @@ export default function CategoriesPage() {
   const handleDelete = async () => {
     if (!deleteCat) return
     setActionLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setActionLoading(false); return }
     try {
-      const res = await deleteCategory(token, deleteCat.id)
+      const res = await deleteCategory(deleteCat.id)
       if (res.success) {
         toast.success(res.message ?? "Đã xóa")
         setDeleteCat(null)

@@ -17,7 +17,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
 import { fetchSellers, fetchSellerById, approveSeller, rejectSeller, activateSeller, suspendSeller, closeSeller } from "@/services/sellers"
 import {
   VerificationStatus, VerificationStatusLabels, VerificationStatusColors,
@@ -67,19 +66,10 @@ export default function SellersPage() {
   const openDialog = (type: DialogType, shop: ShopVerification) => { setDialogType(type); setTarget(shop); setReason(""); setNote("") }
   const closeDialog = () => { setDialogType(null); setTarget(null); setReason(""); setNote("") }
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
-  React.useEffect(() => { setPg(1) }, [debouncedSearch])
-
   const load = React.useCallback(async () => {
     setLoading(true)
-    const tk = await getToken()
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchSellers(tk, pg, ps, null)
+      const r = await fetchSellers(pg, ps, null)
       if (r.success) { setSellers(r.shops); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
@@ -89,10 +79,8 @@ export default function SellersPage() {
 
   const loadShopById = React.useCallback(async (id: string) => {
     setDetailLoading(true)
-    const tk = await getToken()
-    if (!tk) { setDetailLoading(false); return }
     try {
-      const r = await fetchSellerById(tk, id)
+      const r = await fetchSellerById(id)
       if (r.success && r.shop) setSelectedShop(r.shop)
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi tải chi tiết") }
     finally { setDetailLoading(false) }
@@ -119,10 +107,8 @@ export default function SellersPage() {
 
   const handleApproveAction = async (shopId: string, noteVal?: string) => {
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await approveSeller(tk, shopId, noteVal)
+      const r = await approveSeller(shopId, noteVal)
       if (r.success) { toast.success(r.message ?? "Đã duyệt"); if (selectedShop?.id === shopId && r.shop) setSelectedShop(r.shop); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -131,10 +117,8 @@ export default function SellersPage() {
 
   const handleRejectAction = async (shopId: string, reasonVal: string) => {
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await rejectSeller(tk, shopId, reasonVal)
+      const r = await rejectSeller(shopId, reasonVal)
       if (r.success) { toast.success(r.message ?? "Đã từ chối"); if (selectedShop?.id === shopId && r.shop) setSelectedShop(r.shop); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -143,10 +127,8 @@ export default function SellersPage() {
 
   const handleActivateAction = async (shop: ShopVerification) => {
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await activateSeller(tk, shop.id)
+      const r = await activateSeller(shop.id)
       if (r.success) { toast.success(r.message ?? "Đã kích hoạt"); if (selectedShop?.id === shop.id && r.shop) setSelectedShop(r.shop); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -155,10 +137,8 @@ export default function SellersPage() {
 
   const handleSuspendAction = async (shopId: string, reasonVal: string) => {
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await suspendSeller(tk, shopId, reasonVal)
+      const r = await suspendSeller(shopId, reasonVal)
       if (r.success) { toast.success(r.message ?? "Đã đình chỉ"); if (selectedShop?.id === shopId && r.shop) setSelectedShop(r.shop); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -167,10 +147,8 @@ export default function SellersPage() {
 
   const handleCloseAction = async (shopId: string, reasonVal: string) => {
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await closeSeller(tk, shopId, reasonVal)
+      const r = await closeSeller(shopId, reasonVal)
       if (r.success) { toast.success(r.message ?? "Đã đóng cửa"); if (selectedShop?.id === shopId && r.shop) setSelectedShop(r.shop); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }

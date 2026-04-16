@@ -5,12 +5,10 @@ import { toast } from "sonner"
 
 import {
   fetchProducts,
-  fetchProductById,
   hideProduct as apiHide,
   unhideProduct as apiUnhide,
   removeProduct as apiRemove,
 } from "@/services/products"
-import { supabase } from "@/lib/supabase"
 import type { ProductModeration } from "@/types/product"
 
 type Params = {
@@ -35,24 +33,10 @@ export function useProducts(initialParams?: Partial<Params>) {
 
   const mountedRef = useRef(true)
 
-  const getToken = useCallback(async (): Promise<string | null> => {
-    const { data, error } = await supabase.auth.getSession()
-    if (error || !data.session?.access_token) {
-      toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.")
-      return null
-    }
-    return data.session.access_token
-  }, [])
-
   const load = useCallback(async () => {
     setLoading(true)
-    const token = await getToken()
-    if (!token) {
-      setLoading(false)
-      return
-    }
     try {
-      const res = await fetchProducts(token, {
+      const res = await fetchProducts({
         page: params.page,
         pageSize: params.pageSize,
         status: params.status,
@@ -72,7 +56,7 @@ export function useProducts(initialParams?: Partial<Params>) {
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [getToken, params])
+  }, [params])
 
   useEffect(() => {
     mountedRef.current = true
@@ -82,10 +66,8 @@ export function useProducts(initialParams?: Partial<Params>) {
 
   const hideProduct = useCallback(async (productId: string, reason: string) => {
     setActionLoading(true)
-    const token = await getToken()
-    if (!token) { setActionLoading(false); return false }
     try {
-      const res = await apiHide(token, productId, reason)
+      const res = await apiHide(productId, reason)
       if (res.success) {
         toast.success(res.message ?? "Ẩn sản phẩm thành công")
         await load()
@@ -100,14 +82,12 @@ export function useProducts(initialParams?: Partial<Params>) {
     } finally {
       setActionLoading(false)
     }
-  }, [getToken, load])
+  }, [load])
 
   const unhideProduct = useCallback(async (productId: string) => {
     setActionLoading(true)
-    const token = await getToken()
-    if (!token) { setActionLoading(false); return false }
     try {
-      const res = await apiUnhide(token, productId)
+      const res = await apiUnhide(productId)
       if (res.success) {
         toast.success(res.message ?? "Hiển thị lại sản phẩm thành công")
         await load()
@@ -122,14 +102,12 @@ export function useProducts(initialParams?: Partial<Params>) {
     } finally {
       setActionLoading(false)
     }
-  }, [getToken, load])
+  }, [load])
 
   const removeProduct = useCallback(async (productId: string, reason: string) => {
     setActionLoading(true)
-    const token = await getToken()
-    if (!token) { setActionLoading(false); return false }
     try {
-      const res = await apiRemove(token, productId, reason)
+      const res = await apiRemove(productId, reason)
       if (res.success) {
         toast.success(res.message ?? "Gỡ sản phẩm thành công")
         await load()
@@ -144,7 +122,7 @@ export function useProducts(initialParams?: Partial<Params>) {
     } finally {
       setActionLoading(false)
     }
-  }, [getToken, load])
+  }, [load])
 
   const setPage = useCallback((page: number) => {
     setParams(p => ({ ...p, page }))

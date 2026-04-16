@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
 import { fetchWithdrawals, approveWithdrawal, rejectWithdrawal } from "@/services/withdrawals"
 import { WithdrawStatus, WithdrawStatusLabels, WithdrawStatusColors } from "@/types/withdraw"
 import type { WithdrawRequest } from "@/types/withdraw"
@@ -50,17 +49,10 @@ export default function WithdrawalsPage() {
 
   React.useEffect(() => { setPg(1) }, [debouncedSearch])
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
   const load = React.useCallback(async () => {
     setLoading(true)
-    const tk = await getToken()
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchWithdrawals(tk, pg, ps, null)
+      const r = await fetchWithdrawals(pg, ps, null)
       if (r.success) { setRequests(r.requests); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
@@ -71,10 +63,8 @@ export default function WithdrawalsPage() {
   const handleApprove = async (adminNote: string) => {
     if (!target) return
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await approveWithdrawal(tk, target.id, adminNote || undefined)
+      const r = await approveWithdrawal(target.id, adminNote || undefined)
       if (r.success) { toast.success(r.message ?? "Đã duyệt"); closeDialog(); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -84,10 +74,8 @@ export default function WithdrawalsPage() {
   const handleReject = async (reason: string, adminNote: string) => {
     if (!target || !reason) return
     setBusy(true)
-    const tk = await getToken()
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await rejectWithdrawal(tk, target.id, reason, adminNote || undefined)
+      const r = await rejectWithdrawal(target.id, reason, adminNote || undefined)
       if (r.success) { toast.success(r.message ?? "Đã từ chối"); closeDialog(); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }

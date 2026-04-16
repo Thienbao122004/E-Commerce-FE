@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { supabase } from "@/lib/supabase"
 import {
   fetchPlatformFeeRecords,
   fetchPlatformFeeSummary,
@@ -48,11 +47,6 @@ export default function AdminPlatformFeesPage() {
   const [toDate, setToDate] = React.useState("")
   const pageSize = 15
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
   const rangeParams = React.useCallback(() => {
     const fromUtc = fromDate ? startOfDayUtcIso(fromDate) : undefined
     const toUtc = toDate ? endOfDayUtcIso(toDate) : undefined
@@ -61,17 +55,11 @@ export default function AdminPlatformFeesPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const tk = await getToken()
-    if (!tk) {
-      toast.error("Phiên đăng nhập hết hạn")
-      setLoading(false)
-      return
-    }
     const { fromUtc, toUtc } = rangeParams()
     try {
       const [sumRes, recRes] = await Promise.all([
-        fetchPlatformFeeSummary(tk, fromUtc, toUtc),
-        fetchPlatformFeeRecords(tk, page, pageSize, fromUtc, toUtc),
+        fetchPlatformFeeSummary(fromUtc, toUtc),
+        fetchPlatformFeeRecords(page, pageSize, fromUtc, toUtc),
       ])
       if (sumRes.success && sumRes.data) setSummary(sumRes.data)
       else setSummary(null)

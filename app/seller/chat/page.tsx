@@ -24,7 +24,6 @@ export default function SellerChatPage() {
   const { session, user } = useAuth()
   const token = session?.access_token
   const currentUserId = user?.id ?? null
-
   const [conversations, setConversations] = useState<ConversationDto[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<MessageDto[]>([])
@@ -73,12 +72,12 @@ export default function SellerChatPage() {
 
   // ── Load conversations ────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
-    if (!token || !currentUserId) {
+    if (!currentUserId) {
       setLoading(false)
       return
     }
     try {
-      const data = await fetchConversations(token)
+      const data = await fetchConversations()
       const sellerOnly = data.filter(
         (c) => c.sellerId === currentUserId && c.buyerId !== currentUserId
       )
@@ -88,7 +87,7 @@ export default function SellerChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, currentUserId])
+  }, [currentUserId])
 
   useEffect(() => {
     loadConversations()
@@ -97,12 +96,11 @@ export default function SellerChatPage() {
   // ── Load messages when selecting conversation ─────────────────────────
   const loadMessages = useCallback(
     async (conversationId: string) => {
-      if (!token) return
       setLoadingMessages(true)
       try {
-        const detail = await fetchMessages(token, conversationId, 1, 50)
+        const detail = await fetchMessages(conversationId, 1, 50)
         setMessages(detail.messages.reverse())
-        await markAsRead(token, conversationId).catch(() => {})
+        await markAsRead(conversationId).catch(() => {})
         setConversations((prev) =>
           prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
         )
@@ -112,7 +110,7 @@ export default function SellerChatPage() {
         setLoadingMessages(false)
       }
     },
-    [token]
+    []
   )
 
   useEffect(() => {
@@ -171,12 +169,12 @@ export default function SellerChatPage() {
 
   // ── Send message ──────────────────────────────────────────────────────
   const handleSend = async () => {
-    if (!message.trim() || !activeId || !token || sending) return
+    if (!message.trim() || !activeId || sending) return
     const content = message.trim()
     setMessage("")
     setSending(true)
     try {
-      const newMsg = await sendMessage(token, activeId, content)
+      const newMsg = await sendMessage(activeId, content)
       setMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev
         return [...prev, newMsg]

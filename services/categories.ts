@@ -1,3 +1,4 @@
+import { api } from "@/lib/api-client"
 import type {
   CategoryListResponse,
   CategoryResponse,
@@ -5,10 +6,7 @@ import type {
   MigrateProductsResponse,
 } from "@/types/category"
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
-export async function fetchCategories(
-  token: string,
+export function fetchCategories(
   page = 1,
   pageSize = 20,
   level?: number | null,
@@ -20,125 +18,48 @@ export async function fetchCategories(
   })
   if (level !== null && level !== undefined) params.set("level", String(level))
   if (isActive !== null && isActive !== undefined) params.set("isActive", String(isActive))
-
-  const res = await fetch(`${API}/api/admin/categories?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh mục")
-  return res.json()
+  return api.get<CategoryListResponse>(`/api/admin/categories?${params}`)
 }
 
-export async function fetchCategoryTree(
-  token: string
-): Promise<CategoryTreeResponse> {
-  const res = await fetch(`${API}/api/admin/categories/tree`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải cây danh mục")
-  return res.json()
+export function fetchCategoryTree(): Promise<CategoryTreeResponse> {
+  return api.get<CategoryTreeResponse>("/api/admin/categories/tree")
 }
 
-export async function fetchCategoryById(
-  token: string,
-  id: number
-): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải chi tiết danh mục")
-  return res.json()
+export function fetchCategoryById(id: number): Promise<CategoryResponse> {
+  return api.get<CategoryResponse>(`/api/admin/categories/${id}`)
 }
 
-export async function createCategory(
-  token: string,
+export function createCategory(
   data: { parentId?: number | null; code: string; name: string }
 ): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error("Lỗi tạo danh mục")
-  return res.json()
+  return api.post<CategoryResponse>("/api/admin/categories", data)
 }
 
-export async function updateCategory(
-  token: string,
+export function updateCategory(
   id: number,
   data: { code?: string; name?: string; parentId?: number | null }
 ): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories/${id}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error("Lỗi cập nhật danh mục")
-  return res.json()
+  return api.put<CategoryResponse>(`/api/admin/categories/${id}`, data)
 }
 
-export async function activateCategory(
-  token: string,
-  id: number
-): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories/${id}/activate`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi kích hoạt danh mục")
-  return res.json()
+export function activateCategory(id: number): Promise<CategoryResponse> {
+  return api.post<CategoryResponse>(`/api/admin/categories/${id}/activate`)
 }
 
-export async function deactivateCategory(
-  token: string,
-  id: number,
-  reason?: string
-): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories/${id}/deactivate`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason }),
-  })
-  if (!res.ok) throw new Error("Lỗi vô hiệu hóa danh mục")
-  return res.json()
+export function deactivateCategory(id: number, reason?: string): Promise<CategoryResponse> {
+  return api.post<CategoryResponse>(`/api/admin/categories/${id}/deactivate`, { reason })
 }
 
-export async function deleteCategory(
-  token: string,
-  id: number
-): Promise<CategoryResponse> {
-  const res = await fetch(`${API}/api/admin/categories/${id}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi xóa danh mục")
-  return res.json()
+export function deleteCategory(id: number): Promise<CategoryResponse> {
+  return api.delete<CategoryResponse>(`/api/admin/categories/${id}`)
 }
 
-export async function migrateProducts(
-  token: string,
+export function migrateProducts(
   fromId: number,
   targetCategoryId: number
 ): Promise<MigrateProductsResponse> {
-  const res = await fetch(
-    `${API}/api/admin/categories/${fromId}/migrate-products`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ targetCategoryId }),
-    }
+  return api.post<MigrateProductsResponse>(
+    `/api/admin/categories/${fromId}/migrate-products`,
+    { targetCategoryId }
   )
-  if (!res.ok) throw new Error("Lỗi di chuyển sản phẩm")
-  return res.json()
 }

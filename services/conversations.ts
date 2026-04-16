@@ -1,136 +1,61 @@
-const API = process.env.NEXT_PUBLIC_API_URL
+import { api } from "@/lib/api-client"
+import type {
+  MessageDto,
+  ConversationDto,
+  ConversationDetailDto,
+} from "@/types/conversation"
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+export type { MessageDto, ConversationDto, ConversationDetailDto } from "@/types/conversation"
 
-export interface MessageDto {
-  id: string
-  conversationId: string
-  senderId: string
-  senderName: string
-  senderRole: "buyer" | "seller"
-  messageType: string
-  content: string
-  isRead: boolean
-  createdAt: string
-}
-
-export interface ConversationDto {
-  id: string
-  shopId: string
-  shopName: string
-  shopLogoUrl: string | null
-  buyerId: string
-  buyerName: string
-  buyerAvatarUrl?: string | null
-  sellerId: string
-  orderId: string | null
-  lastMessage: MessageDto | null
-  unreadCount: number
-  createdAt: string
-  /** Từ API: đã tắt thông báo (theo user đang đăng nhập). */
-  isMuted?: boolean
-}
-
-export interface ConversationDetailDto {
-  conversation: ConversationDto
-  messages: MessageDto[]
-  totalMessages: number
-  page: number
-  pageSize: number
-}
-
-// ─── API ────────────────────────────────────────────────────────────────────
-
-export async function fetchConversations(token: string): Promise<ConversationDto[]> {
-  const res = await fetch(`${API}/api/conversations`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh sách hội thoại")
-  const json = await res.json()
+export async function fetchConversations(): Promise<ConversationDto[]> {
+  const json = await api.get<{ data: ConversationDto[] }>("/api/conversations")
   return json.data ?? []
 }
 
 export async function fetchMessages(
-  token: string,
   conversationId: string,
   page = 1,
   pageSize = 30
 ): Promise<ConversationDetailDto> {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
-  const res = await fetch(`${API}/api/conversations/${conversationId}/messages?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải tin nhắn")
-  const json = await res.json()
+  const json = await api.get<{ data: ConversationDetailDto }>(
+    `/api/conversations/${conversationId}/messages?${params}`
+  )
   return json.data
 }
 
 export async function sendMessage(
-  token: string,
   conversationId: string,
   content: string,
   messageType = "text"
 ): Promise<MessageDto> {
-  const res = await fetch(`${API}/api/conversations/${conversationId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ content, messageType }),
-  })
-  if (!res.ok) throw new Error("Lỗi gửi tin nhắn")
-  const json = await res.json()
+  const json = await api.post<{ data: MessageDto }>(
+    `/api/conversations/${conversationId}/messages`,
+    { content, messageType }
+  )
   return json.data
 }
 
 export async function startOrGetConversation(
-  token: string,
   shopId: string,
   orderId?: string,
   firstMessage?: string
 ): Promise<ConversationDto> {
-  const res = await fetch(`${API}/api/conversations`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ shopId, orderId, firstMessage }),
-  })
-  if (!res.ok) throw new Error("Lỗi tạo hội thoại")
-  const json = await res.json()
+  const json = await api.post<{ data: ConversationDto }>(
+    "/api/conversations",
+    { shopId, orderId, firstMessage }
+  )
   return json.data
 }
 
-export async function markAsRead(token: string, conversationId: string): Promise<void> {
-  const res = await fetch(`${API}/api/conversations/${conversationId}/read`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi đánh dấu đã đọc")
+export function markAsRead(conversationId: string): Promise<void> {
+  return api.put(`/api/conversations/${conversationId}/read`)
 }
 
-export async function setConversationMuted(
-  token: string,
-  conversationId: string,
-  muted: boolean
-): Promise<void> {
-  const res = await fetch(`${API}/api/conversations/${conversationId}/mute`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ muted }),
-  })
-  if (!res.ok) throw new Error("Không cập nhật được thông báo")
+export function setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  return api.put(`/api/conversations/${conversationId}/mute`, { muted })
 }
 
-export async function hideConversationForUser(token: string, conversationId: string): Promise<void> {
-  const res = await fetch(`${API}/api/conversations/${conversationId}/hide`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Không ẩn được cuộc trò chuyện")
+export function hideConversationForUser(conversationId: string): Promise<void> {
+  return api.post(`/api/conversations/${conversationId}/hide`)
 }

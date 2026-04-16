@@ -27,19 +27,25 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (authLoading) return
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       setFavoriteIds(new Set())
       return
     }
 
     setIsLoading(true)
-    getFavoriteIds(session.access_token)
+    getFavoriteIds()
       .then((res) => {
-        if (res.success) setFavoriteIds(new Set(res.productIds))
+        if (res.success) {
+          setFavoriteIds((prev) => {
+            const next = new Set(res.productIds)
+            if (prev.size === next.size && [...prev].every((id) => next.has(id))) return prev
+            return next
+          })
+        }
       })
       .catch(() => {})
       .finally(() => setIsLoading(false))
-  }, [session?.access_token, authLoading])
+  }, [authLoading, session?.user?.id])
 
   const isFavorited = useCallback(
     (productId: string) => favoriteIds.has(productId),
@@ -53,7 +59,6 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // optimistic update
       setFavoriteIds((prev) => {
         const next = new Set(prev)
         if (next.has(productId)) next.delete(productId)
@@ -62,7 +67,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
       })
 
       try {
-        const res = await toggleFavorite(productId, session.access_token)
+        const res = await toggleFavorite(productId)
         if (res.success) {
           setFavoriteIds((prev) => {
             const next = new Set(prev)

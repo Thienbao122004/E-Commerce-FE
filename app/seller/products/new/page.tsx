@@ -17,6 +17,7 @@ import {
   IconPalette,
   IconAlertCircle,
   IconPencil,
+  IconSearch,
 } from "@tabler/icons-react"
 
 import { toast } from "sonner"
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
   aiAnalyzeProduct,
@@ -33,14 +35,19 @@ import {
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import { supabase } from "@/lib/supabase"
+import {
+  fetchSellerMaterials,
+  fetchSellerTags,
+} from "@/services/seller-dashboard"
 import type {
   AnalyzeImageResponse,
   CategorySuggestion,
   TagSuggestion,
   MaterialSuggestion,
 } from "@/services/ai-seller"
+import type { MaterialDto } from "@/services/admin-materials"
+import type { Tag } from "@/types/tag"
 
-/** Danh mục làm phẳng từ cây — hiển thị đường dẫn cha › con (cấp 2, 3…). */
 type ManualCategoryRow = {
   id: number
   name: string
@@ -175,7 +182,6 @@ export default function CreateProductPage() {
   const { create, actionLoading } = useSellerProducts()
 
   const [name, setName] = React.useState("")
-  // price: hiển thị có dấu phẩy nghìn, priceRaw: số thực để submit
   const [price, setPrice] = React.useState("")
   const [priceRaw, setPriceRaw] = React.useState(0)
   const [sku, setSku] = React.useState("")
@@ -203,6 +209,20 @@ export default function CreateProductPage() {
   const [manualCatQuery, setManualCatQuery] = React.useState("")
   const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
+  const [platformMaterials, setPlatformMaterials] = React.useState<MaterialDto[]>([])
+  const [platformTags, setPlatformTags] = React.useState<Tag[]>([])
+  const [platformMatQuery, setPlatformMatQuery] = React.useState("")
+  const [debouncedPlatformMatQuery, setDebouncedPlatformMatQuery] = React.useState("")
+  const [platformTagQuery, setPlatformTagQuery] = React.useState("")
+  const [debouncedPlatformTagQuery, setDebouncedPlatformTagQuery] = React.useState("")
+  const [platformMatLoading, setPlatformMatLoading] = React.useState(false)
+  const [platformTagLoading, setPlatformTagLoading] = React.useState(false)
+  const [matPage, setMatPage] = React.useState(1)
+  const [tagPage, setTagPage] = React.useState(1)
+  const [hasMoreMats, setHasMoreMats] = React.useState(true)
+  const [hasMoreTags, setHasMoreTags] = React.useState(true)
+  const [hasAnalyzed, setHasAnalyzed] = React.useState(false)
+
   const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
   const [selTagIds, setSelTagIds] = React.useState<number[]>([])
   const [selMatIds, setSelMatIds] = React.useState<string[]>([])
@@ -219,6 +239,26 @@ export default function CreateProductPage() {
     return () => clearTimeout(timer)
   }, [manualCatQuery])
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPlatformMatQuery(platformMatQuery)
+      setPlatformMaterials([])
+      setMatPage(1)
+      setHasMoreMats(true)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [platformMatQuery])
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPlatformTagQuery(platformTagQuery)
+      setPlatformTags([])
+      setTagPage(1)
+      setHasMoreTags(true)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [platformTagQuery])
+
   const manualCategoryOptions = React.useMemo(() => {
     const q = debouncedManualCatQuery.trim().toLowerCase()
     if (!q) return manualCategoryRows.slice(0, 12)
@@ -229,6 +269,11 @@ export default function CreateProductPage() {
       )
       .slice(0, 24)
   }, [manualCategoryRows, debouncedManualCatQuery])
+
+  // Server handles filtering — just return what we have fetched
+  const filteredPlatformMaterials = platformMaterials
+
+  const filteredPlatformTags = platformTags
 
   React.useEffect(() => {
     let mounted = true
@@ -245,6 +290,43 @@ export default function CreateProductPage() {
       mounted = false
     }
   }, [])
+
+  const loadPlatformMaterials = React.useCallback(async (page = 1) => {
+    if (platformMatLoading) return
+    setPlatformMatLoading(true)
+    try {
+      const res = await fetchSellerMaterials(page, 30, debouncedPlatformMatQuery || undefined)
+      if (res.success) {
+        const items = res.materials ?? []
+        setPlatformMaterials((prev) => page === 1 ? items : [...prev, ...items])
+        setMatPage(page)
+        setHasMoreMats(items.length === 30)
+      }
+    } catch (err) {
+      toast.error(`Không tải được chất liệu: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setPlatformMatLoading(false)
+    }
+  }, [platformMatLoading, debouncedPlatformMatQuery])
+
+  const loadPlatformTags = React.useCallback(async (page = 1) => {
+    if (platformTagLoading) return
+    setPlatformTagLoading(true)
+    try {
+      const res = await fetchSellerTags(page, 30, debouncedPlatformTagQuery || undefined)
+      if (res.success) {
+        const items = res.tags ?? []
+        setPlatformTags((prev) => page === 1 ? items : [...prev, ...items])
+        setTagPage(page)
+        setHasMoreTags(items.length === 30)
+      }
+    } catch (err) {
+      toast.error(`Không tải được thẻ: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setPlatformTagLoading(false)
+    }
+  }, [platformTagLoading, debouncedPlatformTagQuery])
+
 
   const blobUrlToDataUrl = React.useCallback(async (blobUrl: string) => {
     const res = await fetch(blobUrl)
@@ -296,12 +378,13 @@ export default function CreateProductPage() {
     setSelMatIds(
       (materials ?? []).map((m) => m.materialId).filter((id): id is string => typeof id === "string" && id.length > 0)
     )
+    setHasAnalyzed(true)
   }, [])
 
   const runAiAnalysis = React.useCallback(async () => {
     const hasImages = imageUrls.length > 0
     if (!hasInput && !hasImages) {
-      toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích AI")
+      toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích")
       return
     }
 
@@ -529,6 +612,15 @@ export default function CreateProductPage() {
     setSelTagIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
   const toggleMat = (id: string) =>
     setSelMatIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id])
+
+  const togglePlatformMat = (mat: MaterialDto) => {
+    const key = mat.id
+    setSelMatIds((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key])
+  }
+
+  const togglePlatformTag = (tag: Tag) => {
+    setSelTagIds((p) => p.includes(tag.id) ? p.filter((x) => x !== tag.id) : [...p, tag.id])
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -1058,8 +1150,6 @@ export default function CreateProductPage() {
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
                       <IconLoader2 className="size-3 animate-spin text-[#6f8659]" /> Đang tải...
                     </div>
-                  ) : matSuggestions.length === 0 ? (
-                    <p className="text-[11px] italic text-[#8a9a80]">Không có gợi ý</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {matSuggestions.map((m, idx) => {
@@ -1082,6 +1172,83 @@ export default function CreateProductPage() {
                         )
                       })}
 
+                      {matSuggestions.length === 0 && (
+                        <span className="text-[11px] italic text-[#8a9a80]">
+                          Không có gợi ý từ AI
+                        </span>
+                      )}
+
+                      {/* „+“ badge mở Popover chọn từ nền tảng */}
+                      {hasAnalyzed && (
+                        <Popover onOpenChange={(open) => { if (open) loadPlatformMaterials(1) }}>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center size-7 rounded-full border-2 border-dashed border-[#9db183] bg-white text-[#6b7f5e] hover:border-[#5a7248] hover:bg-[#f2f7ee] transition-all"
+                              title="Chọn chất liệu từ nền tảng"
+                            >
+                              <IconPlus className="size-3.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-72 p-3">
+                            <p className="mb-2 text-[11px] font-semibold text-[#44553a] uppercase tracking-wide">Chất liệu nền tảng</p>
+                            <div className="relative mb-2">
+                              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                              <Input
+                                value={platformMatQuery}
+                                onChange={(e) => setPlatformMatQuery(e.target.value)}
+                                placeholder="Tìm chất liệu..."
+                                className="h-7 pl-7 text-[11px]"
+                              />
+                            </div>
+                            {platformMatLoading && platformMaterials.length === 0 ? (
+                              <div className="flex items-center gap-2 py-3 text-[11px] text-muted-foreground">
+                                <IconLoader2 className="size-3 animate-spin" /> Đang tải...
+                              </div>
+                            ) : (
+                              <div
+                                className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto"
+                                onScroll={(e) => {
+                                  const el = e.currentTarget
+                                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60 && hasMoreMats && !platformMatLoading) {
+                                    loadPlatformMaterials(matPage + 1)
+                                  }
+                                }}
+                              >
+                                {filteredPlatformMaterials.map((mat) => {
+                                  const active = selMatIds.includes(mat.id)
+                                  return (
+                                    <button
+                                      key={mat.id}
+                                      type="button"
+                                      onClick={() => togglePlatformMat(mat)}
+                                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
+                                        active
+                                          ? "border-[#8ea27a] bg-[#e9f0e2] text-[#415337]"
+                                          : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a] hover:bg-[#f2f6ee]"
+                                      }`}
+                                    >
+                                      {mat.name}
+                                      {active && <IconCheck className="size-3" />}
+                                    </button>
+                                  )
+                                })}
+                                {filteredPlatformMaterials.length === 0 && !platformMatLoading && (
+                                  <p className="text-[11px] italic text-muted-foreground py-1">Không tìm thấy</p>
+                                )}
+                                {platformMatLoading && platformMaterials.length > 0 && (
+                                  <div className="w-full flex justify-center py-1">
+                                    <IconLoader2 className="size-3 animate-spin text-muted-foreground" />
+                                  </div>
+                                )}
+                                {!hasMoreMats && platformMaterials.length > 0 && (
+                                  <p className="w-full text-center text-[10px] text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
+                                )}
+                              </div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1124,7 +1291,79 @@ export default function CreateProductPage() {
                       })}
 
                       {tagSuggestions.length === 0 && selCategory && !tagLoading && (
-                        <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý tag cho category này</span>
+                        <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý tag từ AI</span>
+                      )}
+
+                      {/* „+“ badge mở Popover chọn từ nền tảng */}
+                      {hasAnalyzed && (
+                        <Popover onOpenChange={(open) => { if (open) loadPlatformTags(1) }}>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center size-7 rounded-md border-2 border-dashed border-[#e8b37f] bg-white text-[#c06f2a] hover:border-[#d49640] hover:bg-[#fdf5eb] transition-all"
+                              title="Chọn thẻ từ nền tảng"
+                            >
+                              <IconPlus className="size-3.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-72 p-3">
+                            <p className="mb-2 text-[11px] font-semibold text-[#8a3d05] uppercase tracking-wide">Thẻ nền tảng</p>
+                            <div className="relative mb-2">
+                              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                              <Input
+                                value={platformTagQuery}
+                                onChange={(e) => setPlatformTagQuery(e.target.value)}
+                                placeholder="Tìm thẻ..."
+                                className="h-7 pl-7 text-[11px]"
+                              />
+                            </div>
+                            {platformTagLoading && platformTags.length === 0 ? (
+                              <div className="flex items-center gap-2 py-3 text-[11px] text-muted-foreground">
+                                <IconLoader2 className="size-3 animate-spin" /> Đang tải...
+                              </div>
+                            ) : (
+                              <div
+                                className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto"
+                                onScroll={(e) => {
+                                  const el = e.currentTarget
+                                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60 && hasMoreTags && !platformTagLoading) {
+                                    loadPlatformTags(tagPage + 1)
+                                  }
+                                }}
+                              >
+                                {filteredPlatformTags.map((tag) => {
+                                  const active = selTagIds.includes(tag.id)
+                                  return (
+                                    <button
+                                      key={tag.id}
+                                      type="button"
+                                      onClick={() => togglePlatformTag(tag)}
+                                      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
+                                        active
+                                          ? "border-[#e8b37f] bg-[#fdf0e2] text-[#b06017]"
+                                          : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f] hover:bg-[#fdf5eb]"
+                                      }`}
+                                    >
+                                      #{tag.name}
+                                      {active && <IconCheck className="size-3" />}
+                                    </button>
+                                  )
+                                })}
+                                {filteredPlatformTags.length === 0 && !platformTagLoading && (
+                                  <p className="text-[11px] italic text-muted-foreground py-1">Không tìm thấy</p>
+                                )}
+                                {platformTagLoading && platformTags.length > 0 && (
+                                  <div className="w-full flex justify-center py-1">
+                                    <IconLoader2 className="size-3 animate-spin text-muted-foreground" />
+                                  </div>
+                                )}
+                                {!hasMoreTags && platformTags.length > 0 && (
+                                  <p className="w-full text-center text-[10px] text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
+                                )}
+                              </div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
                   )}

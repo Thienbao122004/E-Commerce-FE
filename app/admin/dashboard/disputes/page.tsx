@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { supabase } from "@/lib/supabase"
 import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes"
 import {
   DisputeStatus, DisputeStatusLabels, DisputeStatusColors,
@@ -53,11 +52,8 @@ export default function DisputesPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setLoading(false); return }
     try {
-      const res = await fetchDisputes(token, pg, ps, null, null)
+      const res = await fetchDisputes(pg, ps, null, null)
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
     finally { setLoading(false) }
@@ -77,13 +73,10 @@ export default function DisputesPage() {
       if (approvedAmount > dialogDispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
     }
     setActionLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) { setActionLoading(false); return }
     try {
       const res = dialogType === "approve"
-        ? await approveRefund(token, dialogDispute.id, approvedAmount, resolution, adminNote || undefined)
-        : await rejectDispute(token, dialogDispute.id, resolution, adminNote || undefined)
+        ? await approveRefund(dialogDispute.id, approvedAmount, resolution, adminNote || undefined)
+        : await rejectDispute(dialogDispute.id, resolution, adminNote || undefined)
       if (res.success) { toast.success(res.message ?? "Thao tác thành công"); setDialogDispute(null); setDialogType(null); load() }
       else toast.error(res.message ?? "Lỗi")
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }

@@ -128,7 +128,6 @@ type View = "list" | "chat"
 
 export function ChatWidget() {
   const { session, user, isLoading: authLoading } = useAuth()
-  const token = session?.access_token
   const currentUserId = user?.id
 
   const [open, setOpen] = useState(false)
@@ -153,11 +152,10 @@ export function ChatWidget() {
 
   const toggleMuteConversation = useCallback(
     async (convId: string) => {
-      if (!token) return
       const current = conversations.find((c) => c.id === convId)
       const next = !(current?.isMuted ?? false)
       try {
-        await setConversationMuted(token, convId, next)
+        await setConversationMuted(convId, next)
         setConversations((prev) =>
           prev.map((c) => (c.id === convId ? { ...c, isMuted: next } : c))
         )
@@ -168,14 +166,13 @@ export function ChatWidget() {
         toast.error("Không cập nhật được thông báo")
       }
     },
-    [token, conversations, setConversations, setActiveConv]
+    [conversations, setConversations, setActiveConv]
   )
 
   const hideConversationFromList = useCallback(
     async (convId: string) => {
-      if (!token) return
       try {
-        await hideConversationForUser(token, convId)
+        await hideConversationForUser(convId)
         setConversations((prev) => prev.filter((c) => c.id !== convId))
         setActiveConv((prev) => (prev?.id === convId ? null : prev))
         setView("list")
@@ -189,7 +186,6 @@ export function ChatWidget() {
       }
     },
     [
-      token,
       setConversations,
       setActiveConv,
       setView,
@@ -200,7 +196,7 @@ export function ChatWidget() {
   )
 
   const openChatByShop = useCallback(async (shopId: string, product?: ChatProductInfo) => {
-    if (!token || !shopId) return
+    if (!shopId) return
 
     setOpen(true)
     if (product) {
@@ -208,7 +204,7 @@ export function ChatWidget() {
     }
 
     try {
-      const conv = await startOrGetConversation(token, shopId)
+      const conv = await startOrGetConversation(shopId)
       setActiveConv(conv)
       setView("chat")
 
@@ -218,12 +214,12 @@ export function ChatWidget() {
         messageCacheRef.current[conv.id] = dedupedCached
         setMessages(dedupedCached)
       } else {
-        const detail = await fetchMessages(token, conv.id, 1, 50)
+        const detail = await fetchMessages(conv.id, 1, 50)
         const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
         messageCacheRef.current[conv.id] = fetchedMessages
         setMessages(fetchedMessages)
       }
-      await markAsRead(token, conv.id).catch(() => {})
+      await markAsRead(conv.id).catch(() => {})
 
       setConversations((prev) => {
         const exists = prev.some((c) => c.id === conv.id)
@@ -233,7 +229,7 @@ export function ChatWidget() {
     } catch {
       // silent
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -295,7 +291,7 @@ export function ChatWidget() {
   )
 
   // Don't render if not logged in or still loading
-  if (authLoading || !token) return null
+  if (authLoading || !session) return null
 
   return (
     <>
@@ -321,7 +317,6 @@ export function ChatWidget() {
           style={{ width: activeConv ? "640px" : "270px", height: "460px", maxHeight: "74vh", transition: "width 0.25s ease" }}
         >
           <ChatWidgetInner
-            token={token}
             currentUserId={currentUserId}
             view={view}
             setView={setView}
@@ -373,7 +368,6 @@ export function ChatWidget() {
 // ─── Inner Component ────────────────────────────────────────────────────────
 
 type InnerProps = {
-  token: string
   currentUserId?: string
   view: View
   setView: (v: View) => void
@@ -412,7 +406,7 @@ type InnerProps = {
 }
 
 function ChatWidgetInner({
-  token, currentUserId, setView,
+  currentUserId, setView,
   conversations, setConversations,
   activeConv, setActiveConv,
   messages, setMessages,
@@ -429,19 +423,20 @@ function ChatWidgetInner({
   onToggleMute,
   onHideConversation,
 }: InnerProps) {
+  const { session } = useAuth()
+  const token = session?.access_token
   const shouldBootstrapConversationsRef = useRef(conversations.length === 0)
-
   const loadConversations = useCallback(async (withLoading = false) => {
     if (withLoading) setLoading(true)
     try {
-      const data = await fetchConversations(token)
+      const data = await fetchConversations()
       setConversations(data)
     } catch {
 
     } finally {
       if (withLoading) setLoading(false)
     }
-  }, [token, setConversations, setLoading])
+  }, [setConversations, setLoading])
 
   useEffect(() => {
     if (shouldBootstrapConversationsRef.current) {
@@ -459,18 +454,18 @@ function ChatWidgetInner({
       messageCacheRef.current[convId] = dedupedCached
       setMessages(dedupedCached)
       setLoadingMessages(false)
-      await markAsRead(token, convId).catch(() => {})
+      await markAsRead(convId).catch(() => {})
       setConversations((prev) => prev.map((c) => c.id === convId ? { ...c, unreadCount: 0 } : c))
       return
     }
 
     setLoadingMessages(true)
     try {
-      const detail = await fetchMessages(token, convId, 1, 50)
+      const detail = await fetchMessages(convId, 1, 50)
       const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
       messageCacheRef.current[convId] = fetchedMessages
       setMessages(fetchedMessages)
-      await markAsRead(token, convId).catch(() => {})
+      await markAsRead(convId).catch(() => {})
       setConversations((prev) =>
         prev.map((c) => c.id === convId ? { ...c, unreadCount: 0 } : c)
       )
@@ -479,10 +474,10 @@ function ChatWidgetInner({
     } finally {
       setLoadingMessages(false)
     }
-  }, [token, setMessages, setLoadingMessages, setConversations, messageCacheRef])
+  }, [setMessages, setLoadingMessages, setConversations, messageCacheRef])
 
   useEffect(() => {
-    const connection = createChatRealtimeConnection(token, {
+    const connection = createChatRealtimeConnection(session?.access_token, {
       onConversationUpdated: (incoming: ConversationDto) => {
       if (!incoming?.id) return
       setConversations((prev) => {
@@ -554,7 +549,6 @@ function ChatWidgetInner({
       void disposeChatRealtimeConnection(connection)
     }
   }, [
-    token,
     setConversations,
     setActiveConv,
     setMessages,
@@ -596,7 +590,7 @@ function ChatWidgetInner({
     setSending(true)
     try {
       if (content) {
-        const textMsg = await sendMessage(token, activeConv.id, content, "text")
+        const textMsg = await sendMessage(activeConv.id, content, "text")
         setMessages((prev) => (prev.some((m) => m.id === textMsg.id) ? prev : [...prev, textMsg]))
         const cached = messageCacheRef.current[activeConv.id] ?? []
         if (!cached.some((m) => m.id === textMsg.id)) {
@@ -608,7 +602,7 @@ function ChatWidgetInner({
       }
 
       if (attachedImage) {
-        const imageMsg = await sendMessage(token, activeConv.id, attachedImage, "image")
+        const imageMsg = await sendMessage(activeConv.id, attachedImage, "image")
         setMessages((prev) => (prev.some((m) => m.id === imageMsg.id) ? prev : [...prev, imageMsg]))
         const cached = messageCacheRef.current[activeConv.id] ?? []
         if (!cached.some((m) => m.id === imageMsg.id)) {

@@ -3,6 +3,29 @@ import { getAccessToken } from "@/lib/auth"
 const AI_BASE_URL =
   process.env.NEXT_PUBLIC_AI_URL || "http://localhost:5001"
 
+import type {
+  SuggestCategoryResponse,
+  SuggestTagsResponse,
+  SuggestMaterialsResponse,
+  AnalyzeImageResponse,
+  AnalyzeProductResponse,
+  TagSuggestionLogResponse,
+} from "@/types/ai-seller"
+
+export type {
+  CategorySuggestion,
+  TagSuggestion,
+  MaterialSuggestion,
+  SuggestCategoryResponse,
+  SuggestTagsResponse,
+  SuggestMaterialsResponse,
+  AnalyzeImageResponse,
+  AnalyzeProductResponse,
+  TagSuggestionItem,
+  TagSuggestionLogItem,
+  TagSuggestionLogResponse,
+} from "@/types/ai-seller"
+
 async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
   const token = await getAccessToken()
   const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
@@ -19,60 +42,6 @@ async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
   }
   return res.json()
 }
-
-
-export type CategorySuggestion = {
-  categoryId: number
-  categoryName: string
-  categoryPath: string
-  confidenceScore: number
-}
-
-export type TagSuggestion = {
-  tagId: number
-  tagName: string
-  confidence?: number
-}
-
-export type MaterialSuggestion = {
-  materialId: string
-  materialName: string
-  confidence?: number
-}
-
-export type SuggestCategoryResponse = {
-  suggestions: CategorySuggestion[]
-  logId: string | null
-}
-
-export type SuggestTagsResponse = {
-  suggestions: TagSuggestion[]
-  logId: string | null
-}
-
-export type SuggestMaterialsResponse = {
-  suggestions: MaterialSuggestion[]
-  logId: string | null
-}
-
-export type AnalyzeImageResponse = {
-  quality: {
-    score: number
-    rating: string
-    hasGoodLighting: boolean
-    hasCleanBackground: boolean
-    isProductCentered: boolean
-    hasHighResolution: boolean
-  }
-  suggestedCategories: CategorySuggestion[]
-  suggestedTags: TagSuggestion[]
-  suggestedMaterials: MaterialSuggestion[]
-  improvements: string[]
-  summary: string
-  success: boolean
-  errorMessage?: string
-}
-
 
 /** Gợi ý danh mục từ tên + mô tả + ảnh */
 export function aiSuggestCategory(params: {
@@ -134,14 +103,6 @@ export function aiSendFeedback(params: {
   })
 }
 
-export type AnalyzeProductResponse = {
-  categories: CategorySuggestion[]
-  tags: TagSuggestion[]
-  materials: MaterialSuggestion[]
-  success: boolean
-  errorMessage?: string
-}
-
 /**
  * Phân tích sản phẩm (text-only) — 1 Gemini call thay cho suggest-category + suggest-tags + suggest-materials.
  * Kết quả đã được post-validate: chỉ trả về IDs thực sự tồn tại trong DB.
@@ -171,8 +132,6 @@ export function aiAnalyzeImage(params: {
   })
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 async function aiGet<T>(endpoint: string): Promise<T> {
   const token = await getAccessToken()
   const res = await fetch(`${AI_BASE_URL}${endpoint}`, {
@@ -187,35 +146,6 @@ async function aiGet<T>(endpoint: string): Promise<T> {
     throw new Error((err as { message?: string }).message ?? "AI request failed")
   }
   return res.json()
-}
-
-// ── Tag Suggestion Log ────────────────────────────────────────────────────────
-
-/** Format item trong suggested_tags JSONB: {"tag": "vải cotton", "confidence": 0.95} */
-export type TagSuggestionItem = {
-  tag: string
-  confidence: number
-}
-
-export type TagSuggestionLogItem = {
-  id: string
-  productId: string
-  inputTitle: string | null
-  suggestedCategoryId: number | null
-  /** AI gợi ý: [{tag: "vải cotton", confidence: 0.95}] */
-  suggestedTags: TagSuggestionItem[]
-  /** Seller đã chọn cuối cùng: ["vải cotton", "tối giản"] */
-  chosenTags: string[]
-  action: "accepted" | "modified" | "rejected"
-  createdAt: string
-}
-
-export type TagSuggestionLogResponse = {
-  items: TagSuggestionLogItem[]
-  total: number
-  accepted: number
-  modified: number
-  rejected: number
 }
 
 /** Lấy lịch sử gợi ý tags của seller */

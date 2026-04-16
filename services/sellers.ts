@@ -1,10 +1,8 @@
+import { api } from "@/lib/api-client"
 import type { ShopListResponse, ShopResponse } from "@/types/seller"
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
 // ---------- List ----------
-export async function fetchSellers(
-  token: string,
+export function fetchSellers(
   page = 1,
   pageSize = 10,
   verificationStatus?: number | null
@@ -15,107 +13,35 @@ export async function fetchSellers(
   })
   if (verificationStatus !== null && verificationStatus !== undefined)
     params.set("verificationStatus", String(verificationStatus))
-
-  const res = await fetch(`${API}/api/admin/sellers?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh sách người bán")
-  return res.json()
+  return api.get<ShopListResponse>(`/api/admin/sellers?${params}`)
 }
 
 // ---------- Detail ----------
-export async function fetchSellerById(
-  token: string,
-  shopId: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải thông tin shop")
-  return res.json()
+export function fetchSellerById(shopId: string): Promise<ShopResponse> {
+  return api.get<ShopResponse>(`/api/admin/sellers/${shopId}`)
 }
 
 // ---------- Approve ----------
-export async function approveSeller(
-  token: string,
-  shopId: string,
-  note?: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}/approve`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ note }),
-  })
-  if (!res.ok) throw new Error("Lỗi duyệt shop")
-  return res.json()
+export function approveSeller(shopId: string, note?: string): Promise<ShopResponse> {
+  return api.post<ShopResponse>(`/api/admin/sellers/${shopId}/approve`, { note })
 }
 
 // ---------- Reject ----------
-export async function rejectSeller(
-  token: string,
-  shopId: string,
-  reason: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}/reject`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason }),
-  })
-  if (!res.ok) throw new Error("Lỗi từ chối shop")
-  return res.json()
+export function rejectSeller(shopId: string, reason: string): Promise<ShopResponse> {
+  return api.post<ShopResponse>(`/api/admin/sellers/${shopId}/reject`, { reason })
 }
 
 // ---------- Activate ----------
-export async function activateSeller(
-  token: string,
-  shopId: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}/activate`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi kích hoạt shop")
-  return res.json()
+export function activateSeller(shopId: string): Promise<ShopResponse> {
+  return api.post<ShopResponse>(`/api/admin/sellers/${shopId}/activate`)
 }
 
 // ---------- Suspend ----------
-export async function suspendSeller(
-  token: string,
-  shopId: string,
-  reason: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}/suspend`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason }),
-  })
-  if (!res.ok) throw new Error("Lỗi đình chỉ shop")
-  return res.json()
+export function suspendSeller(shopId: string, reason: string): Promise<ShopResponse> {
+  return api.post<ShopResponse>(`/api/admin/sellers/${shopId}/suspend`, { reason })
 }
 
 // ---------- Close ----------
-export async function closeSeller(
-  token: string,
-  shopId: string,
-  reason: string
-): Promise<ShopResponse> {
-  const res = await fetch(`${API}/api/admin/sellers/${shopId}/close`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason }),
-  })
-  if (!res.ok) throw new Error("Lỗi đóng cửa shop")
-  return res.json()
+export function closeSeller(shopId: string, reason: string): Promise<ShopResponse> {
+  return api.post<ShopResponse>(`/api/admin/sellers/${shopId}/close`, { reason })
 }
