@@ -1,10 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { IconSparkles, IconAlertCircle, IconBulb } from "@tabler/icons-react"
+import { IconSparkles, IconAlertCircle, IconBulb, IconDownload } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { generateReport } from "@/services/ai-admin"
 import type { GenerateReportResponse } from "@/services/ai-admin"
+import {
+  downloadAdminReportCsv,
+  downloadAdminReportExcel,
+  downloadAdminReportJson,
+  downloadAdminReportMarkdown,
+  downloadAdminReportPdf,
+} from "@/lib/export-admin-report"
 
 import { AiText, BulletList, fmtDateTime, daysAgo, today } from "./ai-shared"
 
@@ -77,11 +90,100 @@ export function ReportTab() {
       {loading && <Skeleton className="h-64 rounded-xl" />}
       {data && (
         <div className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            Báo cáo <strong>{reportTypeLabels[data.reportType]}</strong> &nbsp;·&nbsp;
-            {new Date(data.fromDate).toLocaleDateString("vi-VN")} — {new Date(data.toDate).toLocaleDateString("vi-VN")} &nbsp;·&nbsp;
-            Tạo lúc {fmtDateTime(data.generatedAt)}
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Báo cáo <strong>{reportTypeLabels[data.reportType]}</strong> &nbsp;·&nbsp;
+              {new Date(data.fromDate).toLocaleDateString("vi-VN")} — {new Date(data.toDate).toLocaleDateString("vi-VN")} &nbsp;·&nbsp;
+              Tạo lúc {fmtDateTime(data.generatedAt)}
+            </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5">
+                  <IconDownload className="size-4" />
+                  Xuất báo cáo
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      downloadAdminReportMarkdown(data, {
+                        reportLabel: reportTypeLabels[data.reportType] ?? data.reportType,
+                        additionalContext: form.additionalContext,
+                      })
+                      toast.success("Đã tải file Markdown")
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Không xuất được file")
+                    }
+                  }}
+                >
+                  Tải Markdown (.md)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      downloadAdminReportJson(data, {
+                        reportLabel: reportTypeLabels[data.reportType] ?? data.reportType,
+                        additionalContext: form.additionalContext,
+                      })
+                      toast.success("Đã tải file JSON")
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Không xuất được file")
+                    }
+                  }}
+                >
+                  Tải JSON (.json)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    const id = toast.loading("Đang tạo PDF...")
+                    try {
+                      await downloadAdminReportPdf(data, {
+                        reportLabel: reportTypeLabels[data.reportType] ?? data.reportType,
+                        additionalContext: form.additionalContext,
+                      })
+                      toast.success("Đã tải file PDF", { id })
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Không tạo được PDF", { id })
+                    }
+                  }}
+                >
+                  Xuất PDF (.pdf)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    const id = toast.loading("Đang tạo Excel...")
+                    try {
+                      await downloadAdminReportExcel(data, {
+                        reportLabel: reportTypeLabels[data.reportType] ?? data.reportType,
+                        additionalContext: form.additionalContext,
+                      })
+                      toast.success("Đã tải file Excel", { id })
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Không xuất được Excel", { id })
+                    }
+                  }}
+                >
+                  Xuất Excel (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    try {
+                      downloadAdminReportCsv(data, {
+                        reportLabel: reportTypeLabels[data.reportType] ?? data.reportType,
+                        additionalContext: form.additionalContext,
+                      })
+                      toast.success("Đã tải file CSV")
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Không xuất được CSV")
+                    }
+                  }}
+                >
+                  Tải CSV (.csv)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">

@@ -119,6 +119,14 @@ function confidenceText(score?: number) {
   return `${Math.round(score * 100)}%`
 }
 
+/** Normalize tag id: API may return string or tag_id (snake_case). */
+function parseTagIdFromSuggestion(tag: TagSuggestion & { tag_id?: unknown }): number | null {
+  const raw: unknown = (tag as TagSuggestion & { tag_id?: unknown }).tagId ?? tag.tag_id
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw
+  if (typeof raw === "string" && /^\d+$/.test(raw.trim())) return parseInt(raw.trim(), 10)
+  return null
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -372,7 +380,8 @@ export default function CreateProductPage() {
     )
     setTagSuggestions(tags ?? [])
     setSelTagIds(
-      (tags ?? []).map((t) => t.tagId).filter((id): id is number => typeof id === "number")
+      (tags ?? []).map((t) => parseTagIdFromSuggestion(t as TagSuggestion & { tag_id?: unknown }))
+        .filter((id): id is number => id != null)
     )
     setMatSuggestions(materials ?? [])
     setSelMatIds(
@@ -441,7 +450,8 @@ export default function CreateProductPage() {
         // Merge tags: dedup theo tagId, ưu tiên image kết quả trước, top 10
         const tagMap = new Map<number, TagSuggestion>()
         for (const tag of [...(imageRes?.suggestedTags ?? []), ...(textRes?.tags ?? [])]) {
-          if (tag.tagId != null && !tagMap.has(tag.tagId)) tagMap.set(tag.tagId, tag)
+          const tid = parseTagIdFromSuggestion(tag as TagSuggestion & { tag_id?: unknown })
+          if (tid != null && !tagMap.has(tid)) tagMap.set(tid, { ...tag, tagId: tid })
         }
         const mergedTags = [...tagMap.values()].slice(0, 10)
 
@@ -494,9 +504,13 @@ export default function CreateProductPage() {
   }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
-    setSelCategory(cat)
-    setSelTagIds([])
-    setSelMatIds([])
+    setSelCategory((prev) => {
+      if (prev?.categoryId !== cat.categoryId) {
+        setSelTagIds([])
+        setSelMatIds([])
+      }
+      return cat
+    })
   }
 
   const handleSubmit = async () => {
@@ -1066,7 +1080,6 @@ export default function CreateProductPage() {
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <ConfidenceDot score={cat.confidenceScore} />
-                              <IconPencil className={`size-3.5 ${active ? "text-[#607b4a]" : "text-[#8f9f82]"}`} />
                               {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
                             </div>
                           </button>
@@ -1268,7 +1281,7 @@ export default function CreateProductPage() {
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {tagSuggestions.map((tag, idx) => {
-                        const tagId = typeof tag.tagId === "number" ? tag.tagId : null
+                        const tagId = parseTagIdFromSuggestion(tag as TagSuggestion & { tag_id?: unknown })
                         const active = tagId !== null ? selTagIds.includes(tagId) : false
                         return (
                           <button
