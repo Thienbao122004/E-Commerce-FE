@@ -535,13 +535,16 @@ function ShopioAvatar({ size = "sm" }: { size?: "xs" | "sm" | "md" }) {
 }
 
 export function ShopioAssistantWidget() {
-  const {isLoading: authLoading } = useAuth()
+  const { session, isLoading: authLoading } = useAuth()
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<"list" | "chat">("list")
   const [sessions, setSessions] = useState<AiSessionSummary[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionSearch, setSessionSearch] = useState("")
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all")
+
+  // Hide widget if user is not logged in
+  if (!session && !authLoading) return null;
 
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<UiMessage[]>([])
