@@ -533,6 +533,15 @@ function OrderCard({
   const canPayNow = order.status === 0
   const canCancel = order.status >= 0 && order.status <= 3
   const canReorder = REORDERABLE_STATUSES.has(order.status)
+  
+  const DISPUTE_WINDOW_DAYS = 7
+  const DISPUTE_ALLOWED_STATUSES = new Set([5, 6])
+  const canDispute = (() => {
+    if (!DISPUTE_ALLOWED_STATUSES.has(order.status)) return false
+    const daysSince = (Date.now() - new Date(order.updatedAt ?? order.createdAt).getTime()) / 86400000
+    return daysSince <= DISPUTE_WINDOW_DAYS
+  })()
+
   /** Đơn hoàn thành và còn ít nhất một sản phẩm chưa đánh giá (theo DB). */
   const canReview =
     order.status === 6 && order.items.some((i) => i.hasReviewedByUser !== true)
@@ -680,6 +689,15 @@ function OrderCard({
                 <Star size={14} />
                 <span>Đánh Giá</span>
               </button>
+            )}
+            {canDispute && (
+              <Link
+                href={`/user/purchase/${order.id}`}
+                className="text-sm px-4 py-1.5 rounded transition-colors inline-flex items-center gap-1.5"
+                style={{ borderColor: '#fdba74', color: '#ea580c', border: '1px solid currentColor' }}
+              >
+                <span>Khiếu Nại</span>
+              </Link>
             )}
             {canReorder && (
               <button
