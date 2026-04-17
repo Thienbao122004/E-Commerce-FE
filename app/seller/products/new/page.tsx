@@ -27,7 +27,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
   aiAnalyzeProduct,
@@ -230,6 +235,8 @@ export default function CreateProductPage() {
   const [hasMoreMats, setHasMoreMats] = React.useState(true)
   const [hasMoreTags, setHasMoreTags] = React.useState(true)
   const [hasAnalyzed, setHasAnalyzed] = React.useState(false)
+  const [matDialogOpen, setMatDialogOpen] = React.useState(false)
+  const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
 
   const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
   const [selTagIds, setSelTagIds] = React.useState<number[]>([])
@@ -1185,82 +1192,112 @@ export default function CreateProductPage() {
                         )
                       })}
 
-                      {matSuggestions.length === 0 && (
+                      {platformMaterials
+                        .filter(
+                          (mat) =>
+                            selMatIds.includes(mat.id) &&
+                            !matSuggestions.some((m) => m.materialId === mat.id)
+                        )
+                        .map((mat) => (
+                          <button
+                            key={`platform-mat-${mat.id}`}
+                            type="button"
+                            onClick={() => togglePlatformMat(mat)}
+                            className="inline-flex items-center gap-1 rounded-full border border-[#8ea27a] bg-white px-3 py-1 text-xs font-medium text-[#415337] transition-all hover:border-red-300 hover:text-red-500"
+                          >
+                            {mat.name}
+                            <IconCheck className="size-3.5" />
+                          </button>
+                        ))}
+
+                      {matSuggestions.length === 0 &&
+                        platformMaterials.filter(
+                          (mat) =>
+                            selMatIds.includes(mat.id) &&
+                            !matSuggestions.some((m) => m.materialId === mat.id)
+                        ).length === 0 && (
                         <span className="text-[11px] italic text-[#8a9a80]">
                           Không có gợi ý từ AI
                         </span>
                       )}
 
-                      {/* „+“ badge mở Popover chọn từ nền tảng */}
                       {hasAnalyzed && (
-                        <Popover onOpenChange={(open) => { if (open) loadPlatformMaterials(1) }}>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center size-7 rounded-full border-2 border-dashed border-[#9db183] bg-white text-[#6b7f5e] hover:border-[#5a7248] hover:bg-[#f2f7ee] transition-all"
-                              title="Chọn chất liệu từ nền tảng"
-                            >
-                              <IconPlus className="size-3.5" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" className="w-72 p-3">
-                            <p className="mb-2 text-[11px] font-semibold text-[#44553a] uppercase tracking-wide">Chất liệu nền tảng</p>
-                            <div className="relative mb-2">
-                              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
-                              <Input
-                                value={platformMatQuery}
-                                onChange={(e) => setPlatformMatQuery(e.target.value)}
-                                placeholder="Tìm chất liệu..."
-                                className="h-7 pl-7 text-[11px]"
-                              />
-                            </div>
-                            {platformMatLoading && platformMaterials.length === 0 ? (
-                              <div className="flex items-center gap-2 py-3 text-[11px] text-muted-foreground">
-                                <IconLoader2 className="size-3 animate-spin" /> Đang tải...
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setMatDialogOpen(true); loadPlatformMaterials(1) }}
+                            className="inline-flex items-center justify-center size-7 rounded-full border-2 border-dashed border-[#9db183] bg-white text-[#6b7f5e] hover:border-[#5a7248] hover:bg-[#f2f7ee] transition-all"
+                            title="Chọn chất liệu từ nền tảng"
+                          >
+                            <IconPlus className="size-3.5" />
+                          </button>
+
+                          <Dialog open={matDialogOpen} onOpenChange={setMatDialogOpen}>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle className="text-sm font-semibold text-[#44553a]">Chọn chất liệu</DialogTitle>
+                              </DialogHeader>
+                              <div className="relative">
+                                <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                                <Input
+                                  value={platformMatQuery}
+                                  onChange={(e) => setPlatformMatQuery(e.target.value)}
+                                  placeholder="Tìm chất liệu..."
+                                  className="h-9 pl-8 text-sm"
+                                  autoFocus
+                                />
                               </div>
-                            ) : (
-                              <div
-                                className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto"
-                                onScroll={(e) => {
-                                  const el = e.currentTarget
-                                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60 && hasMoreMats && !platformMatLoading) {
-                                    loadPlatformMaterials(matPage + 1)
-                                  }
-                                }}
-                              >
-                                {filteredPlatformMaterials.map((mat) => {
-                                  const active = selMatIds.includes(mat.id)
-                                  return (
-                                    <button
-                                      key={mat.id}
-                                      type="button"
-                                      onClick={() => togglePlatformMat(mat)}
-                                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                                        active
-                                          ? "border-[#8ea27a] bg-[#e9f0e2] text-[#415337]"
-                                          : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a] hover:bg-[#f2f6ee]"
-                                      }`}
-                                    >
-                                      {mat.name}
-                                      {active && <IconCheck className="size-3" />}
-                                    </button>
-                                  )
-                                })}
-                                {filteredPlatformMaterials.length === 0 && !platformMatLoading && (
-                                  <p className="text-[11px] italic text-muted-foreground py-1">Không tìm thấy</p>
-                                )}
-                                {platformMatLoading && platformMaterials.length > 0 && (
-                                  <div className="w-full flex justify-center py-1">
-                                    <IconLoader2 className="size-3 animate-spin text-muted-foreground" />
-                                  </div>
-                                )}
-                                {!hasMoreMats && platformMaterials.length > 0 && (
-                                  <p className="w-full text-center text-[10px] text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
-                                )}
-                              </div>
-                            )}
-                          </PopoverContent>
-                        </Popover>
+                              {platformMatLoading && platformMaterials.length === 0 ? (
+                                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                                  <IconLoader2 className="size-4 animate-spin" /> Đang tải...
+                                </div>
+                              ) : (
+                                <div
+                                  className="flex flex-wrap gap-2 max-h-72 overflow-y-auto py-1 pr-1"
+                                  onScroll={(e) => {
+                                    const el = e.currentTarget
+                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && hasMoreMats && !platformMatLoading) {
+                                      loadPlatformMaterials(matPage + 1)
+                                    }
+                                  }}
+                                >
+                                  {filteredPlatformMaterials.map((mat) => {
+                                    const active = selMatIds.includes(mat.id)
+                                    return (
+                                      <button
+                                        key={mat.id}
+                                        type="button"
+                                        onClick={() => togglePlatformMat(mat)}
+                                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                                          active
+                                            ? "border-[#8ea27a] bg-[#e9f0e2] text-[#415337]"
+                                            : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a] hover:bg-[#f2f6ee]"
+                                        }`}
+                                      >
+                                        {mat.name}
+                                        {active && <IconCheck className="size-3.5" />}
+                                      </button>
+                                    )
+                                  })}
+                                  {filteredPlatformMaterials.length === 0 && !platformMatLoading && (
+                                    <p className="w-full text-center text-sm italic text-muted-foreground py-4">Không tìm thấy chất liệu</p>
+                                  )}
+                                  {platformMatLoading && platformMaterials.length > 0 && (
+                                    <div className="w-full flex justify-center py-2">
+                                      <IconLoader2 className="size-4 animate-spin text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  {!hasMoreMats && platformMaterials.length > 0 && (
+                                    <p className="w-full text-center text-xs text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
+                                  )}
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                Đã chọn: <span className="font-semibold text-foreground">{selMatIds.length}</span> chất liệu
+                              </p>
+                            </DialogContent>
+                          </Dialog>
+                        </>
                       )}
                     </div>
                   )}
@@ -1292,94 +1329,133 @@ export default function CreateProductPage() {
                               toggleTag(tagId)
                             }}
                             disabled={tagId === null}
-                            className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
+                            className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
                               active
                                 ? "border-[#e8b37f] bg-white text-[#b06017]"
                                 : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f]"
                             }`}
                           >
                             #{tag.tagName}
+                            {active && <IconCheck className="size-3" />}
                           </button>
                         )
                       })}
 
-                      {tagSuggestions.length === 0 && selCategory && !tagLoading && (
+                      {/* Chip cho tag được chọn từ platform (không có trong AI suggestions) */}
+                      {platformTags
+                        .filter(
+                          (t) =>
+                            selTagIds.includes(t.id) &&
+                            !tagSuggestions.some(
+                              (s) => parseTagIdFromSuggestion(s as TagSuggestion & { tag_id?: unknown }) === t.id
+                            )
+                        )
+                        .map((t) => (
+                          <button
+                            key={`platform-tag-${t.id}`}
+                            type="button"
+                            onClick={() => togglePlatformTag(t)}
+                            className="inline-flex items-center gap-1 rounded-md border border-[#e8b37f] bg-white px-2.5 py-1 text-xs font-medium text-[#b06017] transition-all hover:border-red-300 hover:text-red-500"
+                          >
+                            #{t.name}
+                            <IconCheck className="size-3" />
+                          </button>
+                        ))}
+
+                      {tagSuggestions.length === 0 &&
+                        platformTags.filter(
+                          (t) =>
+                            selTagIds.includes(t.id) &&
+                            !tagSuggestions.some(
+                              (s) => parseTagIdFromSuggestion(s as TagSuggestion & { tag_id?: unknown }) === t.id
+                            )
+                        ).length === 0 &&
+                        selCategory && !tagLoading && (
                         <span className="text-[11px] italic text-[#8a9a80]">Không có gợi ý tag từ AI</span>
                       )}
 
-                      {/* „+“ badge mở Popover chọn từ nền tảng */}
+                      {/* „+" badge mở Popover chọn từ nền tảng */}
                       {hasAnalyzed && (
-                        <Popover onOpenChange={(open) => { if (open) loadPlatformTags(1) }}>
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center size-7 rounded-md border-2 border-dashed border-[#e8b37f] bg-white text-[#c06f2a] hover:border-[#d49640] hover:bg-[#fdf5eb] transition-all"
-                              title="Chọn thẻ từ nền tảng"
-                            >
-                              <IconPlus className="size-3.5" />
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" className="w-72 p-3">
-                            <p className="mb-2 text-[11px] font-semibold text-[#8a3d05] uppercase tracking-wide">Thẻ nền tảng</p>
-                            <div className="relative mb-2">
-                              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
-                              <Input
-                                value={platformTagQuery}
-                                onChange={(e) => setPlatformTagQuery(e.target.value)}
-                                placeholder="Tìm thẻ..."
-                                className="h-7 pl-7 text-[11px]"
-                              />
-                            </div>
-                            {platformTagLoading && platformTags.length === 0 ? (
-                              <div className="flex items-center gap-2 py-3 text-[11px] text-muted-foreground">
-                                <IconLoader2 className="size-3 animate-spin" /> Đang tải...
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setTagDialogOpen(true); loadPlatformTags(1) }}
+                            className="inline-flex items-center justify-center size-7 rounded-md border-2 border-dashed border-[#e8b37f] bg-white text-[#c06f2a] hover:border-[#d49640] hover:bg-[#fdf5eb] transition-all"
+                            title="Chọn thẻ từ nền tảng"
+                          >
+                            <IconPlus className="size-3.5" />
+                          </button>
+
+                          <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle className="text-sm font-semibold text-[#8a3d05]">Chọn thẻ</DialogTitle>
+                              </DialogHeader>
+                              <div className="relative">
+                                <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                                <Input
+                                  value={platformTagQuery}
+                                  onChange={(e) => setPlatformTagQuery(e.target.value)}
+                                  placeholder="Tìm thẻ..."
+                                  className="h-9 pl-8 text-sm"
+                                  autoFocus
+                                />
                               </div>
-                            ) : (
-                              <div
-                                className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto"
-                                onScroll={(e) => {
-                                  const el = e.currentTarget
-                                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60 && hasMoreTags && !platformTagLoading) {
-                                    loadPlatformTags(tagPage + 1)
-                                  }
-                                }}
-                              >
-                                {filteredPlatformTags.map((tag) => {
-                                  const active = selTagIds.includes(tag.id)
-                                  return (
-                                    <button
-                                      key={tag.id}
-                                      type="button"
-                                      onClick={() => togglePlatformTag(tag)}
-                                      className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[11px] font-medium transition-all ${
-                                        active
-                                          ? "border-[#e8b37f] bg-[#fdf0e2] text-[#b06017]"
-                                          : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f] hover:bg-[#fdf5eb]"
-                                      }`}
-                                    >
-                                      #{tag.name}
-                                      {active && <IconCheck className="size-3" />}
-                                    </button>
-                                  )
-                                })}
-                                {filteredPlatformTags.length === 0 && !platformTagLoading && (
-                                  <p className="text-[11px] italic text-muted-foreground py-1">Không tìm thấy</p>
-                                )}
-                                {platformTagLoading && platformTags.length > 0 && (
-                                  <div className="w-full flex justify-center py-1">
-                                    <IconLoader2 className="size-3 animate-spin text-muted-foreground" />
-                                  </div>
-                                )}
-                                {!hasMoreTags && platformTags.length > 0 && (
-                                  <p className="w-full text-center text-[10px] text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
-                                )}
-                              </div>
-                            )}
-                          </PopoverContent>
-                        </Popover>
+                              {platformTagLoading && platformTags.length === 0 ? (
+                                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                                  <IconLoader2 className="size-4 animate-spin" /> Đang tải...
+                                </div>
+                              ) : (
+                                <div
+                                  className="flex flex-wrap gap-2 max-h-72 overflow-y-auto py-1 pr-1"
+                                  onScroll={(e) => {
+                                    const el = e.currentTarget
+                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && hasMoreTags && !platformTagLoading) {
+                                      loadPlatformTags(tagPage + 1)
+                                    }
+                                  }}
+                                >
+                                  {filteredPlatformTags.map((tag) => {
+                                    const active = selTagIds.includes(tag.id)
+                                    return (
+                                      <button
+                                        key={tag.id}
+                                        type="button"
+                                        onClick={() => togglePlatformTag(tag)}
+                                        className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all ${
+                                          active
+                                            ? "border-[#e8b37f] bg-[#fdf0e2] text-[#b06017]"
+                                            : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f] hover:bg-[#fdf5eb]"
+                                        }`}
+                                      >
+                                        #{tag.name}
+                                        {active && <IconCheck className="size-3.5" />}
+                                      </button>
+                                    )
+                                  })}
+                                  {filteredPlatformTags.length === 0 && !platformTagLoading && (
+                                    <p className="w-full text-center text-sm italic text-muted-foreground py-4">Không tìm thấy thẻ</p>
+                                  )}
+                                  {platformTagLoading && platformTags.length > 0 && (
+                                    <div className="w-full flex justify-center py-2">
+                                      <IconLoader2 className="size-4 animate-spin text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  {!hasMoreTags && platformTags.length > 0 && (
+                                    <p className="w-full text-center text-xs text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
+                                  )}
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                Đã chọn: <span className="font-semibold text-foreground">{selTagIds.length}</span> thẻ
+                              </p>
+                            </DialogContent>
+                          </Dialog>
+                        </>
                       )}
                     </div>
                   )}
+
                 </div>
 
                 {selCategory && (
