@@ -15,6 +15,7 @@ import {
 } from '@/lib/pending-payment-session'
 import { toast } from 'sonner'
 import { useGHNShippingFee } from '@/hooks/useGHNShippingFee'
+import { CheckoutAddressModal } from './_components/CheckoutAddressModal'
 import {
   AlertCircle,
   ChevronRight,
@@ -94,6 +95,18 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vnpay')
   const [checkoutItems, setCheckoutItems] = useState<CartItemWithShop[]>([])
+  const [addressModalOpen, setAddressModalOpen] = useState(false)
+
+  const reloadAddresses = useCallback(async () => {
+    try {
+      const res = await profileService.getAddresses()
+      if (res.success) {
+        setAddresses(res.data ?? [])
+      }
+    } catch {
+      toast.error('Không thể tải lại danh sách địa chỉ')
+    }
+  }, [])
 
   const enrichItemsWithShop = useCallback((items: CartItem[]): CartItemWithShop[] => {
     return items.map((item) => ({
@@ -400,13 +413,13 @@ export default function CheckoutPage() {
                 <p className="text-xs text-muted-foreground">Giao đúng địa chỉ để tránh thất lạc đơn</p>
               </div>
             </div>
-            <Link
-              href="/user/profile/addresses"
+            <button
+              onClick={() => setAddressModalOpen(true)}
               className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[rgba(236,127,19,0.08)]"
               style={{ borderColor: '#d9cec2', color: 'var(--color-primary)' }}
             >
               Thay đổi
-            </Link>
+            </button>
           </div>
           <div className="px-5 py-4">
             {selectedAddress ? (
@@ -678,6 +691,15 @@ export default function CheckoutPage() {
           </button>
         </div>
       </div>
+
+      <CheckoutAddressModal
+        open={addressModalOpen}
+        onOpenChange={setAddressModalOpen}
+        addresses={addresses}
+        selectedAddressId={selectedAddressId}
+        onSelectAddress={setSelectedAddressId}
+        onAddressUpdated={reloadAddresses}
+      />
     </div>
   )
 }
