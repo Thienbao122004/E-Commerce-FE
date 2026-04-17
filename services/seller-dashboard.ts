@@ -18,7 +18,11 @@ import type {
   WithdrawalsResponse,
   CreateWithdrawalPayload,
   SellerProductReviewsResponse,
+  SellerMaterialListResponse,
+  SellerTagListResponse,
 } from "@/types/seller-dashboard"
+
+export type { MaterialDto } from "@/types/material"
 
 // ====== Shop ======
 
@@ -161,3 +165,14 @@ export function replyToReview(reviewId: string, reply: string) {
   )
 }
 
+export function fetchSellerMaterials(page = 1, pageSize = 30, search?: string): Promise<SellerMaterialListResponse> {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (search?.trim()) params.set("search", search.trim())
+  return api.get<SellerMaterialListResponse>(`/api/seller/materials?${params}`)
+}
+
+export function fetchSellerTags(page = 1, pageSize = 30, search?: string): Promise<SellerTagListResponse> {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (search?.trim()) params.set("search", search.trim())
+  return api.get<SellerTagListResponse>(`/api/seller/tags?${params}`)
+}

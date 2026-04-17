@@ -22,7 +22,6 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { supabase } from "@/lib/supabase"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 import { formatDateVN } from "@/lib/formatters"
 import {
@@ -63,19 +62,12 @@ export default function AdminMaterialsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
   const load = React.useCallback(async () => {
     setLoading(true)
-    const tk = await getToken()
-    if (!tk) { setLoading(false); return }
     try {
       const isActive =
         activeFilter === "active" ? true : activeFilter === "inactive" ? false : undefined
-      const res = await fetchAdminMaterials(tk, page, PAGE_SIZE, debouncedSearch || undefined, isActive)
+      const res = await fetchAdminMaterials(page, PAGE_SIZE, debouncedSearch || undefined, isActive)
       if (res.success) {
         setMaterials(res.materials)
         setTotal(res.totalCount)
@@ -107,13 +99,11 @@ export default function AdminMaterialsPage() {
   const handleSave = async () => {
     if (!formName.trim()) { toast.error("Tên chất liệu không được để trống"); return }
     setActionLoading(true)
-    const tk = await getToken()
-    if (!tk) { setActionLoading(false); return }
     try {
       const data = { name: formName.trim(), description: formDesc.trim() || null }
       const res = editTarget
-        ? await updateMaterial(tk, editTarget.id, data)
-        : await createMaterial(tk, data)
+        ? await updateMaterial(editTarget.id, data)
+        : await createMaterial(data)
       if (res.success) {
         toast.success(editTarget ? "Đã cập nhật chất liệu" : "Đã tạo chất liệu mới")
         setSheetOpen(false)
@@ -130,10 +120,8 @@ export default function AdminMaterialsPage() {
 
   const handleToggle = async (m: MaterialDto) => {
     setActionLoading(true)
-    const tk = await getToken()
-    if (!tk) { setActionLoading(false); return }
     try {
-      const res = await toggleMaterialActive(tk, m.id)
+      const res = await toggleMaterialActive(m.id)
       if (res.success) {
         toast.success(m.isActive ? `Đã vô hiệu hóa "${m.name}"` : `Đã kích hoạt "${m.name}"`)
         load()
@@ -150,10 +138,8 @@ export default function AdminMaterialsPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     setActionLoading(true)
-    const tk = await getToken()
-    if (!tk) { setActionLoading(false); return }
     try {
-      const res = await deleteMaterial(tk, deleteTarget.id)
+      const res = await deleteMaterial(deleteTarget.id)
       if (res.success) {
         toast.success(`Đã xóa chất liệu "${deleteTarget.name}"`)
         setDeleteTarget(null)

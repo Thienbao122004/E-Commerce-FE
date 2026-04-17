@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchUserById, suspendUser, unsuspendUser, fetchUserAuditLogs } from "@/services/users"
 import {
   UserStatus,
@@ -38,13 +37,10 @@ export default function UserDetailPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setLoading(false); return }
     try {
       const [ur, lr] = await Promise.all([
-        fetchUserById(tk, id),
-        fetchUserAuditLogs(tk, id),
+        fetchUserById(id),
+        fetchUserAuditLogs(id),
       ])
       if (ur.success && ur.user) setUser(ur.user)
       else toast.error(ur.message ?? "Không tìm thấy")
@@ -58,11 +54,8 @@ export default function UserDetailPage() {
   const handleSuspend = async () => {
     if (!reason) return
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await suspendUser(tk, id, reason)
+      const r = await suspendUser(id, reason)
       if (r.success) { toast.success("Đã khóa tài khoản"); setSuspendDlg(false); setReason(""); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -71,11 +64,8 @@ export default function UserDetailPage() {
 
   const handleUnsuspend = async () => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await unsuspendUser(tk, id)
+      const r = await unsuspendUser(id)
       if (r.success) { toast.success("Đã mở khóa"); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }

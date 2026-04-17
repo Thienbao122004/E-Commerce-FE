@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDateVN as fmtDate } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchTags, createTag, updateTag, deleteTag } from "@/services/tags"
 import type { Tag } from "@/types/tag"
 
@@ -38,11 +37,8 @@ export default function TagsPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchTags(tk, pg, ps, search || null)
+      const r = await fetchTags(pg, ps, search || null)
       if (r.success) { setTags(r.tags); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
@@ -55,11 +51,8 @@ export default function TagsPage() {
 
   const save = async () => {
     if (!name) return; setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = edit ? await updateTag(tk, edit.id, name) : await createTag(tk, name)
+      const r = edit ? await updateTag(edit.id, name) : await createTag(name)
       if (r.success) { toast.success(r.message ?? "OK"); setDlg(false); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -68,11 +61,8 @@ export default function TagsPage() {
 
   const doDelete = async () => {
     if (!del) return; setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await deleteTag(tk, del.id)
+      const r = await deleteTag(del.id)
       if (r.success) { toast.success(r.message ?? "Đã xóa"); setDel(null); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }

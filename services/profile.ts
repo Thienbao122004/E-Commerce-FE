@@ -7,41 +7,36 @@ import type {
   AddAddressRequest,
   UpdateAddressRequest,
 } from '@/types/profile'
-
-interface ApiResponse<T> {
-  success: boolean
-  message?: string
-  data: T
-}
+import type { ApiDataResponse } from '@/types/api'
 
 export const profileService = {
   getProfile: () =>
-    api.get<ApiResponse<UserProfileResponse>>('/api/user/profile'),
+    api.get<ApiDataResponse<UserProfileResponse>>('/api/user/profile'),
 
   updateProfile: (data: UpdateProfileRequest) =>
-    api.put<ApiResponse<null>>('/api/user/profile', data),
+    api.put<ApiDataResponse<null>>('/api/user/profile', data),
 
   registerSeller: (data: RegisterSellerRequest) =>
-    api.post<ApiResponse<null>>('/api/user/register-seller', data),
+    api.post<ApiDataResponse<null>>('/api/user/register-seller', data),
 
   requestEmailChange: (newEmail: string) =>
-    api.post<ApiResponse<null>>('/api/user/profile/request-email-change', { newEmail }),
+    api.post<ApiDataResponse<null>>('/api/user/profile/request-email-change', { newEmail }),
 
   confirmEmailChange: (newEmail: string, otp: string) =>
-    api.post<ApiResponse<null>>('/api/user/profile/confirm-email-change', { newEmail, otp }),
+    api.post<ApiDataResponse<null>>('/api/user/profile/confirm-email-change', { newEmail, otp }),
 
   getAddresses: () =>
-    api.get<ApiResponse<AddressResponse[]>>('/api/user/addresses'),
+    api.get<ApiDataResponse<AddressResponse[]>>('/api/user/addresses'),
 
   addAddress: (data: AddAddressRequest) =>
-    api.post<ApiResponse<AddressResponse>>('/api/user/addresses', data),
+    api.post<ApiDataResponse<AddressResponse>>('/api/user/addresses', data),
 
   updateAddress: (addressId: string, data: UpdateAddressRequest) =>
-    api.put<ApiResponse<null>>(`/api/user/addresses/${addressId}`, data),
+    api.put<ApiDataResponse<null>>(`/api/user/addresses/${addressId}`, data),
 
   deleteAddress: (addressId: string) =>
-    api.delete<ApiResponse<null>>(`/api/user/addresses/${addressId}`),
+    api.delete<ApiDataResponse<null>>(`/api/user/addresses/${addressId}`),
 
   setDefaultAddress: (addressId: string) =>
-    api.post<ApiResponse<null>>(`/api/user/addresses/${addressId}/set-default`),
+    api.post<ApiDataResponse<null>>(`/api/user/addresses/${addressId}/set-default`),
 }

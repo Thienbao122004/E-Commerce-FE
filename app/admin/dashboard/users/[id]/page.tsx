@@ -53,7 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchAdminOrders } from "@/services/admin-orders"
 import { fetchDisputes } from "@/services/disputes"
 import {
@@ -132,14 +131,8 @@ export default function UserDetailPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setLoading(false)
-      return
-    }
     try {
-      const ur = await fetchUserById(tk, id)
+      const ur = await fetchUserById(id)
       if (ur.success && ur.user) {
         setUser(ur.user)
         setRoleEdit(ur.user.role)
@@ -149,13 +142,13 @@ export default function UserDetailPage() {
       }
 
       const [lr, ar, wr, or, dr, pr, sr] = await Promise.all([
-        fetchUserAuditLogs(tk, id),
-        fetchUserAddresses(tk, id),
-        fetchUserWalletDetails(tk, id),
-        fetchAdminOrders(tk, 1, 15, id),
-        fetchDisputes(tk, 1, 15, null, null, id),
-        fetchUserProductReviews(tk, id, 1, 15),
-        fetchUserShopReviews(tk, id, 1, 15),
+        fetchUserAuditLogs(id),
+        fetchUserAddresses(id),
+        fetchUserWalletDetails(id),
+        fetchAdminOrders(1, 15, id),
+        fetchDisputes(1, 15, null, null, id),
+        fetchUserProductReviews(id, 1, 15),
+        fetchUserShopReviews(id, 1, 15),
       ])
 
       if (lr.success) setLogs(lr.logs)
@@ -206,14 +199,8 @@ export default function UserDetailPage() {
   const handleSuspend = async () => {
     if (!reason.trim()) return
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setBusy(false)
-      return
-    }
     try {
-      const r = await suspendUser(tk, id, reason.trim())
+      const r = await suspendUser(id, reason.trim())
       if (r.success && r.user) {
         toast.success("Đã khóa tài khoản")
         setSuspendDlg(false)
@@ -230,14 +217,8 @@ export default function UserDetailPage() {
 
   const handleUnsuspend = async () => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setBusy(false)
-      return
-    }
     try {
-      const r = await unsuspendUser(tk, id)
+      const r = await unsuspendUser(id)
       if (r.success && r.user) {
         toast.success("Đã kích hoạt tài khoản")
         setUser(r.user)
@@ -252,14 +233,8 @@ export default function UserDetailPage() {
 
   const handleDeactivate = async () => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setBusy(false)
-      return
-    }
     try {
-      const r = await updateUserAccountStatus(tk, id, { status: UserStatus.Inactive })
+      const r = await updateUserAccountStatus(id, { status: UserStatus.Inactive })
       if (r.success && r.user) {
         toast.success("Đã vô hiệu hóa tài khoản")
         setUser(r.user)
@@ -275,14 +250,8 @@ export default function UserDetailPage() {
   const handleSaveRole = async () => {
     if (!roleEdit || !user || roleEdit === user.role) return
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setBusy(false)
-      return
-    }
     try {
-      const r = await updateUser(tk, id, { role: roleEdit })
+      const r = await updateUser(id, { role: roleEdit })
       if (r.success && r.user) {
         toast.success("Đã cập nhật vai trò")
         setUser(r.user)
@@ -297,14 +266,8 @@ export default function UserDetailPage() {
 
   const handlePasswordReset = async () => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) {
-      setBusy(false)
-      return
-    }
     try {
-      const r = await sendUserPasswordReset(tk, id)
+      const r = await sendUserPasswordReset(id)
       if (r.success) toast.success(r.message ?? "Đã gửi email")
       else toast.error(r.message ?? "Lỗi")
     } catch (e) {

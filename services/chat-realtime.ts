@@ -1,10 +1,9 @@
 import { HubConnection, HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr"
-import type { ConversationDto, MessageDto } from "@/services/conversations"
+import type { ConversationDto, MessageDto } from "@/types/conversation"
+import type { ChatMessageReceivedPayload } from "@/types/chat-realtime"
 
-export type ChatMessageReceivedPayload = {
-  conversationId?: string
-  message?: MessageDto
-}
+export type { ChatMessageReceivedPayload } from "@/types/chat-realtime"
+export type { ConversationDto, MessageDto } from "@/types/conversation"
 
 type ChatRealtimeHandlers = {
   onConversationUpdated?: (conversation: ConversationDto) => void

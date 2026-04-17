@@ -24,8 +24,6 @@ export default function AuthCallbackPage() {
             let sessionRetrieved = false
 
             if (code) {
-                // supabase-js automatically exchanges the code in the background when it detects it in the URL.
-                // We just need to wait for the session to be available.
                 for (let i = 0; i < 20; i++) {
                     const { data } = await supabase.auth.getSession()
                     if (data.session) {

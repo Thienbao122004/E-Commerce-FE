@@ -1,37 +1,17 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
 
-export interface StorefrontCategory {
-  id: number
-  parentId: number | null
-  code: string
-  name: string
-  slug: string
-  level: number
-  productCount: number
-  image?: string
-  subcategories: StorefrontCategory[]
-}
+import type {
+  StorefrontCategoryListResponse,
+  StorefrontCategoryTreeResponse,
+  StorefrontCategoryDetailResponse,
+} from "@/types/storefront-category"
 
-export interface StorefrontCategoryListResponse {
-  success: boolean
-  message?: string | null
-  categories: StorefrontCategory[]
-  totalCount: number
-  page: number
-  pageSize: number
-}
-
-export interface StorefrontCategoryTreeResponse {
-  success: boolean
-  message?: string | null
-  tree: StorefrontCategory[]
-}
-
-export interface StorefrontCategoryDetailResponse {
-  success: boolean
-  message?: string | null
-  category?: StorefrontCategory
-}
+export type {
+  StorefrontCategory,
+  StorefrontCategoryListResponse,
+  StorefrontCategoryTreeResponse,
+  StorefrontCategoryDetailResponse,
+} from "@/types/storefront-category"
 
 type CacheEntry<T> = {
   data: T

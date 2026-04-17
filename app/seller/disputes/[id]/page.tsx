@@ -15,7 +15,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
-import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
 import { fetchSellerDisputeById, respondToSellerDispute } from "@/services/disputes"
 import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
@@ -34,11 +33,8 @@ export default function SellerDisputeDetailPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchSellerDisputeById(tk, id)
+      const r = await fetchSellerDisputeById(id)
       if (r.success && r.dispute) setDispute(r.dispute)
       else toast.error(r.message ?? "Không tìm thấy")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -56,12 +52,9 @@ export default function SellerDisputeDetailPage() {
   const handleRespond = async () => {
     if (!dispute || respondText.trim().length < 10) return
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
       const r = await respondToSellerDispute(
-        tk, dispute.id, respondText.trim(),
+        dispute.id, respondText.trim(),
         respondEvidenceUrls.length > 0 ? respondEvidenceUrls : undefined
       )
       if (r.success) {

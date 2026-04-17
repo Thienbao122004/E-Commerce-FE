@@ -7,7 +7,6 @@ import {
   IconExternalLink, IconLock, IconLockOpen, IconFilter,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
-
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,11 +18,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
 import {
   UserStatus,
-  UserStatusLabels,
   userStatusBadgeClass,
   userStatusLabel,
 } from "@/types/user"
@@ -55,11 +52,8 @@ export default function UsersPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setLoading(false); return }
     try {
-      const r = await fetchUsers(tk, pg, ps, role, status)
+      const r = await fetchUsers(pg, ps, role, status)
       if (r.success) { setUsers(r.users); setTotal(r.totalCount) }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
     finally { setLoading(false) }
@@ -70,11 +64,8 @@ export default function UsersPage() {
   const handleSuspend = async () => {
     if (!suspendTarget || !reason) return
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await suspendUser(tk, suspendTarget.id, reason)
+      const r = await suspendUser(suspendTarget.id, reason)
       if (r.success) { toast.success(r.message ?? "Đã khóa"); setSuspendTarget(null); setReason(""); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -83,11 +74,8 @@ export default function UsersPage() {
 
   const handleUnsuspend = async (u: AdminUser) => {
     setBusy(true)
-    const { data } = await supabase.auth.getSession()
-    const tk = data.session?.access_token
-    if (!tk) { setBusy(false); return }
     try {
-      const r = await unsuspendUser(tk, u.id)
+      const r = await unsuspendUser(u.id)
       if (r.success) { toast.success(r.message ?? "Đã mở khóa"); load() }
       else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }

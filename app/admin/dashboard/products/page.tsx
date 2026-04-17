@@ -14,7 +14,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { useProducts } from "@/hooks/use-products"
 import { fetchProductById } from "@/services/products"
-import { supabase } from "@/lib/supabase"
 import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
 const ProductDetailView = dynamic(() => import("./_components/product-detail-view").then(m => m.ProductDetailView), {
@@ -55,17 +54,10 @@ export default function ProductsPage() {
 
   React.useEffect(() => { setSearch(debouncedSearch) }, [debouncedSearch, setSearch])
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
   const loadProductById = React.useCallback(async (id: string) => {
     setDetailLoading(true)
-    const token = await getToken()
-    if (!token) { setDetailLoading(false); return }
     try {
-      const res = await fetchProductById(token, id)
+      const res = await fetchProductById(id)
       if (res.success && res.product) setSelectedProduct(res.product)
     } catch {  }
     finally { setDetailLoading(false) }

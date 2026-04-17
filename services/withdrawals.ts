@@ -1,10 +1,8 @@
+import { api } from "@/lib/api-client"
 import type { WithdrawListResponse, WithdrawResponse } from "@/types/withdraw"
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
 // ---------- List ----------
-export async function fetchWithdrawals(
-  token: string,
+export function fetchWithdrawals(
   page = 1,
   pageSize = 10,
   status?: number | null
@@ -16,46 +14,22 @@ export async function fetchWithdrawals(
   if (status !== null && status !== undefined)
     params.set("status", String(status))
 
-  const res = await fetch(`${API}/api/admin/withdrawals?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error("Lỗi tải danh sách yêu cầu rút tiền")
-  return res.json()
+  return api.get<WithdrawListResponse>(`/api/admin/withdrawals?${params}`)
 }
 
 // ---------- Approve ----------
-export async function approveWithdrawal(
-  token: string,
+export function approveWithdrawal(
   requestId: string,
   adminNote?: string
 ): Promise<WithdrawResponse> {
-  const res = await fetch(`${API}/api/admin/withdrawals/${requestId}/approve`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ adminNote }),
-  })
-  if (!res.ok) throw new Error("Lỗi duyệt yêu cầu rút tiền")
-  return res.json()
+  return api.post<WithdrawResponse>(`/api/admin/withdrawals/${requestId}/approve`, { adminNote })
 }
 
 // ---------- Reject ----------
-export async function rejectWithdrawal(
-  token: string,
+export function rejectWithdrawal(
   requestId: string,
   reason: string,
   adminNote?: string
 ): Promise<WithdrawResponse> {
-  const res = await fetch(`${API}/api/admin/withdrawals/${requestId}/reject`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason, adminNote }),
-  })
-  if (!res.ok) throw new Error("Lỗi từ chối yêu cầu rút tiền")
-  return res.json()
+  return api.post<WithdrawResponse>(`/api/admin/withdrawals/${requestId}/reject`, { reason, adminNote })
 }

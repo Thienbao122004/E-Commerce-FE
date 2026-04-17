@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
-import { supabase } from "@/lib/supabase"
 import {
   fetchPlatformFeeSettings,
   updatePlatformFeeSettings,
@@ -45,17 +44,10 @@ export default function AdminPlatformFeeConfigPage() {
   const [historyPage, setHistoryPage] = React.useState(1)
   const [loadingHistory, setLoadingHistory] = React.useState(true)
 
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession()
-    return data.session?.access_token
-  }
-
   const loadCurrent = React.useCallback(async () => {
     setLoadingCurrent(true)
-    const tk = await getToken()
-    if (!tk) { setLoadingCurrent(false); return }
     try {
-      const res = await fetchPlatformFeeSettings(tk)
+      const res = await fetchPlatformFeeSettings()
       if (res.success && res.data) {
         setCurrent(res.data)
         setNewPercent(String(res.data.commissionPercent))
@@ -69,10 +61,8 @@ export default function AdminPlatformFeeConfigPage() {
 
   const loadHistory = React.useCallback(async () => {
     setLoadingHistory(true)
-    const tk = await getToken()
-    if (!tk) { setLoadingHistory(false); return }
     try {
-      const res = await fetchPlatformFeeSettingsHistory(tk, historyPage, PAGE_SIZE)
+      const res = await fetchPlatformFeeSettingsHistory(historyPage, PAGE_SIZE)
       if (res.success && res.data) {
         setHistory(res.data.items)
         setHistoryTotal(res.data.totalCount)
@@ -94,10 +84,8 @@ export default function AdminPlatformFeeConfigPage() {
       return
     }
     setSaving(true)
-    const tk = await getToken()
-    if (!tk) { setSaving(false); return }
     try {
-      const res = await updatePlatformFeeSettings(tk, {
+      const res = await updatePlatformFeeSettings({
         commissionPercent: percent,
         note: note.trim() || null,
       })

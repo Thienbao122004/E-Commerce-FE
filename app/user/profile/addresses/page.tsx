@@ -20,10 +20,8 @@ import {
 import { toast } from 'sonner'
 import {
   vietnamProvincesService,
-  type Province,
-  type District,
-  type Ward,
 } from '@/services/vietnam-provinces'
+import type { Province, District, Ward } from '@/types/vietnam-provinces'
 
 interface AddressFormData {
   label: string

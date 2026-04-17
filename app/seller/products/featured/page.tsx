@@ -2,18 +2,14 @@
 
 import * as React from "react"
 import {
-  IconStar,
   IconTrophy,
-  IconRefresh,
   IconMedal,
   IconMedal2,
-  IconHash,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardDescription,
@@ -30,7 +26,6 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatNumberVN as fmt, formatPriceVND as currency } from "@/lib/formatters"
-import { supabase } from "@/lib/supabase"
 import { fetchTopProducts } from "@/services/dashboard"
 import type { TopProduct } from "@/types/dashboard"
 
@@ -40,15 +35,8 @@ export default function FeaturedProductsPage() {
 
   const load = React.useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) {
-      toast.error("Phiên đăng nhập hết hạn.")
-      setLoading(false)
-      return
-    }
     try {
-      const res = await fetchTopProducts(token)
+      const res = await fetchTopProducts()
       if (res.success) setProducts(res.products)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi tải dữ liệu")
@@ -63,7 +51,6 @@ export default function FeaturedProductsPage() {
     <>
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
-          {/* Top 3 Cards */}
           {!loading && products.length >= 3 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {products.slice(0, 3).map((product, i) => (

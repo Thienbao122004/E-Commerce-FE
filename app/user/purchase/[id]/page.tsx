@@ -281,10 +281,7 @@ export default function PurchaseOrderDetailPage() {
 
     setSubmittingDispute(true)
     try {
-      const { data } = await import('@/lib/supabase').then((m) => m.supabase.auth.getSession())
-      const tk = data.session?.access_token
-      if (!tk) { toast.error('Phiên đăng nhập hết hạn'); return }
-      const res = await createDispute(tk, {
+      const res = await createDispute({
         orderId: order.id,
         type: Number(disputeForm.type),
         title: disputeForm.title.trim(),

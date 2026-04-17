@@ -46,9 +46,6 @@ export default function ShopDetailPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
-  const { session } = useAuth()
-  const token = session?.access_token
-
   const [shop, setShop] = useState<ShopPublicDto | null>(null)
   const [products, setProducts] = useState<StorefrontProduct[]>([])
   const [categories, setCategories] = useState<ShopCategoryDto[]>([])
@@ -75,7 +72,7 @@ export default function ShopDetailPage() {
   useEffect(() => {
     if (!slug) return
     setLoading(true)
-    getShopBySlug(slug, token)
+    getShopBySlug(slug)
       .then((res) => {
         if (res.success && res.shop) {
           setShop(res.shop)
@@ -84,7 +81,7 @@ export default function ShopDetailPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [slug, token])
+  }, [slug])
 
   useEffect(() => {
     if (!shop) return
@@ -112,16 +109,16 @@ export default function ShopDetailPage() {
   }, [loadProducts])
 
   const handleFollow = async () => {
-    if (!token || !shop) { router.push("/login"); return }
+    if (!shop) { router.push("/login"); return }
     setFollowLoading(true)
     try {
       if (following) {
-        await unfollowShop(token, shop.id)
+        await unfollowShop(shop.id)
         setFollowing(false)
         setShop((p) => p ? { ...p, followerCount: p.followerCount - 1 } : p)
         toast.success("Đã hủy theo dõi")
       } else {
-        await followShop(token, shop.id)
+        await followShop(shop.id)
         setFollowing(true)
         setShop((p) => p ? { ...p, followerCount: p.followerCount + 1 } : p)
         toast.success("Đã theo dõi shop")
@@ -131,7 +128,7 @@ export default function ShopDetailPage() {
   }
 
   const handleChat = () => {
-    if (!token || !shop) { router.push("/login"); return }
+    if (!shop) { router.push("/login"); return }
     window.dispatchEvent(new CustomEvent("open-chat-widget", { detail: { shopId: shop.id } }))
   }
 
