@@ -23,6 +23,7 @@ import {
   createDispute,
   cancelMyDispute,
 } from "@/services/disputes"
+import { ordersService } from "@/services/orders"
 import {
   DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeType, DisputeTypeLabels,
 } from "@/types/dispute"
@@ -123,14 +124,36 @@ export default function MyDisputesPage() {
   }
 
   const handleCreate = async () => {
-    if (!form.orderId.trim()) { toast.error("Vui lòng nhập mã đơn hàng"); return }
-    if (!form.title.trim()) { toast.error("Vui lòng nhập tiêu đề"); return }
-    if (form.reason.trim().length < 20) { toast.error("Lý do phải có ít nhất 20 ký tự"); return }
+    let actualOrderId = form.orderId.trim();
+    if (!actualOrderId) { toast.error("Vui lòng nhập mã đơn hàng"); return }
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(actualOrderId)) {
+      setCreating(true);
+      try {
+        const res = await ordersService.getMyOrders(1, 100);
+        const matchedItem = res.orders.find(o => o.orderCode?.trim().toUpperCase() === actualOrderId.toUpperCase());
+        if (matchedItem) {
+          actualOrderId = matchedItem.id;
+        } else {
+          toast.error("Không tìm thấy đơn hàng bạn nhập trong danh sách gần đây. Hãy vào Đơn mua -> Chi tiết đơn -> bấm Khiếu nại để thử lại.");
+          setCreating(false);
+          return;
+        }
+      } catch {
+        toast.error("Lỗi khi kiểm tra mã đơn hàng.");
+        setCreating(false);
+        return;
+      }
+    }
+
+    if (!form.title.trim()) { toast.error("Vui lòng nhập tiêu đề"); setCreating(false); return }
+    if (form.reason.trim().length < 20) { toast.error("Lý do phải có ít nhất 20 ký tự"); setCreating(false); return }
 
     setCreating(true)
     try {
       const res = await createDispute({
-        orderId: form.orderId.trim(),
+        orderId: actualOrderId,
         type: Number(form.type),
         title: form.title.trim(),
         reason: form.reason.trim(),
@@ -329,7 +352,7 @@ export default function MyDisputesPage() {
               <Label htmlFor="orderId">Mã đơn hàng (ID) <span className="text-red-500">*</span></Label>
               <Input
                 id="orderId"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                placeholder="Ví dụ: 3767D68F260418"
                 value={form.orderId}
                 onChange={(e) => setForm((f) => ({ ...f, orderId: e.target.value }))}
                 className="font-mono text-sm"
