@@ -242,7 +242,7 @@ export type CreateSellerProductPayload = {
   variants?: SellerProductVariantPayload[]
   imageUrls?: string[]
   tagIds?: number[]
-  materialIds?: number[]
+  materialIds?: string[]
 }
 
 export type AddProductVariantResponse = {

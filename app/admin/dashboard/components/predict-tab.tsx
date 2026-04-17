@@ -19,10 +19,11 @@ const metricLabels: Record<string, string> = {
   revenue: "Doanh thu",
   orders: "Đơn hàng",
   users: "Người dùng",
+  products: "Sản phẩm",
 }
 
 export function PredictTab() {
-  const [metric, setMetric] = React.useState<"revenue" | "orders" | "users">("revenue")
+  const [metric, setMetric] = React.useState<"revenue" | "orders" | "users" | "products">("revenue")
   const [forecastDays, setForecastDays] = React.useState(30)
   const [data, setData] = React.useState<PredictMetricsResponse | null>(null)
   const [loading, setLoading] = React.useState(false)
@@ -108,13 +109,13 @@ export function PredictTab() {
                       <tr key={i} className="border-b last:border-0">
                         <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">{new Date(pt.date).toLocaleDateString("vi-VN")}</td>
                         <td className="px-2 py-1.5 text-right font-semibold tabular-nums">
-                          {metric === "revenue" ? fmtVND(pt.predictedValue) : pt.predictedValue.toLocaleString("vi-VN")}
+                          {metric === "revenue" ? fmtVND(pt.predictedValue) : Math.round(pt.predictedValue).toLocaleString("vi-VN")}
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                          {metric === "revenue" ? fmtVND(pt.lowerBound) : pt.lowerBound.toLocaleString("vi-VN")}
+                          {metric === "revenue" ? fmtVND(pt.lowerBound) : Math.round(pt.lowerBound).toLocaleString("vi-VN")}
                         </td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                          {metric === "revenue" ? fmtVND(pt.upperBound) : pt.upperBound.toLocaleString("vi-VN")}
+                          {metric === "revenue" ? fmtVND(pt.upperBound) : Math.round(pt.upperBound).toLocaleString("vi-VN")}
                         </td>
                       </tr>
                     ))}

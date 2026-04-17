@@ -20,6 +20,7 @@ const dtLabels: Record<string, string> = {
   orders: "Đơn hàng",
   revenue: "Doanh thu",
   users: "Người dùng",
+  products: "Sản phẩm",
 }
 
 const typeLabels: Record<string, string> = {
@@ -29,7 +30,7 @@ const typeLabels: Record<string, string> = {
 }
 
 export function AnomaliesTab() {
-  const [dataType, setDataType] = React.useState<"orders" | "revenue" | "users">("orders")
+  const [dataType, setDataType] = React.useState<"orders" | "revenue" | "users" | "products">("orders")
   const [lookbackDays, setLookbackDays] = React.useState(30)
   const [data, setData] = React.useState<DetectAnomaliesResponse | null>(null)
   const [loading, setLoading] = React.useState(false)

@@ -36,7 +36,7 @@ export type AnalyzeTrendsResponse = {
 }
 
 export type DetectAnomaliesRequest = {
-  dataType: "orders" | "revenue" | "users"
+  dataType: "orders" | "revenue" | "users" | "products"
   lookbackDays: number
 }
 
@@ -56,7 +56,7 @@ export type DetectAnomaliesResponse = {
 }
 
 export type PredictMetricsRequest = {
-  metric: "revenue" | "orders" | "users"
+  metric: "revenue" | "orders" | "users" | "products"
   forecastDays: number
 }
 

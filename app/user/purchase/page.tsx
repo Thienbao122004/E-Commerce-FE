@@ -529,7 +529,7 @@ function OrderCard({
 
   const statusColor = STATUS_COLORS[order.status] ?? '#6b7280'
   const statusLabel = STATUS_LABELS[order.status] ?? order.statusName
-  const canConfirm = order.status === 4
+  const canConfirm = order.status === 5
   const canPayNow = order.status === 0
   const canCancel = order.status >= 0 && order.status <= 3
   const canReorder = REORDERABLE_STATUSES.has(order.status)
