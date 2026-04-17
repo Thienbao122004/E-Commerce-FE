@@ -547,6 +547,7 @@ export default function CreateProductPage() {
       imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
       categoryId: selCategory?.categoryId ?? undefined,
       tagIds: selTagIds.length > 0 ? selTagIds : undefined,
+      materialIds: selMatIds.length > 0 ? selMatIds : undefined,
     }
 
     const ok = useVariants
