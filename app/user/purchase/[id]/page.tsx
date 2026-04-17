@@ -216,6 +216,7 @@ export default function PurchaseOrderDetailPage() {
     return base
   }, [order])
 
+  /** Backend: confirm only when Delivered (5) → Completed. */
   const canConfirm = order?.status === 5
   const isEndedOrder = order?.status === 7 || order?.status === 8
   const statusLabel = order ? (STATUS_LABELS[order.status] ?? order.statusName) : ''
