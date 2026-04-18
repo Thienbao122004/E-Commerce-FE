@@ -1,9 +1,15 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { usePathname } from "next/navigation"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useHeaderActions } from "@/hooks/use-header-actions"
+
+const NotificationDropdown = dynamic(
+  () => import("@/components/layout/notification-dropdown").then((m) => m.NotificationDropdown),
+  { ssr: false },
+)
 
 const NAV_LABELS: { url: string; title: string }[] = [
   // Admin
@@ -61,7 +67,10 @@ export function SiteHeader() {
           />
           <h1 className="text-base font-medium">{title}</h1>
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <div className="flex items-center gap-2 shrink-0">
+          <NotificationDropdown />
+          {actions}
+        </div>
       </div>
     </header>
   )

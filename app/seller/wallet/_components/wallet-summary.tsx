@@ -41,9 +41,11 @@ export function WalletSummary({ wallet, loading }: Props) {
   const available = wallet?.availableBalance ?? 0
   const held = wallet?.heldBalance ?? 0
   const pending = wallet?.pendingBalance ?? 0
-  const earnings = wallet?.totalEarnings ?? 0
+  const grossCredited = wallet?.totalEarnings ?? 0
   const withdrawn = wallet?.totalWithdrawn ?? 0
   const refunded = wallet?.totalRefunded ?? 0
+  const netIncome =
+    wallet?.netEarningsAfterRefunds ?? Math.max(0, grossCredited - refunded)
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
@@ -105,11 +107,18 @@ export function WalletSummary({ wallet, loading }: Props) {
               <IconTrendingUp className="size-5 text-green-600 dark:text-green-400" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-muted-foreground">Tổng thu nhập</p>
+              <p className="text-xs font-medium text-muted-foreground">Thu nhập ròng</p>
               <p className="text-lg xl:text-xl font-bold tabular-nums text-green-600 dark:text-green-400 mt-1 break-all leading-tight">
-                {currency(earnings)}
+                {currency(netIncome)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">Tất cả thời gian</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                Sau hoàn đơn · Lũy kế
+              </p>
+              {refunded > 0 && (
+                <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                  Đã ghi có (trước hoàn): {currency(grossCredited)}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>

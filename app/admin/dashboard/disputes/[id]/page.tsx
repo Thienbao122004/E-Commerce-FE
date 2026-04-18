@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { fetchDisputeById, approveRefund, rejectDispute, requestSellerResponse, requestCustomerResponse } from "@/services/disputes"
-import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
+import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels, disputeRefundCeiling } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
@@ -55,16 +55,35 @@ export default function DisputeDetailPage() {
   const handleAction = async () => {
     if (!dispute) return
     if ((dlgType === "approve" || dlgType === "reject") && !resolution) return
-    if (dlgType === "approve" && amount) {
-      const amt = Number(amount)
+    let finalApproveAmount: number | undefined
+    if (dlgType === "approve") {
+      const d = dispute
+      const ceiling = disputeRefundCeiling(d)
+      const parsed = amount.trim() === "" ? undefined : Number(amount)
+      let amt = parsed
+      if ((amt === undefined || Number.isNaN(amt)) && d.requestedAmount > 0) {
+        amt = d.requestedAmount
+      }
+      if (amt === undefined || Number.isNaN(amt)) {
+        toast.error("Vui lòng nhập số tiền hoàn.")
+        return
+      }
       if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
-      if (amt > dispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
+      if (amt > ceiling) {
+        toast.error(
+          d.requestedAmount > 0
+            ? "Số tiền duyệt không được vượt quá số tiền yêu cầu"
+            : "Số tiền duyệt không được vượt quá tổng đơn hàng"
+        )
+        return
+      }
+      finalApproveAmount = amt
     }
     setBusy(true)
     try {
       let r
       if (dlgType === "approve") {
-        r = await approveRefund(dispute.id, amount ? Number(amount) : undefined, resolution, adminNote || undefined)
+        r = await approveRefund(dispute.id, finalApproveAmount, resolution, adminNote || undefined)
       } else if (dlgType === "reject") {
         r = await rejectDispute(dispute.id, resolution, adminNote || undefined)
       } else if (dlgType === "seller") {
@@ -121,11 +140,33 @@ export default function DisputeDetailPage() {
                       <span className="text-sm text-muted-foreground">Loại</span>
                       <Badge variant="outline">{DisputeTypeLabels[dispute.type] ?? dispute.typeName}</Badge>
                     </div>
+                    {dispute.affectedItems && dispute.affectedItems.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-2">
+                          <span className="text-sm text-muted-foreground">Sản phẩm trong phạm vi khiếu nại</span>
+                          <ul className="text-sm space-y-1.5">
+                            {dispute.affectedItems.map((row) => (
+                              <li key={row.orderItemId} className="flex justify-between gap-2 tabular-nums">
+                                <span className="text-foreground font-medium">{row.productName} × {row.quantity}</span>
+                                <span className="text-muted-foreground shrink-0">{formatPriceVND(row.lineTotal)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
+                    )}
                     <Separator />
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Số tiền yêu cầu</span>
                       <span className="text-sm font-bold text-orange-600 tabular-nums">{formatPriceVND(dispute.requestedAmount)}</span>
                     </div>
+                    {dispute.orderTotal != null && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Tổng đơn hàng</span>
+                        <span className="text-sm font-medium tabular-nums">{formatPriceVND(dispute.orderTotal)}</span>
+                      </div>
+                    )}
                     {dispute.approvedAmount !== null && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Số tiền duyệt</span>

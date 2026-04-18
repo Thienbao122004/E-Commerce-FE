@@ -47,7 +47,7 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
     (o) => o.status === OrderStatus.Refunded
   ).length
   const totalRefunded = wallet?.totalRefunded ?? 0
-  const netRevenue = stats ? stats.totalRevenue - totalRefunded : 0
+  const netRevenue = stats?.totalRevenue ?? 0
 
   if (loading || !stats) {
     return (

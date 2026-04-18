@@ -195,6 +195,21 @@ export default function CustomerDisputeDetailPage() {
               <InfoRow label="Loại khiếu nại">
                 <Badge variant="outline">{DisputeTypeLabels[dispute.type] ?? dispute.typeName}</Badge>
               </InfoRow>
+              {dispute.affectedItems && dispute.affectedItems.length > 0 && (
+                <InfoRow label="Sản phẩm khiếu nại">
+                  <ul className="text-right space-y-1.5 max-w-[min(100%,320px)] ml-auto">
+                    {dispute.affectedItems.map((row) => (
+                      <li key={row.orderItemId} className="text-sm leading-snug">
+                        <span className="font-medium text-gray-800">{row.productName}</span>
+                        <span className="text-gray-500"> · SL {row.quantity}</span>
+                        <span className="block text-xs text-gray-400 tabular-nums">
+                          {formatPriceVND(row.lineTotal)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </InfoRow>
+              )}
               <InfoRow label="Số tiền yêu cầu">
                 <span className="text-orange-600 font-bold">{formatPriceVND(dispute.requestedAmount)}</span>
               </InfoRow>
@@ -233,14 +248,46 @@ export default function CustomerDisputeDetailPage() {
               </div>
               <p className="text-sm text-gray-600 leading-relaxed mb-4">{dispute.reason}</p>
 
-              {/* Banner khi admin đang chờ phản hồi */}
+              {dispute.adminNote && (
+                <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1.5">
+                    Nội dung từ bộ phận hỗ trợ
+                  </p>
+                  <p className="text-sm text-indigo-950 leading-relaxed whitespace-pre-wrap">{dispute.adminNote}</p>
+                </div>
+              )}
+
               {dispute.status === DisputeStatus.WaitingCustomer && (
                 <div className="mb-4 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
                   <span className="material-symbols-outlined text-indigo-500 text-base mt-0.5 shrink-0">info</span>
                   <div>
-                    <p className="text-sm font-medium text-indigo-700">Admin đang chờ phản hồi từ bạn</p>
-                    <p className="text-xs text-indigo-500 mt-0.5">
-                      Vui lòng nhấn &ldquo;Gửi phản hồi&rdquo; để cung cấp thêm thông tin hoặc bằng chứng bổ sung.
+                    <p className="text-sm font-medium text-indigo-800">Cần bạn phản hồi thêm</p>
+                    <p className="text-xs text-indigo-700/90 mt-0.5">
+                      Bộ phận hỗ trợ đang chờ thêm thông tin từ bạn. Vui lòng dùng nút &ldquo;Gửi phản hồi&rdquo; ở trên để gửi giải thích hoặc bằng chứng bổ sung.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {dispute.status === DisputeStatus.WaitingSeller && (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <span className="material-symbols-outlined text-amber-600 text-base mt-0.5 shrink-0">storefront</span>
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">Đang chờ cửa hàng xử lý</p>
+                    <p className="text-xs text-amber-800/90 mt-0.5">
+                      Shop đang được yêu cầu bổ sung thông tin. Bạn không cần làm gì thêm lúc này; nếu cần bạn trả lời, chúng tôi sẽ thông báo trên trang này.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(dispute.status === DisputeStatus.Pending || dispute.status === DisputeStatus.UnderReview) && (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <span className="material-symbols-outlined text-slate-500 text-base mt-0.5 shrink-0">hourglass_empty</span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Khiếu nại đang được xử lý</p>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Bộ phận hỗ trợ đang xem xét. Bạn sẽ thấy cập nhật tại đây khi có yêu cầu mới hoặc quyết định.
                     </p>
                   </div>
                 </div>

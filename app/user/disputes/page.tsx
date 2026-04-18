@@ -152,6 +152,29 @@ export default function MyDisputesPage() {
 
     setCreating(true)
     try {
+      const detail = await ordersService.getOrderById(actualOrderId)
+      if (!detail.success || !detail.order) {
+        toast.error(detail.message ?? "Không tải được chi tiết đơn hàng")
+        setCreating(false)
+        return
+      }
+      const o = detail.order
+      if (o.items.length === 0) {
+        toast.error("Đơn không có sản phẩm")
+        setCreating(false)
+        return
+      }
+      let disputeItems: { orderItemId: string; quantity: number }[]
+      if (o.items.length === 1) {
+        disputeItems = [{ orderItemId: o.items[0].id, quantity: o.items[0].quantity }]
+      } else {
+        toast.error(
+          "Đơn có nhiều sản phẩm — vui lòng vào Đơn mua → Chi tiết đơn → Khiếu nại để chọn đúng món bị lỗi.",
+        )
+        setCreating(false)
+        return
+      }
+
       const res = await createDispute({
         orderId: actualOrderId,
         type: Number(form.type),
@@ -159,6 +182,7 @@ export default function MyDisputesPage() {
         reason: form.reason.trim(),
         requestedAmount: form.requestedAmount ? Number(form.requestedAmount) : 0,
         evidenceUrls: evidenceUrls.length > 0 ? evidenceUrls : undefined,
+        items: disputeItems,
       })
       if (res.success) {
         toast.success("Đã tạo khiếu nại thành công")
