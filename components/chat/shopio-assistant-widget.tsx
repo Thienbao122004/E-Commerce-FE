@@ -543,9 +543,6 @@ export function ShopioAssistantWidget() {
   const [sessionSearch, setSessionSearch] = useState("")
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all")
 
-  // Hide widget if user is not logged in
-  if (!session && !authLoading) return null;
-
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<UiMessage[]>([])
   const [input, setInput] = useState("")
@@ -1056,7 +1053,7 @@ export function ShopioAssistantWidget() {
     setShowAddressModal(false)
   }, [])
 
-  if (authLoading) return null
+  if (authLoading || !session) return null
 
   return (
     <>
