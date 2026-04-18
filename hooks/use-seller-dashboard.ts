@@ -100,8 +100,13 @@ export function useSellerDashboard(): SellerDashboardData {
     ).size
     const activeProducts = products.filter((p) => p.status === 1).length
 
+    const gross = wallet?.totalEarnings ?? 0
+    const refunded = wallet?.totalRefunded ?? 0
+    const net =
+      wallet?.netEarningsAfterRefunds ?? Math.max(0, gross - refunded)
+
     setStats({
-      totalRevenue: wallet?.totalEarnings ?? 0,
+      totalRevenue: net,
       totalOrders: orders.length,
       totalProducts: products.length,
       totalCustomers: uniqueCustomers,
