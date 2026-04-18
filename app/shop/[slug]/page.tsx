@@ -45,6 +45,7 @@ const MAX_VISIBLE_CATS = 4
 export default function ShopDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { session, isLoading: authLoading } = useAuth()
   const slug = params.slug as string
   const [shop, setShop] = useState<ShopPublicDto | null>(null)
   const [products, setProducts] = useState<StorefrontProduct[]>([])
@@ -70,9 +71,9 @@ export default function ShopDetailPage() {
   }, [])
 
   useEffect(() => {
-    if (!slug) return
+    if (!slug || authLoading) return
     setLoading(true)
-    getShopBySlug(slug)
+    getShopBySlug(slug, session?.access_token)
       .then((res) => {
         if (res.success && res.shop) {
           setShop(res.shop)
@@ -81,7 +82,7 @@ export default function ShopDetailPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [slug])
+  }, [slug, authLoading, session?.access_token])
 
   useEffect(() => {
     if (!shop) return
@@ -187,15 +188,17 @@ export default function ShopDetailPage() {
                 <h2 className="text-xl md:text-2xl font-bold" style={{ color: "#3d2e1f" }}>{shop.name}</h2>
                 {shop.description && <p className="text-sm mt-1 max-w-xl truncate" style={{ color: "#8b7355" }}>{shop.description}</p>}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button onClick={handleFollow} disabled={followLoading} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${following ? "border-2 border-orange-500 text-orange-600 bg-orange-50 hover:bg-orange-100" : "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25"}`}>
-                  {followLoading ? <IconLoader2 className="size-4 animate-spin" /> : following ? <IconUserCheck className="size-4" /> : <IconUserPlus className="size-4" />}
-                  {following ? "Đang Theo Dõi" : "Theo Dõi"}
-                </button>
-                <button onClick={handleChat} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200 hover:bg-orange-50" style={{ borderColor: "#e5ded6", color: "#3d2e1f" }}>
-                  <IconMessage2 className="size-4" />Chat
-                </button>
-              </div>
+              {session && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={handleFollow} disabled={followLoading} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${following ? "border-2 border-orange-500 text-orange-600 bg-orange-50 hover:bg-orange-100" : "bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25"}`}>
+                    {followLoading ? <IconLoader2 className="size-4 animate-spin" /> : following ? <IconUserCheck className="size-4" /> : <IconUserPlus className="size-4" />}
+                    {following ? "Đang Theo Dõi" : "Theo Dõi"}
+                  </button>
+                  <button onClick={handleChat} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200 hover:bg-orange-50" style={{ borderColor: "#e5ded6", color: "#3d2e1f" }}>
+                    <IconMessage2 className="size-4" />Chat
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
