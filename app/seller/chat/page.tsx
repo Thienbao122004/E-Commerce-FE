@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { sortMessagesChronological } from "@/lib/sort-chat-messages"
 import { useAuth } from "@/contexts/auth-context"
 import {
   createChatRealtimeConnection,
@@ -20,8 +22,10 @@ import { ConversationList } from "./_components/conversation-list"
 import { ChatWindow, ChatEmptyState } from "./_components/chat-window"
 import { IconLoader2 } from "@tabler/icons-react"
 
-export default function SellerChatPage() {
+function SellerChatPageInner() {
   const { session, user } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const token = session?.access_token
   const currentUserId = user?.id ?? null
   const [conversations, setConversations] = useState<ConversationDto[]>([])
@@ -70,7 +74,6 @@ export default function SellerChatPage() {
     })
   }, [currentUserId])
 
-  // ── Load conversations ────────────────────────────────────────────────
   const loadConversations = useCallback(async () => {
     if (!currentUserId) {
       setLoading(false)
@@ -93,16 +96,17 @@ export default function SellerChatPage() {
     loadConversations()
   }, [loadConversations])
 
-  // ── Load messages when selecting conversation ─────────────────────────
   const loadMessages = useCallback(
     async (conversationId: string) => {
       setLoadingMessages(true)
       try {
         const detail = await fetchMessages(conversationId, 1, 50)
-        setMessages(detail.messages.reverse())
+        const chronological = sortMessagesChronological(detail.messages)
+        setMessages(chronological)
         await markAsRead(conversationId).catch(() => {})
+        const merged = { ...detail.conversation, unreadCount: 0 }
         setConversations((prev) =>
-          prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
+          prev.map((c) => (c.id === conversationId ? { ...c, ...merged } : c))
         )
       } catch {
         setMessages([])
@@ -117,7 +121,21 @@ export default function SellerChatPage() {
     if (activeId) loadMessages(activeId)
   }, [activeId, loadMessages])
 
-  // Realtime updates via SignalR
+  const conversationIdFromUrl = searchParams.get("conversation")
+
+  useEffect(() => {
+    if (loading || !conversationIdFromUrl) return
+    const id = conversationIdFromUrl.trim()
+    if (!id) return
+    if (!conversations.some((c) => c.id === id)) return
+
+    setShowList(false)
+    if (activeId !== id) {
+      setActiveId(id)
+    }
+    router.replace("/seller/chat", { scroll: false })
+  }, [loading, conversationIdFromUrl, conversations, activeId, router])
+
   useEffect(() => {
     const connection = createChatRealtimeConnection(token, {
       onConversationUpdated: (incoming: ConversationDto) => {
@@ -151,7 +169,7 @@ export default function SellerChatPage() {
       setMessages((prev) => {
         if (activeIdRef.current !== conversationId) return prev
         if (prev.some((m) => m.id === incomingMessage.id)) return prev
-        return [...prev, incomingMessage]
+        return sortMessagesChronological([...prev, incomingMessage])
       })
       },
       onReconnected: () => {
@@ -167,7 +185,6 @@ export default function SellerChatPage() {
     }
   }, [token, loadConversations, loadMessages, upsertConversation])
 
-  // ── Send message ──────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!message.trim() || !activeId || sending) return
     const content = message.trim()
@@ -177,7 +194,7 @@ export default function SellerChatPage() {
       const newMsg = await sendMessage(activeId, content)
       setMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev
-        return [...prev, newMsg]
+        return sortMessagesChronological([...prev, newMsg])
       })
       setConversations((prev) =>
         prev.map((c) =>
@@ -185,7 +202,7 @@ export default function SellerChatPage() {
         )
       )
     } catch {
-      setMessage(content) // restore on error
+      setMessage(content)
     } finally {
       setSending(false)
     }
@@ -237,5 +254,21 @@ export default function SellerChatPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function ChatPageFallback() {
+  return (
+    <div className="flex h-[calc(100svh-var(--header-height))] min-h-0 items-center justify-center overflow-hidden">
+      <IconLoader2 className="size-6 animate-spin text-muted-foreground" />
+    </div>
+  )
+}
+
+export default function SellerChatPage() {
+  return (
+    <Suspense fallback={<ChatPageFallback />}>
+      <SellerChatPageInner />
+    </Suspense>
   )
 }

@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import type { AdminDispute } from "@/types/dispute"
+import { disputeRefundCeiling, type AdminDispute } from "@/types/dispute"
 import { formatPriceVND } from "@/lib/formatters"
 
 export function DisputeActionDialog({
@@ -35,11 +35,13 @@ export function DisputeActionDialog({
   }, [dispute, dialogType])
 
   const handleConfirm = () => {
-    onConfirm(
-      resolution,
-      adminNote,
-      dialogType === "approve" && approvedAmount ? Number(approvedAmount) : undefined
-    )
+    if (dialogType === "approve") {
+      const trimmed = approvedAmount.trim()
+      const parsed = trimmed === "" ? undefined : Number(trimmed)
+      onConfirm(resolution, adminNote, parsed)
+    } else {
+      onConfirm(resolution, adminNote, undefined)
+    }
   }
 
   return (
@@ -65,9 +67,20 @@ export function DisputeActionDialog({
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Yêu cầu: {dispute ? formatPriceVND(dispute.requestedAmount) : ""}
+                {dispute && dispute.requestedAmount <= 0 && dispute.orderTotal != null && (
+                  <span className="block mt-0.5">
+                    Tối đa theo đơn: {formatPriceVND(dispute.orderTotal)}
+                  </span>
+                )}
               </p>
-              {approvedAmount && Number(approvedAmount) > (dispute?.requestedAmount ?? 0) && (
-                <p className="text-xs text-red-500 mt-1">⚠️ Số tiền duyệt không được vượt quá số tiền yêu cầu</p>
+              {dispute &&
+                approvedAmount.trim() !== "" &&
+                !Number.isNaN(Number(approvedAmount)) &&
+                Number(approvedAmount) > disputeRefundCeiling(dispute) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Số tiền duyệt không được vượt quá{" "}
+                  {dispute.requestedAmount > 0 ? "số tiền yêu cầu" : "tổng đơn hàng"}
+                </p>
               )}
             </div>
           )}

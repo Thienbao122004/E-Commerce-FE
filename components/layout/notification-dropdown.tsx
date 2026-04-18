@@ -2,22 +2,44 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { notificationsService, type NotificationItem } from '@/services/notifications'
+import {
+  createNotificationsRealtimeConnection,
+  disposeNotificationsRealtimeConnection,
+  startNotificationsRealtimeConnection,
+} from '@/services/notifications-realtime'
 import { useAuth } from '@/contexts/auth-context'
 import { formatRelativeTimeVN as formatRelativeTime } from '@/lib/formatters'
 
-/** Trả về URL điều hướng dựa trên referenceType + referenceId từ BE */
-function getNotificationUrl(item: NotificationItem): string | null {
+/** Điều hướng theo ngữ cảnh: khách / seller / admin. */
+export function getNotificationUrl(item: NotificationItem, pathname: string): string | null {
   const { referenceType, referenceId } = item
   if (!referenceType || !referenceId) return null
   const type = referenceType.toLowerCase()
-  if (type === 'order') return `/user/purchase/${referenceId}`
-  if (type === 'payment') return `/user/purchase/${referenceId}`
-  if (type === 'dispute') return `/user/disputes/${referenceId}`
+  const isSeller = pathname.startsWith('/seller')
+  const isAdmin = pathname.startsWith('/admin')
+
+  if (type === 'order' || type === 'payment') {
+    if (isSeller) return `/seller/orders/${referenceId}`
+    if (isAdmin) return '/admin/dashboard'
+    return `/user/purchase/${referenceId}`
+  }
+  if (type === 'dispute') {
+    if (isSeller) return `/seller/disputes/${referenceId}`
+    if (isAdmin) return `/admin/dashboard/disputes/${referenceId}`
+    return `/user/disputes/${referenceId}`
+  }
   if (type === 'shop') return '/seller/profile'
-  if (type === 'withdrawal') return '/user/profile/wallet'
+  if (type === 'chat_message') {
+    if (isSeller) return `/seller/chat?conversation=${referenceId}`
+    return null
+  }
+  if (type === 'withdrawal') {
+    if (isSeller) return '/seller/wallet'
+    return '/user/profile/wallet'
+  }
   return null
 }
 
@@ -27,6 +49,7 @@ const STALE_MS = 30_000
 export function NotificationDropdown() {
   const { session } = useAuth()
   const router = useRouter()
+  const pathname = usePathname() ?? ''
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -55,10 +78,25 @@ export function NotificationDropdown() {
     fetchNotifications()
   }, [fetchNotifications])
 
-  // Poll ngầm mỗi 20s để cập nhật badge số thông báo chưa đọc
+  // Realtime: server gửi NotificationsUpdated qua SignalR khi có thông báo mới
+  useEffect(() => {
+    const token = session?.access_token
+    if (!token) return
+
+    const connection = createNotificationsRealtimeConnection(token, () => {
+      void fetchNotifications(true)
+    })
+    void startNotificationsRealtimeConnection(connection)
+
+    return () => {
+      void disposeNotificationsRealtimeConnection(connection)
+    }
+  }, [session?.access_token, fetchNotifications])
+
+  // Dự phòng: poll chậm nếu mất kết nối hub
   useEffect(() => {
     if (!session) return
-    const timer = setInterval(() => fetchNotifications(true), 20_000)
+    const timer = setInterval(() => fetchNotifications(true), 60_000)
     return () => clearInterval(timer)
   }, [session, fetchNotifications])
 
@@ -102,7 +140,7 @@ export function NotificationDropdown() {
     }
 
     // Điều hướng nếu có URL liên quan
-    const url = getNotificationUrl(item)
+    const url = getNotificationUrl(item, pathname)
     if (url) {
       setOpen(false)
       setClosing(false)
@@ -251,7 +289,7 @@ export function NotificationDropdown() {
                 ) : (
                   <div className="max-h-105 overflow-y-auto">
                     {notifications.map((item) => {
-                      const url = getNotificationUrl(item)
+                      const url = getNotificationUrl(item, pathname)
                       return (
                         <button
                           key={item.id}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { cn } from "@/lib/utils"
+import { sortMessagesChronological } from "@/lib/sort-chat-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import {
@@ -62,6 +63,20 @@ export interface ChatProductInfo {
   imageUrl: string | null
   price: number
   shopId: string
+}
+
+function productContextToAttached(
+  pc: NonNullable<ConversationDto["productContext"]>,
+  shopId: string
+): ChatProductInfo {
+  return {
+    id: pc.productId,
+    slug: pc.slug,
+    name: pc.name,
+    imageUrl: pc.imageUrl ?? null,
+    price: pc.price,
+    shopId,
+  }
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -204,9 +219,17 @@ export function ChatWidget() {
     }
 
     try {
-      const conv = await startOrGetConversation(shopId)
+      const conv = await startOrGetConversation(shopId, {
+        productId: product?.id,
+      })
       setActiveConv(conv)
       setView("chat")
+
+      if (conv.productContext) {
+        setAttachedProduct(productContextToAttached(conv.productContext, shopId))
+      } else if (!product) {
+        setAttachedProduct(null)
+      }
 
       const cached = messageCacheRef.current[conv.id]
       if (cached) {
@@ -215,7 +238,7 @@ export function ChatWidget() {
         setMessages(dedupedCached)
       } else {
         const detail = await fetchMessages(conv.id, 1, 50)
-        const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
+        const fetchedMessages = sortMessagesChronological(dedupeMessagesById(detail.messages))
         messageCacheRef.current[conv.id] = fetchedMessages
         setMessages(fetchedMessages)
       }
@@ -424,8 +447,8 @@ function ChatWidgetInner({
   onHideConversation,
 }: InnerProps) {
   const { session } = useAuth()
-  const token = session?.access_token
   const shouldBootstrapConversationsRef = useRef(conversations.length === 0)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const loadConversations = useCallback(async (withLoading = false) => {
     if (withLoading) setLoading(true)
     try {
@@ -450,7 +473,7 @@ function ChatWidgetInner({
   const loadMessages = useCallback(async (convId: string, force = false) => {
     const cached = messageCacheRef.current[convId]
     if (!force && cached) {
-      const dedupedCached = dedupeMessagesById(cached)
+      const dedupedCached = sortMessagesChronological(dedupeMessagesById(cached))
       messageCacheRef.current[convId] = dedupedCached
       setMessages(dedupedCached)
       setLoadingMessages(false)
@@ -462,19 +485,21 @@ function ChatWidgetInner({
     setLoadingMessages(true)
     try {
       const detail = await fetchMessages(convId, 1, 50)
-      const fetchedMessages = dedupeMessagesById(detail.messages.reverse())
+      const fetchedMessages = sortMessagesChronological(dedupeMessagesById(detail.messages))
       messageCacheRef.current[convId] = fetchedMessages
       setMessages(fetchedMessages)
       await markAsRead(convId).catch(() => {})
+      const merged = { ...detail.conversation, unreadCount: 0 }
       setConversations((prev) =>
-        prev.map((c) => c.id === convId ? { ...c, unreadCount: 0 } : c)
+        prev.map((c) => (c.id === convId ? { ...c, ...merged } : c))
       )
+      setActiveConv((prev) => (prev?.id === convId ? { ...prev, ...merged } : prev))
     } catch {
       setMessages([])
     } finally {
       setLoadingMessages(false)
     }
-  }, [setMessages, setLoadingMessages, setConversations, messageCacheRef])
+  }, [setMessages, setLoadingMessages, setConversations, setActiveConv, messageCacheRef])
 
   useEffect(() => {
     const connection = createChatRealtimeConnection(session?.access_token, {
@@ -530,11 +555,15 @@ function ChatWidgetInner({
 
       const cached = messageCacheRef.current[conversationId] ?? []
       if (!cached.some((m) => m.id === incoming.id)) {
-        messageCacheRef.current[conversationId] = [...cached, incoming]
+        messageCacheRef.current[conversationId] = sortMessagesChronological([...cached, incoming])
       }
 
       if (activeConv?.id === conversationId) {
-        setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]))
+        setMessages((prev) =>
+          prev.some((m) => m.id === incoming.id)
+            ? prev
+            : sortMessagesChronological([...prev, incoming])
+        )
       }
       },
       onReconnected: () => {
@@ -560,14 +589,32 @@ function ChatWidgetInner({
   ])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages.length, messagesEndRef])
+    if (!activeConv || loadingMessages) return
+    const el = messagesScrollRef.current
+    if (!el) return
+    const scrollToBottom = () => {
+      el.scrollTop = el.scrollHeight
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToBottom)
+    })
+  }, [activeConv, messages, loadingMessages])
 
   const handleSelect = useCallback((conv: ConversationDto) => {
     setActiveConv(conv)
+    if (conv.productContext) {
+      setAttachedProduct(productContextToAttached(conv.productContext, conv.shopId))
+    } else {
+      setAttachedProduct(null)
+    }
     setView("chat")
     loadMessages(conv.id)
-  }, [setActiveConv, setView, loadMessages])
+  }, [setActiveConv, setView, loadMessages, setAttachedProduct])
+
+  useEffect(() => {
+    if (!activeConv?.productContext) return
+    setAttachedProduct(productContextToAttached(activeConv.productContext, activeConv.shopId))
+  }, [activeConv?.productContext, activeConv?.shopId, setAttachedProduct])
 
   const handleBack = () => {
     setView("list")
@@ -591,10 +638,14 @@ function ChatWidgetInner({
     try {
       if (content) {
         const textMsg = await sendMessage(activeConv.id, content, "text")
-        setMessages((prev) => (prev.some((m) => m.id === textMsg.id) ? prev : [...prev, textMsg]))
+        setMessages((prev) =>
+          prev.some((m) => m.id === textMsg.id)
+            ? prev
+            : sortMessagesChronological([...prev, textMsg])
+        )
         const cached = messageCacheRef.current[activeConv.id] ?? []
         if (!cached.some((m) => m.id === textMsg.id)) {
-          messageCacheRef.current[activeConv.id] = [...cached, textMsg]
+          messageCacheRef.current[activeConv.id] = sortMessagesChronological([...cached, textMsg])
         }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: textMsg } : c)
@@ -603,10 +654,14 @@ function ChatWidgetInner({
 
       if (attachedImage) {
         const imageMsg = await sendMessage(activeConv.id, attachedImage, "image")
-        setMessages((prev) => (prev.some((m) => m.id === imageMsg.id) ? prev : [...prev, imageMsg]))
+        setMessages((prev) =>
+          prev.some((m) => m.id === imageMsg.id)
+            ? prev
+            : sortMessagesChronological([...prev, imageMsg])
+        )
         const cached = messageCacheRef.current[activeConv.id] ?? []
         if (!cached.some((m) => m.id === imageMsg.id)) {
-          messageCacheRef.current[activeConv.id] = [...cached, imageMsg]
+          messageCacheRef.current[activeConv.id] = sortMessagesChronological([...cached, imageMsg])
         }
         setConversations((prev) =>
           prev.map((c) => c.id === activeConv.id ? { ...c, lastMessage: imageMsg } : c)
@@ -829,7 +884,10 @@ function ChatWidgetInner({
             )}
 
             {/* ── Messages ─────────────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-white">
+            <div
+              ref={messagesScrollRef}
+              className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-2.5 bg-white"
+            >
               {loadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <IconLoader2 className="size-5 animate-spin text-gray-400" />
@@ -863,6 +921,10 @@ function ChatWidgetInner({
                               src={msg.content}
                               alt="Ảnh đã gửi"
                               className="max-h-48 w-auto rounded-xl object-contain"
+                              onLoad={() => {
+                                const box = messagesScrollRef.current
+                                if (box) box.scrollTop = box.scrollHeight
+                              }}
                             />
                           ) : (
                             msg.content

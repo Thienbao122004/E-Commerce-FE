@@ -38,12 +38,15 @@ export async function sendMessage(
 
 export async function startOrGetConversation(
   shopId: string,
-  orderId?: string,
-  firstMessage?: string
+  options?: { orderId?: string; firstMessage?: string; productId?: string }
 ): Promise<ConversationDto> {
+  const body: Record<string, unknown> = { shopId }
+  if (options?.orderId) body.orderId = options.orderId
+  if (options?.firstMessage) body.firstMessage = options.firstMessage
+  if (options?.productId) body.productId = options.productId
   const json = await api.post<{ data: ConversationDto }>(
     "/api/conversations",
-    { shopId, orderId, firstMessage }
+    body
   )
   return json.data
 }
