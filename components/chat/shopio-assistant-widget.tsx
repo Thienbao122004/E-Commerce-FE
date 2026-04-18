@@ -1102,7 +1102,7 @@ export function ShopioAssistantWidget() {
       {/* ── Chat Panel ── */}
       {open && (
         <div
-          className="fixed z-[9998] flex flex-col rounded-2xl bg-white border shadow-2xl overflow-hidden"
+          className="fixed z-[9998] flex flex-col rounded-2xl bg-white border shadow-2xl overflow-hidden min-h-0"
           style={{
             bottom: "88px",
             right: "8px",
@@ -1181,7 +1181,7 @@ export function ShopioAssistantWidget() {
           <>
               {/* ── Sessions list view ── */}
               {view === "list" && (
-                <div className="flex-1 overflow-y-auto" style={{ background: "#faf8f6" }}>
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ background: "#faf8f6" }}>
                   <div className="sticky top-0 z-10 border-b px-3 py-2.5 flex items-center gap-2" style={{ background: "#faf8f6", borderColor: "#f0e8de" }}>
                     <div className="flex items-center gap-1.5 rounded-xl border px-2.5 h-10 flex-1 bg-white" style={{ borderColor: "#e5ded6" }}>
                       <Search size={13} className="text-gray-400 shrink-0" />
@@ -1356,11 +1356,11 @@ export function ShopioAssistantWidget() {
 
               {/* ── Chat view ── */}
               {view === "chat" && (
-              <>
+              <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
               {/* Messages */}
               <div
                 ref={listRef}
-                className="flex-1 overflow-y-auto px-3 py-3"
+                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-3"
                 style={{ background: "#faf8f6" }}
               >
                 {bootLoading ? (
@@ -1396,13 +1396,20 @@ export function ShopioAssistantWidget() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-2.5 w-full min-w-0 max-w-full">
                     {messages.map((m) => (
-                      <div key={m.id} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        key={m.id}
+                        className={`flex gap-2 w-full min-w-0 max-w-full ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
                         {m.role === "assistant" && <ShopioAvatar size="xs" />}
-                        <div className={`flex flex-col gap-0.5 max-w-[82%] ${m.role === "user" ? "items-end" : "items-start"}`}>
+                        <div
+                          className={`flex flex-col gap-0.5 min-w-0 ${
+                            m.role === "user" ? "max-w-[min(100%,18.5rem)] items-end" : "flex-1 max-w-full items-stretch pr-0.5"
+                          }`}
+                        >
                           <div
-                            className={`rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                            className={`rounded-2xl px-3 py-2 text-xs leading-relaxed w-full min-w-0 max-w-full ${
                               m.role === "user" ? "rounded-br-sm text-white" : "rounded-bl-sm bg-white border"
                             }`}
                             style={
@@ -1413,12 +1420,12 @@ export function ShopioAssistantWidget() {
                           >
                             {/* Text */}
                             {!(m.role === "assistant" && m.responseMeta?.products?.length) && (
-                              <p className="whitespace-pre-wrap">{m.content}</p>
+                              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.content}</p>
                             )}
 
                             {/* Product cards */}
                             {m.responseMeta?.products?.length ? (
-                              <div className="flex flex-col gap-1.5">
+                              <div className="flex flex-col gap-1.5 w-full min-w-0 max-w-full">
                                 {m.responseMeta.products.map((p) => {
                                   const sel = selectedProductsByMessageId[m.id]?.[p.id]
                                   const checked = sel?.checked ?? false
@@ -1426,10 +1433,10 @@ export function ShopioAssistantWidget() {
                                   return (
                                     <div
                                       key={p.id}
-                                      className="rounded-xl border bg-white overflow-hidden"
+                                      className="rounded-lg border bg-white overflow-hidden w-full min-w-0 max-w-full"
                                       style={{ borderColor: checked ? "#f3c97b" : "#ede5db" }}
                                     >
-                                      <div className="flex items-start gap-2 p-2">
+                                      <div className="flex items-start gap-2 p-2 min-w-0">
                                         <button
                                           type="button"
                                           onClick={() =>
@@ -1457,14 +1464,14 @@ export function ShopioAssistantWidget() {
                                             </div>
                                           )}
                                         </div>
-                                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                                          <p className="text-[11px] font-semibold truncate" style={{ color: "#2f2f2f" }}>{p.name}</p>
-                                          <p className="text-[10px] text-muted-foreground">{p.categoryName ?? "Sản phẩm gợi ý"}</p>
-                                          <div className="flex items-center justify-between gap-1">
-                                            <span className="text-[11px] font-bold" style={{ color: "var(--color-primary)" }}>
+                                        <div className="min-w-0 flex-1 flex flex-col gap-1">
+                                          <p className="text-[11px] font-semibold leading-snug break-words line-clamp-3" style={{ color: "#2f2f2f" }}>{p.name}</p>
+                                          <p className="text-[10px] text-muted-foreground line-clamp-2 break-words">{p.categoryName ?? "Sản phẩm gợi ý"}</p>
+                                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span className="text-[11px] font-bold shrink-0" style={{ color: "var(--color-primary)" }}>
                                               {formatPrice(p.basePrice)}
                                             </span>
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 shrink-0">
                                               <span className="text-[10px] text-muted-foreground">SL</span>
                                               <input
                                                 type="number" min={1} value={quantity}
@@ -1476,28 +1483,23 @@ export function ShopioAssistantWidget() {
                                                     return { ...prev, [m.id]: { ...mm, [p.id]: { checked: cur.checked, quantity: nextQty } } }
                                                   })
                                                 }}
-                                                className="h-5 w-10 rounded border px-1 text-[10px] focus:outline-none text-center"
+                                                className="h-5 w-11 rounded border px-1 text-[10px] focus:outline-none text-center"
                                                 style={{ borderColor: "#e3d3b7" }}
                                               />
                                             </div>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.preventDefault()
+                                                setQuickViewProductId(p.id)
+                                              }}
+                                              className="text-[10px] font-medium underline shrink-0 ml-auto"
+                                              style={{ color: "var(--color-primary)" }}
+                                            >
+                                              Chi tiết
+                                            </button>
                                           </div>
                                         </div>
-                                      </div>
-                                      <div
-                                        className="flex items-center justify-end px-2 py-1 border-t"
-                                        style={{ borderColor: "#f0e8de", backgroundColor: "#fdfaf6" }}
-                                      >
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.preventDefault()
-                                            setQuickViewProductId(p.id)
-                                          }}
-                                          className="text-[10px] font-medium underline"
-                                          style={{ color: "var(--color-primary)" }}
-                                        >
-                                          Xem chi tiết →
-                                        </button>
                                       </div>
                                     </div>
                                   )
@@ -1517,7 +1519,7 @@ export function ShopioAssistantWidget() {
                                     {applyingSelectionMessageId === m.id ? "Đang xử lý..." : <><CircleCheck size={10} /> Thêm vào giỏ</>}
                                   </button>
                                 </div>
-                                <p className="whitespace-pre-wrap text-xs pt-0.5">{m.content}</p>
+                                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs pt-1 border-t" style={{ borderColor: "#f0ebe3" }}>{m.content}</p>
                               </div>
                             ) : null}
 
@@ -1649,9 +1651,9 @@ export function ShopioAssistantWidget() {
                       </div>
                     ))}
                     {sending && (
-                      <div className="flex gap-2 justify-start">
+                      <div className="flex gap-2 justify-start w-full min-w-0 max-w-full">
                         <ShopioAvatar size="xs" />
-                        <div className="rounded-2xl rounded-bl-sm bg-white border" style={{ borderColor: "#e8e0d6" }}>
+                        <div className="rounded-2xl rounded-bl-sm bg-white border min-w-0 max-w-[85%]" style={{ borderColor: "#e8e0d6" }}>
                           <TypingDots />
                         </div>
                       </div>
@@ -1689,7 +1691,7 @@ export function ShopioAssistantWidget() {
                   </button>
                 </div>
               </div>
-              </>
+              </div>
               )}
             </>
         </div>
