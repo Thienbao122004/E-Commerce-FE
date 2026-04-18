@@ -34,7 +34,10 @@ export type SellerWallet = {
   heldBalance?: number
   /** Yêu cầu rút đang chờ admin duyệt */
   pendingBalance: number
+  /** Lũy kế ghi có (bút dương), trước hoàn đơn */
   totalEarnings: number
+  /** Thu nhập ròng: ghi có − hoàn đơn (BE; fallback trên FE nếu API cũ) */
+  netEarningsAfterRefunds?: number
   totalWithdrawn: number
   /** Hoàn tác do hủy/hoàn đơn (sau khi đã quyết toán) */
   totalRefunded?: number
