@@ -280,6 +280,21 @@ export default function PurchaseOrderDetailPage() {
     if (!disputeForm.title.trim()) { toast.error('Vui lòng nhập tiêu đề'); return }
     if (disputeForm.reason.trim().length < 20) { toast.error('Lý do phải có ít nhất 20 ký tự'); return }
 
+    const rawAmt = disputeForm.requestedAmount.trim()
+    const reqAmt = rawAmt === '' ? 0 : Number(rawAmt)
+    if (Number.isNaN(reqAmt) || reqAmt < 0) {
+      toast.error('Số tiền yêu cầu không hợp lệ')
+      return
+    }
+    if (reqAmt > order.totalAmount) {
+      toast.error(`Số tiền yêu cầu không được vượt quá tổng đơn (${formatPrice(order.totalAmount)})`)
+      return
+    }
+    if (Number(disputeForm.type) === DisputeType.Refund && reqAmt <= 0) {
+      toast.error('Với loại hoàn tiền, vui lòng nhập số tiền lớn hơn 0')
+      return
+    }
+
     setSubmittingDispute(true)
     try {
       const res = await createDispute({
@@ -287,7 +302,7 @@ export default function PurchaseOrderDetailPage() {
         type: Number(disputeForm.type),
         title: disputeForm.title.trim(),
         reason: disputeForm.reason.trim(),
-        requestedAmount: disputeForm.requestedAmount ? Number(disputeForm.requestedAmount) : 0,
+        requestedAmount: reqAmt,
         evidenceUrls: disputeEvidenceUrls.length > 0 ? disputeEvidenceUrls : undefined,
       })
       if (res.success) {
@@ -623,11 +638,14 @@ export default function PurchaseOrderDetailPage() {
                 id="d-amount"
                 type="number"
                 min={0}
+                max={order.totalAmount}
                 placeholder="0"
                 value={disputeForm.requestedAmount}
                 onChange={(e) => setDisputeForm((f) => ({ ...f, requestedAmount: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">Để trống nếu chỉ yêu cầu đổi/trả hàng</p>
+              <p className="text-xs text-muted-foreground">
+                Tối đa {formatPrice(order.totalAmount)} (tổng đơn). Để trống hoặc 0 nếu chỉ đổi/trả hàng — với loại Hoàn tiền thì bắt buộc nhập số tiền lớn hơn 0.
+              </p>
             </div>
           </div>
           <DialogFooter>
