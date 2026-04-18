@@ -597,6 +597,21 @@ export function ShopioAssistantWidget() {
     () => addresses.find((a) => a.isDefault) ?? addresses[0] ?? null,
     [addresses]
   )
+
+  useEffect(() => {
+    if (open) {
+      window.dispatchEvent(new CustomEvent('chat-widget-opened', { detail: 'shopio-assistant' }))
+    }
+  }, [open])
+
+  useEffect(() => {
+    const handleOpened = (e: Event) => {
+      if ((e as CustomEvent).detail !== 'shopio-assistant') setOpen(false)
+    }
+    window.addEventListener('chat-widget-opened', handleOpened)
+    return () => window.removeEventListener('chat-widget-opened', handleOpened)
+  }, [])
+
   const effectiveAddress = useMemo(
     () => addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress,
     [addresses, selectedAddressId, defaultAddress]

@@ -15,7 +15,7 @@ export type {
   CreateProductReviewResponse,
 } from '@/types/product-review'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5153'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 export async function getProductReviewStats(
   productId: string

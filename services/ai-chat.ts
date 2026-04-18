@@ -1,7 +1,7 @@
 import { getAccessToken } from "@/lib/auth"
 
-const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || "http://localhost:5001"
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
+const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
 
 import type {
   AiChatSessionResponse,

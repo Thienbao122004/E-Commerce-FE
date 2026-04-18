@@ -63,16 +63,8 @@ export default function FollowedShopsPage() {
         </div>
       ) : shops.length === 0 ? (
         <div className="text-center py-20 flex flex-col items-center justify-center">
-          <span className="material-symbols-outlined text-6xl text-gray-200 block mb-4">store_off</span>
+          <span className="material-symbols-outlined text-6xl text-gray-200 block mb-4">storefront</span>
           <p className="text-gray-500 text-lg font-medium">Bạn chưa theo dõi gian hàng nào.</p>
-          <Link
-            href="/"
-            className="mt-6 px-6 py-2.5 rounded-lg text-white font-bold transition hover:opacity-90 flex items-center justify-center gap-2"
-            style={{ backgroundColor: "var(--color-primary)" }}
-          >
-            <span className="material-symbols-outlined text-xl">shopping_cart</span>
-            Khám phá gian hàng ngay
-          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
