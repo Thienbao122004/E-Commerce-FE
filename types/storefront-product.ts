@@ -14,6 +14,7 @@ export interface StorefrontProduct {
   shopId: string
   shopName: string
   shopSlug: string
+  shopLogoUrl?: string | null
   basePrice: number
   currency: string
   categoryId: number | null
