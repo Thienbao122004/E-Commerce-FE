@@ -1053,6 +1053,7 @@ export function ShopioAssistantWidget() {
     setShowAddressModal(false)
   }, [])
 
+  // Hide widget when loading auth or logged out (must run after all hooks)
   if (authLoading || !session) return null
 
   return (
