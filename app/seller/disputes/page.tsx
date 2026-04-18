@@ -59,12 +59,14 @@ export default function SellerDisputesPage() {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchSellerDisputes(pg, ps)
+      const statusVal = statusFilter === "all" ? null : Number(statusFilter)
+      const typeVal = typeFilter === "all" ? null : Number(typeFilter)
+      const res = await fetchSellerDisputes(pg, ps, statusVal, typeVal)
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
       else toast.error(res.message ?? "Lỗi tải dữ liệu")
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
     finally { setLoading(false) }
-  }, [pg])
+  }, [pg, statusFilter, typeFilter])
 
   React.useEffect(() => { load() }, [load])
 
@@ -107,10 +109,7 @@ export default function SellerDisputesPage() {
     }
   }, [])
 
-  const tableFilters = React.useMemo(() => [
-    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
-    { key: "type", value: typeFilter, match: (r: Record<string, unknown>) => r.type },
-  ], [statusFilter, typeFilter])
+  const tableFilters = React.useMemo(() => [], [])
 
   const { filtered: sorted } = useTableData<SellerDispute>({
     data: disputes,

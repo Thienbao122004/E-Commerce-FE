@@ -33,10 +33,10 @@ export const description = "An interactive area chart"
 
 const chartConfig = {
   revenue: {
-    label: "Doanh thu",
+    label: "Phí sàn (doanh thu sàn)",
   },
   desktop: {
-    label: "Doanh thu (₫)",
+    label: "Phí sàn (₫)",
     color: "var(--primary)",
   },
   mobile: {
@@ -65,14 +65,14 @@ export function ChartAreaInteractive({ stats }: Props) {
     const now = new Date()
     const months: { date: string; desktop: number; mobile: number }[] = []
 
-    // Tạo dữ liệu 6 tháng gần nhất dựa trên tỷ lệ phân bổ từ tổng doanh thu
+    // Ước lượng 6 tháng từ tổng phí sàn và đơn hàng
     const totalRev = stats.revenue.totalRevenue
     const thisMonthRev = stats.revenue.thisMonthRevenue
     const lastMonthRev = stats.revenue.lastMonthRevenue
     const totalOrders = stats.orders.total
     const thisMonthOrders = stats.orders.thisMonthOrders
 
-    // Ước tính doanh thu các tháng trước dựa trên dữ liệu hiện có
+    // Ước tính phí các tháng trước dựa trên dữ liệu hiện có
     const remainingRev = Math.max(0, totalRev - thisMonthRev - lastMonthRev)
     const remainingOrders = Math.max(0, totalOrders - thisMonthOrders)
 
@@ -104,10 +104,10 @@ export function ChartAreaInteractive({ stats }: Props) {
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Doanh thu tổng quan</CardTitle>
+        <CardTitle>Doanh thu sàn (phí) — tổng quan</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            Biểu đồ doanh thu và đơn hàng 6 tháng gần nhất
+            Phí sàn và đơn hàng 6 tháng gần nhất (ước lượng từ dữ liệu hiện có)
           </span>
           <span className="@[540px]/card:hidden">6 tháng gần nhất</span>
         </CardDescription>

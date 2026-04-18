@@ -16,6 +16,7 @@ import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes
 import {
   DisputeStatus, DisputeStatusLabels, DisputeStatusColors,
   DisputeType, DisputeTypeLabels,
+  disputeRefundCeiling,
 } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
 const DisputeActionDialog = dynamic(() => import("./_components/dispute-action-dialog").then(m => m.DisputeActionDialog))
@@ -53,11 +54,13 @@ export default function DisputesPage() {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchDisputes(pg, ps, null, null)
+      const statusVal = statusFilter === "all" ? null : Number(statusFilter)
+      const typeVal = typeFilter === "all" ? null : Number(typeFilter)
+      const res = await fetchDisputes(pg, ps, statusVal, typeVal)
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
     finally { setLoading(false) }
-  }, [pg])
+  }, [pg, statusFilter, typeFilter])
 
   React.useEffect(() => { load() }, [load])
 
@@ -68,14 +71,38 @@ export default function DisputesPage() {
 
   const handleAction = async (resolution: string, adminNote: string, approvedAmount?: number) => {
     if (!dialogDispute || !resolution) return
-    if (dialogType === "approve" && approvedAmount) {
-      if (approvedAmount <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
-      if (approvedAmount > dialogDispute.requestedAmount) { toast.error("Số tiền duyệt không được vượt quá số tiền yêu cầu"); return }
+    let finalApproveAmount: number | undefined
+    if (dialogType === "approve") {
+      const d = dialogDispute
+      const ceiling = disputeRefundCeiling(d)
+      let amt = approvedAmount
+      if ((amt === undefined || Number.isNaN(amt)) && d.requestedAmount > 0) {
+        amt = d.requestedAmount
+      }
+      if (amt === undefined || Number.isNaN(amt)) {
+        toast.error("Vui lòng nhập số tiền hoàn.")
+        return
+      }
+      if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
+      if (amt > ceiling) {
+        toast.error(
+          d.requestedAmount > 0
+            ? "Số tiền duyệt không được vượt quá số tiền yêu cầu"
+            : "Số tiền duyệt không được vượt quá tổng đơn hàng"
+        )
+        return
+      }
+      finalApproveAmount = amt
     }
     setActionLoading(true)
     try {
       const res = dialogType === "approve"
-        ? await approveRefund(dialogDispute.id, approvedAmount, resolution, adminNote || undefined)
+        ? await approveRefund(
+            dialogDispute.id,
+            finalApproveAmount,
+            resolution,
+            adminNote || undefined
+          )
         : await rejectDispute(dialogDispute.id, resolution, adminNote || undefined)
       if (res.success) { toast.success(res.message ?? "Thao tác thành công"); setDialogDispute(null); setDialogType(null); load() }
       else toast.error(res.message ?? "Lỗi")
@@ -95,10 +122,8 @@ export default function DisputesPage() {
     }
   }, [])
 
-  const tableFilters = React.useMemo(() => [
-    { key: "status", value: statusFilter, match: (r: Record<string, unknown>) => r.status },
-    { key: "type", value: typeFilter, match: (r: Record<string, unknown>) => r.type },
-  ], [statusFilter, typeFilter])
+  // Trạng thái / loại lọc từ API (fetchDisputes); chỉ lọc cục bộ theo ô tìm kiếm
+  const tableFilters = React.useMemo(() => [], [])
 
   const { filtered: sorted } = useTableData<AdminDispute>({
     data: disputes,

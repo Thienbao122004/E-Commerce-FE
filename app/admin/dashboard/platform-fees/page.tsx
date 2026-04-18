@@ -251,7 +251,7 @@ export default function AdminPlatformFeesPage() {
                 className="inline-flex items-center gap-1 text-primary hover:underline"
               >
                 <IconExternalLink className="size-3.5" />
-                Tổng phí sàn trên dashboard cũng hiển thị ở thẻ &quot;Phí sàn (tích lũy)&quot;
+                Tổng phí sàn trên dashboard hiển thị ở thẻ &quot;Doanh thu sàn (phí)&quot;
               </Link>
             </p>
           </CardContent>

@@ -1,3 +1,12 @@
+/** Ngữ cảnh sản phẩm gắn với hội thoại (chat từ trang chi tiết SP). */
+export interface ChatProductContextDto {
+  productId: string
+  slug: string
+  name: string
+  imageUrl: string | null
+  price: number
+}
+
 export interface MessageDto {
   id: string
   conversationId: string
@@ -20,10 +29,10 @@ export interface ConversationDto {
   buyerAvatarUrl?: string | null
   sellerId: string
   orderId: string | null
+  productContext?: ChatProductContextDto | null
   lastMessage: MessageDto | null
   unreadCount: number
   createdAt: string
-  /** Từ API: đã tắt thông báo (theo user đang đăng nhập). */
   isMuted?: boolean
 }
 

@@ -3,6 +3,8 @@ export interface AiChatMessage {
   role: "user" | "assistant"
   content: string
   createdAt?: string
+  /** Có khi BE đã lưu suggested_products_json (phiên bản mới). */
+  products?: ProductSuggestion[]
 }
 
 export interface ProductToAdd {
@@ -74,6 +76,7 @@ export interface AiSessionMessage {
   role: "user" | "assistant"
   content: string
   createdAt?: string
+  products?: ProductSuggestion[]
 }
 
 export interface AiSessionMessagesResponse {

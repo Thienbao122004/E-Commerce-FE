@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, MessageCircle, Store, StoreIcon } from 'lucide-react'
+import { ArrowLeft, Check, MessageCircle, Package, Store, StoreIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -155,6 +155,8 @@ export default function PurchaseOrderDetailPage() {
     requestedAmount: '',
   })
   const [disputeEvidenceUrls, setDisputeEvidenceUrls] = useState<string[]>([])
+  /** Số lượng khiếu nại theo từng order line id (0 = không chọn). */
+  const [disputeLineQty, setDisputeLineQty] = useState<Record<string, number>>({})
   const [submittingDispute, setSubmittingDispute] = useState(false)
 
   // Các trạng thái đơn đã kết thúc — không cần poll
@@ -236,6 +238,20 @@ export default function PurchaseOrderDetailPage() {
     return estimated > 0 ? estimated : 0
   }, [order, subtotalAmount])
 
+  /** Tổng giá trị hàng đang được chọn khiếu nại (đơn giá × SL) — trần hợp lý cho «số tiền yêu cầu hoàn». */
+  const disputeSelectedGoodsValue = useMemo(() => {
+    if (!order) return 0
+    let sum = 0
+    for (const it of order.items) {
+      const q = Math.min(
+        Math.max(0, Math.floor(disputeLineQty[it.id] ?? 0)),
+        it.quantity,
+      )
+      sum += it.unitPrice * q
+    }
+    return sum
+  }, [order, disputeLineQty])
+
   const handleConfirm = async () => {
     if (!order) return
     setConfirming(true)
@@ -270,15 +286,58 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const openDisputeDialog = () => {
-    setDisputeForm({ type: String(DisputeType.Refund), title: '', reason: '', requestedAmount: '' })
+    if (!order) return
+    const init: Record<string, number> = {}
+    for (const it of order.items) init[it.id] = 0
+    setDisputeLineQty(init)
+    setDisputeForm({ type: String(DisputeType.Damaged), title: '', reason: '', requestedAmount: '' })
     setDisputeEvidenceUrls([])
     setDisputeDialogOpen(true)
+  }
+
+  const handleDisputeTypeChange = (v: string) => {
+    setDisputeForm((f) => {
+      const next = { ...f, type: v }
+      if (Number(v) === DisputeType.Refund && order && disputeSelectedGoodsValue > 0) {
+        next.requestedAmount = String(Math.round(disputeSelectedGoodsValue))
+      }
+      return next
+    })
+  }
+
+  const applyDisputeAmountFromSelection = () => {
+    if (disputeSelectedGoodsValue <= 0) {
+      toast.error('Chọn ít nhất một sản phẩm với số lượng khiếu nại trước.')
+      return
+    }
+    setDisputeForm((f) => ({
+      ...f,
+      requestedAmount: String(Math.round(disputeSelectedGoodsValue)),
+    }))
   }
 
   const handleSubmitDispute = async () => {
     if (!order) return
     if (!disputeForm.title.trim()) { toast.error('Vui lòng nhập tiêu đề'); return }
     if (disputeForm.reason.trim().length < 20) { toast.error('Lý do phải có ít nhất 20 ký tự'); return }
+
+    const items = order.items
+      .map((it) => ({
+        orderItemId: it.id,
+        quantity: Math.min(Math.max(0, Math.floor(disputeLineQty[it.id] ?? 0)), it.quantity),
+      }))
+      .filter((x) => x.quantity > 0)
+
+    if (items.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một sản phẩm và nhập số lượng khiếu nại (ô SL bên dưới).')
+      return
+    }
+
+    let maxSelected = 0
+    for (const line of items) {
+      const it = order.items.find((i) => i.id === line.orderItemId)
+      if (it) maxSelected += it.unitPrice * line.quantity
+    }
 
     const rawAmt = disputeForm.requestedAmount.trim()
     const reqAmt = rawAmt === '' ? 0 : Number(rawAmt)
@@ -288,6 +347,12 @@ export default function PurchaseOrderDetailPage() {
     }
     if (reqAmt > order.totalAmount) {
       toast.error(`Số tiền yêu cầu không được vượt quá tổng đơn (${formatPrice(order.totalAmount)})`)
+      return
+    }
+    if (reqAmt > maxSelected + 0.01) {
+      toast.error(
+        `Số tiền yêu cầu không được vượt quá giá trị các sản phẩm đã chọn (${formatPrice(maxSelected)}).`,
+      )
       return
     }
     if (Number(disputeForm.type) === DisputeType.Refund && reqAmt <= 0) {
@@ -303,6 +368,7 @@ export default function PurchaseOrderDetailPage() {
         title: disputeForm.title.trim(),
         reason: disputeForm.reason.trim(),
         requestedAmount: reqAmt,
+        items,
         evidenceUrls: disputeEvidenceUrls.length > 0 ? disputeEvidenceUrls : undefined,
       })
       if (res.success) {
@@ -571,24 +637,75 @@ export default function PurchaseOrderDetailPage() {
 
       {/* Dispute Dialog */}
       <Dialog open={disputeDialogOpen} onOpenChange={(v) => { if (!v) setDisputeDialogOpen(false) }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Khiếu nại đơn hàng {order.orderCode ? `#${order.orderCode}` : ''}</DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-1 text-xs">
                 {disputeDeadline && (
                   <p className="text-amber-700 font-medium">
-                    ⏳ Hạn khiếu nại: {formatDate(disputeDeadline.toISOString())}
+                     Hạn khiếu nại: {formatDate(disputeDeadline.toISOString())}
                   </p>
                 )}
-                <p>Mỗi đơn hàng chỉ được khiếu nại một lần. Vui lòng cung cấp bằng chứng rõ ràng.</p>
+                <p>Mỗi đơn hàng chỉ được khiếu nại một lần. Chọn đúng sản phẩm và số lượng bị lỗi — bằng chứng rõ ràng.</p>
               </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {order && order.items.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Sản phẩm trong phạm vi khiếu nại <span className="text-red-500">*</span></Label>
+                <p className="text-xs text-muted-foreground">
+                  Nhập số lượng khiếu nại từng món (0 = không khiếu nại). Ví dụ chỉ tiêu đen hư: nhập 1 ở dòng đó, các món khác để 0.
+                </p>
+                <div className="rounded-lg border divide-y max-h-[240px] overflow-y-auto bg-muted/20">
+                  {order.items.map((it) => (
+                    <div key={it.id} className="flex items-center gap-3 p-2.5 text-sm">
+                      <div
+                        className="size-12 shrink-0 rounded-md border bg-white overflow-hidden flex items-center justify-center"
+                        style={{ borderColor: 'var(--border, #e5e7eb)' }}
+                      >
+                        {it.thumbnailUrl ? (
+                          <Image
+                            src={it.thumbnailUrl}
+                            alt=""
+                            width={48}
+                            height={48}
+                            className="size-full object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <Package className="size-6 text-muted-foreground/55" aria-hidden />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium leading-snug line-clamp-2">{it.productName}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {formatPrice(it.unitPrice)} / món · tối đa {it.quantity}
+                        </p>
+                      </div>
+                      <Input
+                        type="number"
+                        className="w-[4.5rem] h-9 text-center tabular-nums"
+                        min={0}
+                        max={it.quantity}
+                        value={disputeLineQty[it.id] ?? 0}
+                        onChange={(e) => {
+                          const raw = parseInt(e.target.value, 10)
+                          const v = Number.isNaN(raw)
+                            ? 0
+                            : Math.min(it.quantity, Math.max(0, raw))
+                          setDisputeLineQty((prev) => ({ ...prev, [it.id]: v }))
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="d-type">Loại khiếu nại <span className="text-red-500">*</span></Label>
-              <Select value={disputeForm.type} onValueChange={(v) => setDisputeForm((f) => ({ ...f, type: v }))}>
+              <Select value={disputeForm.type} onValueChange={handleDisputeTypeChange}>
                 <SelectTrigger id="d-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DISPUTE_TYPE_OPTIONS.map((opt) => (
@@ -633,7 +750,20 @@ export default function PurchaseOrderDetailPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="d-amount">Số tiền yêu cầu hoàn (₫)</Label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Label htmlFor="d-amount">Số tiền yêu cầu hoàn (₫)</Label>
+                {disputeSelectedGoodsValue > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8"
+                    onClick={applyDisputeAmountFromSelection}
+                  >
+                    Điền theo phần hàng ({formatPrice(disputeSelectedGoodsValue)})
+                  </Button>
+                )}
+              </div>
               <Input
                 id="d-amount"
                 type="number"
@@ -643,8 +773,15 @@ export default function PurchaseOrderDetailPage() {
                 value={disputeForm.requestedAmount}
                 onChange={(e) => setDisputeForm((f) => ({ ...f, requestedAmount: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">
-                Tối đa {formatPrice(order.totalAmount)} (tổng đơn). Để trống hoặc 0 nếu chỉ đổi/trả hàng — với loại Hoàn tiền thì bắt buộc nhập số tiền lớn hơn 0.
+              <p className="text-xs text-muted-foreground space-y-0.5">
+                <span className="block">
+                  Giá trị phần hàng đã chọn:{' '}
+                  <strong className="text-foreground tabular-nums">
+                    {disputeSelectedGoodsValue > 0 ? formatPrice(disputeSelectedGoodsValue) : '—'}
+                  </strong>
+                  {disputeSelectedGoodsValue > 0 &&
+                    ' (vd. chỉ tiêu đen 1 món → tối đa yêu cầu hoàn bằng giá món đó).'}
+                </span>
               </p>
             </div>
           </div>

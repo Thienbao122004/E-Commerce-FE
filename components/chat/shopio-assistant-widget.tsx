@@ -57,6 +57,7 @@ import {
   removeAiChatUiCache,
 } from "@/lib/ai-chat-ui-cache"
 import { dedupeMergedChatMessages } from "@/lib/ai-chat-merge-messages"
+import { mapHistoryMessageToUi } from "@/lib/ai-chat-map-history"
 
 type PaymentMethod = "vnpay" | "momo"
 
@@ -655,13 +656,15 @@ export function ShopioAssistantWidget() {
       const session = await aiChatService.getOrCreateSession()
       setSessionId(session.sessionId)
 
-      // BE history (plain messages, không có responseMeta/products)
-      const beMessages: UiMessage[] = (session.history ?? []).map((m) => ({
-        id: `${m.id}`,
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-      }))
+      const beMessages: UiMessage[] = (session.history ?? []).map((m) =>
+        mapHistoryMessageToUi(session.sessionId, {
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt,
+          products: m.products,
+        })
+      )
 
       // Load cache
       const cachedRaw = readAiChatUiCache(session.sessionId)
@@ -965,9 +968,15 @@ export function ShopioAssistantWidget() {
           } catch { /* ignore */ }
         }
 
-        const beMessages: UiMessage[] = res.messages.map((m) => ({
-          id: m.id, role: m.role, content: m.content, createdAt: m.createdAt,
-        }))
+        const beMessages: UiMessage[] = res.messages.map((m) =>
+          mapHistoryMessageToUi(sid, {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            createdAt: m.createdAt,
+            products: m.products,
+          })
+        )
 
         if (cachedMessages.length > 0) {
           const cachedIds = new Set(cachedMessages.map((m) => m.id))

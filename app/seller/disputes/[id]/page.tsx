@@ -117,6 +117,22 @@ export default function SellerDisputeDetailPage() {
                       {DisputeTypeLabels[dispute.type] ?? dispute.typeName}
                     </Badge>
                   </div>
+                  {dispute.affectedItems && dispute.affectedItems.length > 0 && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <span className="text-sm text-muted-foreground">Sản phẩm khiếu nại</span>
+                        <ul className="text-sm space-y-1">
+                          {dispute.affectedItems.map((row) => (
+                            <li key={row.orderItemId} className="flex justify-between gap-2">
+                              <span>{row.productName} × {row.quantity}</span>
+                              <span className="tabular-nums text-muted-foreground">{currency(row.lineTotal)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  )}
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Tiêu đề</span>
@@ -269,6 +285,11 @@ export default function SellerDisputeDetailPage() {
                   {dispute.canRespond && (
                     <>
                       <Separator />
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Khi admin yêu cầu phản hồi, bạn trả lời tại đây: nội dung lưu vào hồ sơ khiếu nại để{' '}
+                        <strong className="font-medium text-foreground">bộ phận hỗ trợ xem xét</strong>
+                        . Khách hàng cũng xem được phản hồi của shop (mục «Phản hồi từ người bán»).
+                      </p>
                       <Button className="w-full gap-2" onClick={openRespond}>
                         <IconMessageCircle className="size-4" />
                         {dispute.sellerResponse ? "Cập nhật phản hồi" : "Gửi phản hồi"}
@@ -288,8 +309,15 @@ export default function SellerDisputeDetailPage() {
             <DialogTitle>
               {dispute?.sellerResponse ? "Cập nhật phản hồi" : "Gửi phản hồi khiếu nại"}
             </DialogTitle>
-            <DialogDescription>
-              {dispute?.title} · Khách: {dispute?.customerName}
+            <DialogDescription asChild>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <p>
+                  {dispute?.title} · Khách: {dispute?.customerName}
+                </p>
+                <p className="text-xs">
+                  Nội dung gửi đi sẽ hiển thị cho bộ phận hỗ trợ khi xử lý khiếu nại; khách cũng thấy trên đơn của họ.
+                </p>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

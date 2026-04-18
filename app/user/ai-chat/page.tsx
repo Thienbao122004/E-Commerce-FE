@@ -19,6 +19,7 @@ import { profileService } from '@/services/profile'
 import { formatPriceVND as formatPrice, formatTimeVN as formatTime } from '@/lib/formatters'
 import { readAiChatUiCache, writeAiChatUiCache, removeAiChatUiCache } from '@/lib/ai-chat-ui-cache'
 import { dedupeMergedChatMessages } from '@/lib/ai-chat-merge-messages'
+import { mapHistoryMessageToUi } from '@/lib/ai-chat-map-history'
 import type { AddressResponse } from '@/types/profile'
 
 const CART_UPDATED_EVENT = 'cart:updated'
@@ -191,14 +192,18 @@ export default function UserAiChatPage() {
         const session = await aiChatService.getOrCreateSession()
         if (!mounted) return
         setSessionId(session.sessionId)
-        const historyMessages: UiMessage[] = (session.history ?? []).map((m) => ({
-          id: `${m.id}`,
-          role: m.role,
-          content: m.content,
-          createdAt: m.createdAt,
-        }))
-        setMessages(historyMessages)
 
+        const beMessages: UiMessage[] = (session.history ?? []).map((m) =>
+          mapHistoryMessageToUi(session.sessionId, {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            createdAt: m.createdAt,
+            products: m.products,
+          })
+        )
+
+        let cachedMessages: UiMessage[] = []
         const cachedRaw = readAiChatUiCache(session.sessionId)
         if (cachedRaw) {
           try {
@@ -208,9 +213,7 @@ export default function UserAiChatPage() {
               selectedAddressId?: string
               selectedProductsByMessageId?: Record<string, Record<string, ProductSelection>>
             }
-            if (cached.messages?.length) {
-              setMessages(dedupeMergedChatMessages(cached.messages))
-            }
+            if (cached.messages?.length) cachedMessages = cached.messages
             if (cached.confirmTarget) setConfirmTarget(cached.confirmTarget)
             if (cached.selectedAddressId) setSelectedAddressId(cached.selectedAddressId)
             if (cached.selectedProductsByMessageId) {
@@ -219,6 +222,14 @@ export default function UserAiChatPage() {
           } catch {
             // ignore
           }
+        }
+
+        if (cachedMessages.length > 0) {
+          const cachedIds = new Set(cachedMessages.map((m) => m.id))
+          const extraFromBe = beMessages.filter((m) => !cachedIds.has(m.id))
+          setMessages(dedupeMergedChatMessages([...cachedMessages, ...extraFromBe]))
+        } else {
+          setMessages(dedupeMergedChatMessages(beMessages))
         }
         await loadAddresses()
       } catch (err) {

@@ -1,10 +1,14 @@
 "use client"
 
 import { useRef, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { formatChatMessageTimeVN as formatMessageTime } from "@/lib/formatters"
+import {
+  formatChatMessageTimeVN as formatMessageTime,
+  formatPriceVND as formatPrice,
+} from "@/lib/formatters"
 import {
   IconCheck,
   IconChecks,
@@ -66,12 +70,19 @@ type Props = {
 
 export function ChatWindow({ conversation, messages, message, loadingMessages, sending, onMessageChange, onSend, onBack, className }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const { user } = useAuth()
   const currentUserId = user?.id
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages.length, conversation.id])
+    const el = messagesScrollRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight
+      })
+    })
+  }, [messages, loadingMessages, conversation.id])
 
   return (
     <div className={cn("flex flex-col flex-1 min-w-0 h-full min-h-0 overflow-hidden", className)}>
@@ -88,7 +99,42 @@ export function ChatWindow({ conversation, messages, message, loadingMessages, s
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-muted/10">
+      {conversation.productContext ? (
+        <div className="px-4 pt-3 pb-2 shrink-0 border-b bg-muted/20">
+          <Link
+            href={`/seller/products?id=${conversation.productContext.productId}`}
+            className="flex gap-2.5 rounded-lg border bg-background p-2.5 hover:bg-muted/60 transition-colors"
+          >
+            <div className="size-14 shrink-0 rounded-md overflow-hidden bg-muted">
+              {conversation.productContext.imageUrl ? (
+                <img
+                  src={conversation.productContext.imageUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="size-full flex items-center justify-center text-[10px] text-muted-foreground">
+                  SP
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
+              <p className="text-xs font-medium leading-snug line-clamp-2 text-foreground hover:underline">
+                {conversation.productContext.name}
+              </p>
+              <p className="text-xs font-bold text-red-600">{formatPrice(conversation.productContext.price)}</p>
+            </div>
+            <span className="self-center shrink-0 text-[11px] font-medium text-primary whitespace-nowrap">
+              Đang xem
+            </span>
+          </Link>
+        </div>
+      ) : null}
+
+      <div
+        ref={messagesScrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-muted/10"
+      >
         {loadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <IconLoader2 className="size-5 animate-spin text-muted-foreground" />

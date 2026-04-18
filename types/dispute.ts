@@ -65,9 +65,29 @@ export const DisputeTypeLabels: Record<number, string> = {
 }
 
 // ---------- Types ----------
+/** Dòng đơn nằm trong phạm vi khiếu nại (TMĐT: chọn món + SL). */
+export type DisputeAffectedItem = {
+  orderItemId: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+/** Trần hoàn tiền khi admin duyệt: min(yêu cầu, tổng đơn) — nếu không có orderTotal thì chỉ so với yêu cầu. */
+export function disputeRefundCeiling(d: {
+  requestedAmount: number
+  orderTotal?: number
+}): number {
+  if (d.requestedAmount > 0) return d.requestedAmount
+  return d.orderTotal ?? 0
+}
+
 export type AdminDispute = {
   id: string
   orderId: string
+  /** Tổng đơn — dùng làm trần khi khách không nhập số tiền yêu cầu */
+  orderTotal?: number
   customerId: string
   customerName: string
   shopId: string
@@ -91,6 +111,7 @@ export type AdminDispute = {
   evidenceUrls: string[]
   sellerEvidenceUrls: string[]
   customerNote: string | null
+  affectedItems?: DisputeAffectedItem[]
 }
 
 export type DisputeListResponse = {
@@ -133,6 +154,7 @@ export type SellerDispute = {
   canRespond: boolean
   customerNote: string | null
   adminNote: string | null
+  affectedItems?: DisputeAffectedItem[]
 }
 
 export type SellerDisputeListResponse = {
@@ -173,6 +195,8 @@ export type CustomerDispute = {
   updatedAt: string
   canUpdateEvidence: boolean
   customerNote: string | null
+  adminNote?: string | null
+  affectedItems?: DisputeAffectedItem[]
 }
 
 export type CustomerDisputeListResponse = {
@@ -197,4 +221,6 @@ export type CreateDisputeRequest = {
   reason: string
   requestedAmount: number
   evidenceUrls?: string[]
+  /** Bắt buộc: ít nhất một dòng hàng trong đơn. */
+  items: { orderItemId: string; quantity: number }[]
 }

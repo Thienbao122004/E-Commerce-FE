@@ -44,14 +44,17 @@ export function SellerRevenueChart({ wallet, products, loading }: Props) {
   // Build revenue chart data from wallet
   const revenueData = React.useMemo(() => {
     if (!wallet) return []
-    const total = wallet.totalEarnings
+    const gross = wallet.totalEarnings
+    const refunded = wallet.totalRefunded ?? 0
+    const net =
+      wallet.netEarningsAfterRefunds ?? Math.max(0, gross - refunded)
     const available = wallet.availableBalance
     const held = wallet.heldBalance ?? 0
     const pending = wallet.pendingBalance
     const withdrawn = wallet.totalWithdrawn
 
     return [
-      { name: "Tổng thu nhập", revenue: total },
+      { name: "Thu nhập ròng", revenue: net },
       { name: "Khả dụng", revenue: available },
       { name: "Tạm giữ", revenue: held },
       { name: "Chờ duyệt rút", revenue: pending },
