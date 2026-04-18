@@ -533,25 +533,10 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {/* ── Product info ── */}
               <div className="flex flex-col gap-5">
-                {/* Category badge */}
-                {product.categoryName && (
-                  <Link
-                    href={`/?category=${product.categoryId}`}
-                    className="self-start text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide transition-colors hover:opacity-80"
-                    style={{ backgroundColor: "rgba(236,127,19,0.12)", color: "var(--color-text-secondary)" }}
-                  >
-                    {product.categoryName}
-                  </Link>
-                )}
-
-                {/* Name */}
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight" style={{ color: "var(--color-text-main)" }}>
                   {product.name}
                 </h1>
-
-                {/* Rating + sold */}
                 <div className="flex items-center flex-wrap gap-4 text-sm">
                   <StarRating rating={product.averageRating} count={product.reviewCount} />
                   {product.soldCount > 0 && (
@@ -569,7 +554,6 @@ export default function ProductDetailPage() {
 
                 <Separator className="bg-gray-100" />
 
-                {/* Price */}
                 <div className="flex items-end gap-3 flex-wrap">
                   <span className="text-4xl font-bold" style={{ color: "#E07A5F" }}>
                     {formatPrice(displayPrice)}
