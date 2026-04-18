@@ -17,10 +17,11 @@ import { aiChatService, type AiChatSendResponse } from '@/services/ai-chat'
 import { cartService } from '@/services/cart'
 import { profileService } from '@/services/profile'
 import { formatPriceVND as formatPrice, formatTimeVN as formatTime } from '@/lib/formatters'
+import { readAiChatUiCache, writeAiChatUiCache, removeAiChatUiCache } from '@/lib/ai-chat-ui-cache'
+import { dedupeMergedChatMessages } from '@/lib/ai-chat-merge-messages'
 import type { AddressResponse } from '@/types/profile'
 
 const CART_UPDATED_EVENT = 'cart:updated'
-const AI_CHAT_CACHE_PREFIX = 'ai-chat-ui-state:'
 
 type UiMessage = {
   id: string
@@ -198,7 +199,7 @@ export default function UserAiChatPage() {
         }))
         setMessages(historyMessages)
 
-        const cachedRaw = sessionStorage.getItem(`${AI_CHAT_CACHE_PREFIX}${session.sessionId}`)
+        const cachedRaw = readAiChatUiCache(session.sessionId)
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw) as {
@@ -207,7 +208,9 @@ export default function UserAiChatPage() {
               selectedAddressId?: string
               selectedProductsByMessageId?: Record<string, Record<string, ProductSelection>>
             }
-            if (cached.messages?.length) setMessages(cached.messages)
+            if (cached.messages?.length) {
+              setMessages(dedupeMergedChatMessages(cached.messages))
+            }
             if (cached.confirmTarget) setConfirmTarget(cached.confirmTarget)
             if (cached.selectedAddressId) setSelectedAddressId(cached.selectedAddressId)
             if (cached.selectedProductsByMessageId) {
@@ -238,7 +241,7 @@ export default function UserAiChatPage() {
       selectedAddressId,
       selectedProductsByMessageId,
     })
-    sessionStorage.setItem(`${AI_CHAT_CACHE_PREFIX}${sessionId}`, payload)
+    writeAiChatUiCache(sessionId, payload)
   }, [sessionId, messages, confirmTarget, selectedAddressId, selectedProductsByMessageId])
 
   const buildConfirmFromCart = useCallback(async (messageId: string, preferredProductId?: string, quantity = 1) => {
@@ -562,7 +565,7 @@ export default function UserAiChatPage() {
     setConfirmTarget(null)
     setSelectedProductsByMessageId({})
     setInput('')
-    sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sessionId}`)
+    removeAiChatUiCache(sessionId)
   }, [sessionId])
 
   /* ─── Loading screen ─── */
