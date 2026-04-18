@@ -67,6 +67,16 @@ export type DashboardStats = {
     lastMonthFees: number
     settledOrdersCount: number
   }
+  dailyStats?: {
+    dateLabel: string
+    revenue: number
+    orders: number
+  }[]
+  monthlyStats?: {
+    dateLabel: string
+    revenue: number
+    orders: number
+  }[]
 }
 
 export type DashboardStatsResponse = {
