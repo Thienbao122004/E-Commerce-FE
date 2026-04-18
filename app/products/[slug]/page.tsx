@@ -718,26 +718,31 @@ export default function ProductDetailPage() {
                   )}
                 </div>
 
-                {/* Perks */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { icon: "local_shipping", text: "Miễn phí vận chuyển" },
-                    { icon: "verified", text: "Hàng chính hãng" },
-                    { icon: "autorenew", text: "Đổi trả trong 7 ngày" },
-                    { icon: "support_agent", text: "Hỗ trợ 24/7" },
-                  ].map((perk) => (
-                    <div key={perk.text} className="flex items-center gap-2 text-xs text-gray-500">
-                      <span
-                        className="material-symbols-outlined text-base"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        {perk.icon}
-                      </span>
-                      {perk.text}
-                    </div>
-                  ))}
-                </div>
-
+                {/* Tags & Materials */}
+                {(product.tags?.length || product.materials?.length) ? (
+                  <div className="flex flex-col gap-3 py-4 border-y border-gray-100">
+                    {product.tags && product.tags.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm font-medium text-gray-600 min-w-[70px]">Từ khóa:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {product.tags.map(t => (
+                            <span key={t} className="px-2.5 py-1 text-xs rounded-md bg-orange-50 text-orange-700 border border-orange-100">#{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {product.materials && product.materials.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm font-medium text-gray-600 min-w-[70px] mt-0.5">Chất liệu:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {product.materials.map(m => (
+                            <span key={m} className="px-2.5 py-1 text-xs rounded-md bg-gray-100 text-gray-700 border border-gray-200">{m}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

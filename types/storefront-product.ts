@@ -30,6 +30,8 @@ export interface StorefrontProductDetail extends StorefrontProduct {
   reviewCount: number
   variants: ProductVariantStorefront[]
   totalStock: number
+  tags?: string[]
+  materials?: string[]
 }
 
 export interface StorefrontProductsResponse {
