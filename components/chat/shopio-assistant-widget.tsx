@@ -51,6 +51,12 @@ import {
   formatPriceVND as formatPrice,
   formatTimeVN as formatTime,
 } from "@/lib/formatters"
+import {
+  readAiChatUiCache,
+  writeAiChatUiCache,
+  removeAiChatUiCache,
+} from "@/lib/ai-chat-ui-cache"
+import { dedupeMergedChatMessages } from "@/lib/ai-chat-merge-messages"
 
 type PaymentMethod = "vnpay" | "momo"
 
@@ -60,7 +66,6 @@ const PAYMENT_METHODS: Array<{ id: PaymentMethod; label: string; logo: string }>
 ]
 
 const CART_UPDATED_EVENT = "cart:updated"
-const AI_CHAT_CACHE_PREFIX = "ai-chat-ui-state:"
 
 type UiMessage = {
   id: string
@@ -637,7 +642,7 @@ export function ShopioAssistantWidget() {
       }))
 
       // Load cache
-      const cachedRaw = sessionStorage.getItem(`${AI_CHAT_CACHE_PREFIX}${session.sessionId}`)
+      const cachedRaw = readAiChatUiCache(session.sessionId)
       let cachedMessages: UiMessage[] = []
       if (cachedRaw) {
         try {
@@ -659,15 +664,10 @@ export function ShopioAssistantWidget() {
       if (cachedMessages.length > 0) {
         const cachedIds = new Set(cachedMessages.map((m) => m.id))
         const extraFromBe = beMessages.filter((m) => !cachedIds.has(m.id))
-        // Sắp xếp theo thời gian
-        const merged = [...cachedMessages, ...extraFromBe].sort((a, b) => {
-          const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
-          const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
-          return ta - tb
-        })
+        const merged = dedupeMergedChatMessages([...cachedMessages, ...extraFromBe])
         setMessages(merged)
       } else {
-        setMessages(beMessages)
+        setMessages(dedupeMergedChatMessages(beMessages))
       }
 
       await loadAddresses()
@@ -689,8 +689,8 @@ export function ShopioAssistantWidget() {
   // Cache đầy đủ: messages + UI state (để khôi phục sau khi redirect VNPay/MoMo)
   useEffect(() => {
     if (!sessionId) return
-    sessionStorage.setItem(
-      `${AI_CHAT_CACHE_PREFIX}${sessionId}`,
+    writeAiChatUiCache(
+      sessionId,
       JSON.stringify({ messages, confirmTarget, selectedAddressId, selectedProductsByMessageId })
     )
   }, [sessionId, messages, confirmTarget, selectedAddressId, selectedProductsByMessageId])
@@ -898,7 +898,7 @@ export function ShopioAssistantWidget() {
 
   const handleNewConversation = useCallback(async () => {
     // Xoá cache session cũ
-    if (sessionId) sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sessionId}`)
+    if (sessionId) removeAiChatUiCache(sessionId)
 
     // Reset UI ngay lập tức
     setMessages([])
@@ -934,7 +934,7 @@ export function ShopioAssistantWidget() {
     try {
       const res = await aiChatService.getSessionMessages(sid)
       if (res.success) {
-        const cachedRaw = sessionStorage.getItem(`${AI_CHAT_CACHE_PREFIX}${sid}`)
+        const cachedRaw = readAiChatUiCache(sid)
         let cachedMessages: UiMessage[] = []
         if (cachedRaw) {
           try {
@@ -950,14 +950,10 @@ export function ShopioAssistantWidget() {
         if (cachedMessages.length > 0) {
           const cachedIds = new Set(cachedMessages.map((m) => m.id))
           const extra = beMessages.filter((m) => !cachedIds.has(m.id))
-          const merged = [...cachedMessages, ...extra].sort((a, b) => {
-            const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
-            const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
-            return ta - tb
-          })
+          const merged = dedupeMergedChatMessages([...cachedMessages, ...extra])
           setMessages(merged)
         } else {
-          setMessages(beMessages)
+          setMessages(dedupeMergedChatMessages(beMessages))
         }
 
         setSessionId(sid)
@@ -1002,7 +998,7 @@ export function ShopioAssistantWidget() {
             setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
 
             if (sid === sessionId) {
-              sessionStorage.removeItem(`${AI_CHAT_CACHE_PREFIX}${sid}`)
+              removeAiChatUiCache(sid)
               setSessionId(null)
               setMessages([])
               setConfirmTarget(null)
