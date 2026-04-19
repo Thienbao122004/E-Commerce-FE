@@ -17,6 +17,7 @@ const accountLinks = [
 
 const orderLinks = [
   { href: '/user/purchase', label: 'Đơn Mua', icon: 'receipt_long' },
+  { href: '/user/followed-shops', label: 'Shop Theo Dõi', icon: 'store' },
 ]
 
 const allLinks = [...accountLinks, ...orderLinks]

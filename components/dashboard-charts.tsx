@@ -51,14 +51,12 @@ export function DashboardCharts({ stats }: Props) {
 
   if (!stats) return null
 
-  const pf = stats.platformFees
-
-  // ── Chart 1: Doanh thu (+ phí sàn nếu có) ──
+  // Chart 1: doanh thu sàn = phí sàn (stats.revenue)
   const revenueChartData: ChartData<"line"> = {
     labels: ["Tháng trước", "Tháng này", "Hôm nay"],
     datasets: [
       {
-        label: "Doanh thu (₫)",
+        label: "Doanh thu sàn — phí (₫)",
         data: [
           stats.revenue.lastMonthRevenue,
           stats.revenue.thisMonthRevenue,
@@ -75,24 +73,6 @@ export function DashboardCharts({ stats }: Props) {
         borderWidth: 3,
         fill: true,
       },
-      ...(pf
-        ? [
-            {
-              label: "Phí sàn (₫)",
-              data: [pf.lastMonthFees, pf.thisMonthFees, pf.todayFees],
-              borderColor: "#b45309",
-              backgroundColor: "rgba(180,83,9,0.06)",
-              pointBackgroundColor: "#b45309",
-              pointBorderColor: "#fff",
-              pointBorderWidth: 2,
-              pointRadius: 4,
-              pointHoverRadius: 6,
-              tension: 0.4,
-              borderWidth: 2,
-              fill: true,
-            },
-          ]
-        : []),
     ],
   }
 
@@ -266,9 +246,9 @@ export function DashboardCharts({ stats }: Props) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-4 lg:px-6">
       <Card className="flex flex-col">
         <CardHeader>
-          <CardTitle>Doanh thu</CardTitle>
+          <CardTitle>Doanh thu sàn (phí)</CardTitle>
           <CardDescription>
-            Doanh thu đơn hoàn thành; phí sàn từ đơn đã quyết toán ví (nếu có dữ liệu)
+            Tổng phí sàn đã ghi nhận (bản ghi chưa bị hoàn), so sánh tháng trước / tháng này / hôm nay
           </CardDescription>
         </CardHeader>
         <CardContent>

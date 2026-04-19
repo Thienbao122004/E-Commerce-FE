@@ -502,6 +502,28 @@ function ProductQuickViewModal({
                    </div>
                  )}
 
+                 {product.tags && product.tags.length > 0 && (
+                   <div className="mt-2 text-xs">
+                     <p className="font-semibold mb-1.5" style={{ color: "var(--color-text-main)" }}>Từ khóa (Tags):</p>
+                     <div className="flex flex-wrap gap-1.5">
+                       {product.tags.map(t => (
+                         <span key={t} className="px-2 py-0.5 rounded border" style={{ backgroundColor: "#faf6f0", borderColor: "#e5ded6", color: "#8a6a36" }}>#{t}</span>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
+                 {product.materials && product.materials.length > 0 && (
+                   <div className="mt-2 text-xs">
+                     <p className="font-semibold mb-1.5" style={{ color: "var(--color-text-main)" }}>Chất liệu:</p>
+                     <div className="flex flex-wrap gap-1.5">
+                       {product.materials.map(m => (
+                         <span key={m} className="px-2 py-0.5 rounded border" style={{ backgroundColor: "#f3f4f6", borderColor: "#e5e7eb", color: "#4b5563" }}>{m}</span>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+
                  <div className="text-xs text-gray-600 border-t pt-3 mt-1 flex-1 flex flex-col" style={{ borderColor: "#e5ded6" }}>
                    <p className="font-semibold mb-2 text-[13px]" style={{ color: "var(--color-text-main)" }}>Chi tiết mô tả:</p>
                    <div className="overflow-y-auto max-h-[160px] pr-2 custom-scrollbar">
@@ -575,6 +597,21 @@ export function ShopioAssistantWidget() {
     () => addresses.find((a) => a.isDefault) ?? addresses[0] ?? null,
     [addresses]
   )
+
+  useEffect(() => {
+    if (open) {
+      window.dispatchEvent(new CustomEvent('chat-widget-opened', { detail: 'shopio-assistant' }))
+    }
+  }, [open])
+
+  useEffect(() => {
+    const handleOpened = (e: Event) => {
+      if ((e as CustomEvent).detail !== 'shopio-assistant') setOpen(false)
+    }
+    window.addEventListener('chat-widget-opened', handleOpened)
+    return () => window.removeEventListener('chat-widget-opened', handleOpened)
+  }, [])
+
   const effectiveAddress = useMemo(
     () => addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress,
     [addresses, selectedAddressId, defaultAddress]

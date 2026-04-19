@@ -6,7 +6,7 @@ import {
   IconCurrencyDollar,
   IconAlertTriangle,
   IconBuildingStore,
-  IconPercentage,
+  IconChartBar,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -59,13 +59,15 @@ export function SectionCards({ stats, loading }: Props) {
   const growth = stats.revenue.growthPercentage
   const isGrowthPositive = growth >= 0
 
-  const pf = stats.platformFees ?? {
-    totalFees: 0,
-    todayFees: 0,
-    thisMonthFees: 0,
-    lastMonthFees: 0,
-    settledOrdersCount: 0,
+  const gmv = stats.completedOrderGmv ?? {
+    totalGmv: 0,
+    todayGmv: 0,
+    thisMonthGmv: 0,
+    lastMonthGmv: 0,
+    growthPercentage: 0,
   }
+  const gmvGrowth = gmv.growthPercentage
+  const isGmvGrowthPositive = gmvGrowth >= 0
 
   const ord = stats.orders
   const confirmed = ord.confirmed ?? 0
@@ -75,7 +77,7 @@ export function SectionCards({ stats, loading }: Props) {
   const cards = [
     {
       icon: IconCurrencyDollar,
-      label: "Tổng doanh thu",
+      label: "Doanh thu sàn (phí)",
       value: currency(stats.revenue.totalRevenue),
       badge: `${isGrowthPositive ? "+" : ""}${growth.toFixed(1)}%`,
       badgePositive: isGrowthPositive,
@@ -119,13 +121,13 @@ export function SectionCards({ stats, loading }: Props) {
       sub: `Tạm khóa: ${fmt(stats.shops.suspended)}`,
     },
     {
-      icon: IconPercentage,
-      label: "Phí sàn (tích lũy)",
-      value: currency(pf.totalFees),
-      badge: `${fmt(pf.settledOrdersCount)} đơn quyết toán`,
-      badgePositive: true,
-      footer: `Tháng này: ${currency(pf.thisMonthFees)}`,
-      sub: `Hôm nay: ${currency(pf.todayFees)} · Tháng trước: ${currency(pf.lastMonthFees)}`,
+      icon: IconChartBar,
+      label: "GMV đơn hoàn thành",
+      value: currency(gmv.totalGmv),
+      badge: `${isGmvGrowthPositive ? "+" : ""}${gmvGrowth.toFixed(1)}%`,
+      badgePositive: isGmvGrowthPositive,
+      footer: `Tháng này: ${currency(gmv.thisMonthGmv)} · ${fmt(ord.completed)} đơn HT`,
+      sub: `Hôm nay: ${currency(gmv.todayGmv)} · Tháng trước: ${currency(gmv.lastMonthGmv)}`,
     },
   ]
 

@@ -33,10 +33,10 @@ export const description = "An interactive area chart"
 
 const chartConfig = {
   revenue: {
-    label: "Doanh thu",
+    label: "Phí sàn (doanh thu sàn)",
   },
   desktop: {
-    label: "Doanh thu (₫)",
+    label: "Phí sàn (₫)",
     color: "var(--primary)",
   },
   mobile: {
@@ -51,77 +51,76 @@ type Props = {
 
 export function ChartAreaInteractive({ stats }: Props) {
   const isMobile = useIsMobile()
-  const [timeRange, setTimeRange] = React.useState("90d")
-
-  React.useEffect(() => {
-    if (isMobile) {
-      setTimeRange("7d")
-    }
-  }, [isMobile])
+  const [timeRange, setTimeRange] = React.useState("7d")
 
   const chartData = React.useMemo(() => {
     if (!stats) return []
 
-    const now = new Date()
-    const months: { date: string; desktop: number; mobile: number }[] = []
+    const dataPoints: { date: string; desktop: number; mobile: number }[] = []
 
-    // Tạo dữ liệu 6 tháng gần nhất dựa trên tỷ lệ phân bổ từ tổng doanh thu
-    const totalRev = stats.revenue.totalRevenue
-    const thisMonthRev = stats.revenue.thisMonthRevenue
-    const lastMonthRev = stats.revenue.lastMonthRevenue
-    const totalOrders = stats.orders.total
-    const thisMonthOrders = stats.orders.thisMonthOrders
-
-    // Ước tính doanh thu các tháng trước dựa trên dữ liệu hiện có
-    const remainingRev = Math.max(0, totalRev - thisMonthRev - lastMonthRev)
-    const remainingOrders = Math.max(0, totalOrders - thisMonthOrders)
-
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const label = formatMonthYearVN(d)
-
-      let rev = 0
-      let ord = 0
-
-      if (i === 0) {
-        rev = thisMonthRev
-        ord = thisMonthOrders
-      } else if (i === 1) {
-        rev = lastMonthRev
-        ord = Math.round(remainingOrders * 0.3)
-      } else {
-        // Phân bổ đều cho các tháng còn lại
-        rev = Math.round(remainingRev / 4)
-        ord = Math.round(remainingOrders * 0.7 / 4)
-      }
-
-      months.push({ date: label, desktop: rev, mobile: ord })
+    if (timeRange === "7d") {
+      const daily = stats.dailyStats || []
+      const sliced = daily.slice(-7)
+      sliced.forEach(d => {
+        // Date format from backend is yyyy-MM-dd
+        const parts = d.dateLabel.split("-")
+        const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.dateLabel
+        dataPoints.push({
+          date: label,
+          desktop: d.revenue,
+          mobile: d.orders
+        })
+      })
+    } else if (timeRange === "30d") {
+      const daily = stats.dailyStats || []
+      daily.forEach(d => {
+        const parts = d.dateLabel.split("-")
+        const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : d.dateLabel
+        dataPoints.push({
+          date: label,
+          desktop: d.revenue,
+          mobile: d.orders
+        })
+      })
+    } else {
+      // 180d (6 months)
+      const monthly = stats.monthlyStats || []
+      monthly.forEach(m => {
+        // Date format from backend is yyyy-MM
+        const parts = m.dateLabel.split("-")
+        const label = parts.length === 2 ? `Thg ${parts[1]}` : m.dateLabel
+        dataPoints.push({
+          date: label,
+          desktop: m.revenue,
+          mobile: m.orders
+        })
+      })
     }
 
-    return months
-  }, [stats])
+    return dataPoints
+  }, [stats, timeRange])
 
   return (
     <Card className="@container/card">
       <CardHeader>
-        <CardTitle>Doanh thu tổng quan</CardTitle>
+        <CardTitle>Doanh thu sàn (phí) — tổng quan</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            Biểu đồ doanh thu và đơn hàng 6 tháng gần nhất
+            Phí sàn và đơn hàng theo thời gian (ước lượng từ dữ liệu hiện có)
           </span>
-          <span className="@[540px]/card:hidden">6 tháng gần nhất</span>
+          <span className="@[540px]/card:hidden">Theo thời gian</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
             type="single"
             value={timeRange}
-            onValueChange={setTimeRange}
+            onValueChange={(val) => val && setTimeRange(val)}
             variant="outline"
             className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
           >
-            <ToggleGroupItem value="90d">3 tháng</ToggleGroupItem>
-            <ToggleGroupItem value="30d">30 ngày</ToggleGroupItem>
             <ToggleGroupItem value="7d">7 ngày</ToggleGroupItem>
+            <ToggleGroupItem value="30d">30 ngày</ToggleGroupItem>
+            <ToggleGroupItem value="180d">6 tháng</ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger
@@ -129,17 +128,17 @@ export function ChartAreaInteractive({ stats }: Props) {
               size="sm"
               aria-label="Select a value"
             >
-              <SelectValue placeholder="3 tháng" />
+              <SelectValue placeholder="7 ngày" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="90d" className="rounded-lg">
-                3 tháng
+              <SelectItem value="7d" className="rounded-lg">
+                7 ngày
               </SelectItem>
               <SelectItem value="30d" className="rounded-lg">
                 30 ngày
               </SelectItem>
-              <SelectItem value="7d" className="rounded-lg">
-                7 ngày
+              <SelectItem value="180d" className="rounded-lg">
+                6 tháng
               </SelectItem>
             </SelectContent>
           </Select>

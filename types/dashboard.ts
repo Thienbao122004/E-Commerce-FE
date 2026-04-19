@@ -36,11 +36,20 @@ export type DashboardStats = {
     todayOrders: number
     thisMonthOrders: number
   }
+  /** Doanh thu sàn: tổng phí đã ghi nhận (bản ghi chưa bị hoàn). */
   revenue: {
     totalRevenue: number
     todayRevenue: number
     thisMonthRevenue: number
     lastMonthRevenue: number
+    growthPercentage: number
+  }
+  /** GMV: tổng giá trị đơn hoàn thành (khác thu nhập sàn). */
+  completedOrderGmv?: {
+    totalGmv: number
+    todayGmv: number
+    thisMonthGmv: number
+    lastMonthGmv: number
     growthPercentage: number
   }
   disputes: {
@@ -58,6 +67,16 @@ export type DashboardStats = {
     lastMonthFees: number
     settledOrdersCount: number
   }
+  dailyStats?: {
+    dateLabel: string
+    revenue: number
+    orders: number
+  }[]
+  monthlyStats?: {
+    dateLabel: string
+    revenue: number
+    orders: number
+  }[]
 }
 
 export type DashboardStatsResponse = {

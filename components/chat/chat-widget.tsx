@@ -266,6 +266,20 @@ export function ChatWidget() {
   }, [openChatByShop])
 
   useEffect(() => {
+    if (open) {
+      window.dispatchEvent(new CustomEvent('chat-widget-opened', { detail: 'seller-chat' }))
+    }
+  }, [open])
+
+  useEffect(() => {
+    const handleOpened = (e: Event) => {
+      if ((e as CustomEvent).detail !== 'seller-chat') setOpen(false)
+    }
+    window.addEventListener('chat-widget-opened', handleOpened)
+    return () => window.removeEventListener('chat-widget-opened', handleOpened)
+  }, [])
+
+  useEffect(() => {
     if (!("Notification" in window)) return
 
     const hasUnread = conversations.some((c) => c.unreadCount > 0)

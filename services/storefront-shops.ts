@@ -83,3 +83,18 @@ export async function unfollowShop(shopId: string): Promise<void> {
   const { api } = await import("@/lib/api-client")
   await api.delete(`/api/shops/${shopId}/follow`)
 }
+
+export interface ShopFollowedDto {
+  id: string
+  name: string
+  slug: string
+  logoUrl?: string | null
+  followerCount: number
+  averageRating: number
+}
+
+export async function getFollowedShops(): Promise<{ success: boolean; shops: ShopFollowedDto[] }> {
+  const { api } = await import("@/lib/api-client")
+  const res = await api.get<{ success: boolean; shops: ShopFollowedDto[] }>(`/api/shops/followed`)
+  return res
+}

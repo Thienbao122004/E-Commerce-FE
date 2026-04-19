@@ -14,6 +14,7 @@ export interface StorefrontProduct {
   shopId: string
   shopName: string
   shopSlug: string
+  shopLogoUrl?: string | null
   basePrice: number
   currency: string
   categoryId: number | null
@@ -30,6 +31,8 @@ export interface StorefrontProductDetail extends StorefrontProduct {
   reviewCount: number
   variants: ProductVariantStorefront[]
   totalStock: number
+  tags?: string[]
+  materials?: string[]
 }
 
 export interface StorefrontProductsResponse {

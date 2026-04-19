@@ -1,6 +1,6 @@
 import { getAccessToken } from "@/lib/auth"
 
-const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5153"
+const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL
 
 import type {
   GenerateReportRequest,

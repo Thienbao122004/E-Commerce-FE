@@ -78,52 +78,57 @@ function ProductCardSkeleton() {
 
 const HERO_SLIDES = [
   {
-    image: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&q=80",
-    badge: "Ưu đãi hôm nay",
+    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
+    badge: "Thời trang",
     badgeColor: "#ec7f13",
-    title: "Sale lớn\ncuối tuần",
-    titleHighlight: "Giảm đến 50%",
-    desc: "Hàng ngàn sản phẩm chính hãng — giao nhanh toàn quốc",
+    title: "Bộ sưu tập\nThời trang 2025",
+    titleHighlight: "Phong cách mới",
+    desc: "Cập nhật xu hướng thời trang hiện đại kết hợp nét truyền thống",
     cta: "Mua ngay",
     btnColor: "#ec7f13",
     overlay: "rgba(28, 14, 4, 0.58)",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
-    badge: "Hàng mới về",
-    badgeColor: "#9a734c",
-    title: "Thời trang\nthu đông 2025",
-    titleHighlight: "Xu hướng mới",
-    desc: "Phong cách hiện đại kết hợp nét truyền thống Việt Nam",
-    cta: "Khám phá",
-    btnColor: "#9a734c",
-    overlay: "rgba(20, 12, 6, 0.60)",
+    link: "/search?category=thoi-trang-nu",
   },
   {
     image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80",
     badge: "Đặc sản vùng miền",
-    badgeColor: "#c47a2b",
+    badgeColor: "#9a734c",
     title: "Tinh hoa\nẩm thực Việt",
     titleHighlight: "Giao tận nhà",
-    desc: "Cà phê Đà Lạt, đặc sản Hội An, mắm Phú Quốc — chính gốc 100%",
+    desc: "Mùi vị chắt lọc từ những nguyên liệu tươi ngon và chất lượng nhất",
     cta: "Đặt hàng",
+    btnColor: "#9a734c",
+    overlay: "rgba(20, 12, 6, 0.60)",
+    link: "/search?category=bach-hoa-online",
+  },
+  {
+    image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=1200&q=80",
+    badge: "Đồ thủ công",
+    badgeColor: "#c47a2b",
+    title: "Nghệ thuật\nthủ công mỹ nghệ",
+    titleHighlight: "Độc đáo & Tinh xảo",
+    desc: "Sản phẩm từ những nghệ nhân tài ba, mang đậm bản sắc văn hóa",
+    cta: "Khám phá",
     btnColor: "#c47a2b",
     overlay: "rgba(24, 12, 2, 0.55)",
+    link: "/search?category=nha-cua-doi-song",
   },
 ]
 
 const SIDE_BANNERS = [
   {
-    image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600&q=80",
-    sub: "Trang trí nhà cửa",
-    title: "Đồ thủ\ncông mỹ nghệ",
+    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
+    sub: "Làm đẹp",
+    title: "Chăm sóc\ncơ thể & sắc đẹp",
     overlay: "rgba(28, 14, 4, 0.52)",
+    link: "/search?category=sac-dep",
   },
   {
-    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
-    sub: "Voucher giảm 30%",
-    title: "Làm đẹp\nchính hãng",
+    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80",
+    sub: "Trang trí",
+    title: "Nội thất\nkhông gian sống",
     overlay: "rgba(28, 14, 4, 0.52)",
+    link: "/search?category=nha-cua-doi-song",
   },
 ]
 
@@ -326,13 +331,14 @@ export default function LandingPage() {
                     {slide.titleHighlight}
                   </span>
                   <p className="text-white/75 text-sm mb-5 leading-relaxed">{slide.desc}</p>
-                  <button
+                  <Link
+                    href={slide.link}
                     className="self-start px-5 py-2 rounded-lg text-white font-bold text-sm flex items-center gap-1.5 transition-opacity hover:opacity-90"
                     style={{ backgroundColor: slide.btnColor }}
                   >
                     {slide.cta}
                     <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>arrow_forward</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}
@@ -365,7 +371,7 @@ export default function LandingPage() {
             {SIDE_BANNERS.map((b, i) => (
               <Link
                 key={i}
-                href="/search"
+                href={b.link}
                 className="relative flex-1 rounded-xl overflow-hidden cursor-pointer group block"
               >
                 <div

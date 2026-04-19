@@ -136,13 +136,13 @@ export default function CustomerDisputeDetailPage() {
     <div className="w-full max-w-[860px] mx-auto">
       <div className="py-2 md:py-0">
         <div className="flex items-center gap-2 mb-6">
-          <button
-            onClick={() => router.back()}
+          <Link
+            href="/"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[var(--color-primary)] transition-colors"
           >
-            <span className="material-symbols-outlined text-base">arrow_back</span>
-            Quay lại
-          </button>
+            <span className="material-symbols-outlined text-base">home</span>
+            Trang chủ
+          </Link>
           <span className="text-gray-300">/</span>
           <Link href="/user/disputes" className="text-sm text-gray-500 hover:text-[var(--color-primary)]">
             Khiếu nại của tôi

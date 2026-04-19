@@ -12,32 +12,17 @@ import {
   Dialog, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
 import {
   fetchMyDisputes,
-  createDispute,
   cancelMyDispute,
 } from "@/services/disputes"
-import { ordersService } from "@/services/orders"
 import {
-  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeType, DisputeTypeLabels,
+  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels,
 } from "@/types/dispute"
 import type { CustomerDispute } from "@/types/dispute"
 import { formatDateVN, formatPriceVND } from "@/lib/formatters"
-import { EvidenceUploader } from "@/components/common/evidence-uploader"
 
 const PAGE_SIZE = 10
-
-// Trạng thái customer được phép hủy (đồng bộ BE CustomerCancellableStatuses):
-//   Pending        — chưa ai xử lý
-//   WaitingSeller  — đang chờ seller, customer có thể đã tự dàn xếp
-//   WaitingCustomer — admin chờ phản hồi thêm từ customer
-// KHÔNG cho hủy khi UnderReview (admin đang xử lý)
 const CANCELLABLE_DISPUTE_STATUSES = new Set<number>([
   DisputeStatus.Pending,
   DisputeStatus.WaitingSeller,
@@ -56,39 +41,16 @@ const STATUS_FILTER_OPTIONS = [
   { value: String(DisputeStatus.Cancelled), label: "Đã hủy" },
 ]
 
-const TYPE_OPTIONS = [
-  { value: String(DisputeType.Refund), label: "Hoàn tiền" },
-  { value: String(DisputeType.Return), label: "Trả hàng" },
-  { value: String(DisputeType.Damaged), label: "Hàng hư hỏng" },
-  { value: String(DisputeType.NotReceived), label: "Không nhận được" },
-  { value: String(DisputeType.WrongItem), label: "Sai hàng" },
-  { value: String(DisputeType.QualityIssue), label: "Chất lượng không đảm bảo" },
-  { value: String(DisputeType.Other), label: "Khác" },
-]
 
 export default function MyDisputesPage() {
   const { session, isLoading: authLoading } = useAuth()
   const router = useRouter()
-
   const [disputes, setDisputes] = useState<CustomerDispute[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("all")
 
-  // Create dialog state
-  const [createOpen, setCreateOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState({
-    orderId: "",
-    type: String(DisputeType.Refund),
-    title: "",
-    reason: "",
-    requestedAmount: "",
-  })
-  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([])
-
-  // Cancel dialog state
   const [cancelTarget, setCancelTarget] = useState<CustomerDispute | null>(null)
   const [canceling, setCanceling] = useState(false)
 
@@ -118,86 +80,6 @@ export default function MyDisputesPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const resetForm = () => {
-    setForm({ orderId: "", type: String(DisputeType.Refund), title: "", reason: "", requestedAmount: "" })
-    setEvidenceUrls([])
-  }
-
-  const handleCreate = async () => {
-    let actualOrderId = form.orderId.trim();
-    if (!actualOrderId) { toast.error("Vui lòng nhập mã đơn hàng"); return }
-
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!UUID_REGEX.test(actualOrderId)) {
-      setCreating(true);
-      try {
-        const res = await ordersService.getMyOrders(1, 100);
-        const matchedItem = res.orders.find(o => o.orderCode?.trim().toUpperCase() === actualOrderId.toUpperCase());
-        if (matchedItem) {
-          actualOrderId = matchedItem.id;
-        } else {
-          toast.error("Không tìm thấy đơn hàng bạn nhập trong danh sách gần đây. Hãy vào Đơn mua -> Chi tiết đơn -> bấm Khiếu nại để thử lại.");
-          setCreating(false);
-          return;
-        }
-      } catch {
-        toast.error("Lỗi khi kiểm tra mã đơn hàng.");
-        setCreating(false);
-        return;
-      }
-    }
-
-    if (!form.title.trim()) { toast.error("Vui lòng nhập tiêu đề"); setCreating(false); return }
-    if (form.reason.trim().length < 20) { toast.error("Lý do phải có ít nhất 20 ký tự"); setCreating(false); return }
-
-    setCreating(true)
-    try {
-      const detail = await ordersService.getOrderById(actualOrderId)
-      if (!detail.success || !detail.order) {
-        toast.error(detail.message ?? "Không tải được chi tiết đơn hàng")
-        setCreating(false)
-        return
-      }
-      const o = detail.order
-      if (o.items.length === 0) {
-        toast.error("Đơn không có sản phẩm")
-        setCreating(false)
-        return
-      }
-      let disputeItems: { orderItemId: string; quantity: number }[]
-      if (o.items.length === 1) {
-        disputeItems = [{ orderItemId: o.items[0].id, quantity: o.items[0].quantity }]
-      } else {
-        toast.error(
-          "Đơn có nhiều sản phẩm — vui lòng vào Đơn mua → Chi tiết đơn → Khiếu nại để chọn đúng món bị lỗi.",
-        )
-        setCreating(false)
-        return
-      }
-
-      const res = await createDispute({
-        orderId: actualOrderId,
-        type: Number(form.type),
-        title: form.title.trim(),
-        reason: form.reason.trim(),
-        requestedAmount: form.requestedAmount ? Number(form.requestedAmount) : 0,
-        evidenceUrls: evidenceUrls.length > 0 ? evidenceUrls : undefined,
-        items: disputeItems,
-      })
-      if (res.success) {
-        toast.success("Đã tạo khiếu nại thành công")
-        setCreateOpen(false)
-        resetForm()
-        load()
-      } else {
-        toast.error(res.message ?? "Lỗi tạo khiếu nại")
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Lỗi tạo khiếu nại")
-    } finally {
-      setCreating(false)
-    }
-  }
 
   const handleCancel = async () => {
     if (!cancelTarget) return
@@ -225,7 +107,6 @@ export default function MyDisputesPage() {
   return (
     <div className="w-full max-w-[900px] mx-auto">
       <div className="py-2 md:py-0">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div
@@ -243,17 +124,17 @@ export default function MyDisputesPage() {
               )}
             </div>
           </div>
-          <Button
-            onClick={() => { resetForm(); setCreateOpen(true) }}
-            style={{ backgroundColor: "var(--color-primary)", color: "white" }}
-            className="gap-2"
-          >
-            <span className="material-symbols-outlined text-sm">add</span>
-            Tạo khiếu nại
-          </Button>
+          <Link href="/user/disputes/new">
+            <Button
+              style={{ backgroundColor: "var(--color-primary)", color: "white" }}
+              className="gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Tạo khiếu nại
+            </Button>
+          </Link>
         </div>
 
-        {/* Filter — cuộn ngang trên mobile */}
         <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
           {STATUS_FILTER_OPTIONS.map((opt) => (
             <button
@@ -270,7 +151,6 @@ export default function MyDisputesPage() {
           ))}
         </div>
 
-        {/* List */}
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -355,108 +235,6 @@ export default function MyDisputesPage() {
         )}
       </div>
 
-      {/* Create Dispute Dialog */}
-      <Dialog open={createOpen} onOpenChange={(v) => { if (!v) setCreateOpen(false) }}>
-        <DialogContent className="w-full max-w-lg max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
-          <DialogHeader>
-            <DialogTitle>Tạo khiếu nại mới</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-1">
-                <p>Điều kiện để khiếu nại:</p>
-                <ul className="list-disc list-inside text-xs space-y-0.5 text-amber-700">
-                  <li>Đơn hàng phải ở trạng thái <strong>Đã giao</strong> hoặc <strong>Hoàn thành</strong></li>
-                  <li>Trong vòng <strong>7 ngày</strong> kể từ khi đơn được giao/hoàn thành</li>
-                  <li>Mỗi đơn hàng chỉ được khiếu nại <strong>một lần</strong></li>
-                </ul>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="orderId">Mã đơn hàng (ID) <span className="text-red-500">*</span></Label>
-              <Input
-                id="orderId"
-                placeholder="Ví dụ: 3767D68F260418"
-                value={form.orderId}
-                onChange={(e) => setForm((f) => ({ ...f, orderId: e.target.value }))}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-gray-400">
-                Vào{" "}
-                <Link href="/user/purchase" className="text-[var(--color-primary)] underline" target="_blank">
-                  Đơn mua của tôi
-                </Link>
-                {" "}→ mở chi tiết đơn → nhấn nút &ldquo;Khiếu nại&rdquo; để tự điền mã.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="type">Loại khiếu nại <span className="text-red-500">*</span></Label>
-              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
-                <SelectTrigger id="type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TYPE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="title">Tiêu đề <span className="text-red-500">*</span></Label>
-              <Input
-                id="title"
-                placeholder="Ví dụ: Sản phẩm bị hỏng khi nhận hàng"
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                maxLength={255}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="reason">Lý do chi tiết <span className="text-red-500">*</span></Label>
-              <Textarea
-                id="reason"
-                placeholder="Mô tả rõ ràng vấn đề bạn gặp phải, tình trạng sản phẩm, thời điểm phát hiện... (tối thiểu 20 ký tự)"
-                value={form.reason}
-                onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-                className="min-h-[100px]"
-                maxLength={2000}
-              />
-              <p className={`text-xs ${form.reason.length < 20 && form.reason.length > 0 ? "text-red-400" : "text-gray-400"}`}>
-                {form.reason.length}/2000 ký tự {form.reason.length > 0 && form.reason.length < 20 && `(còn thiếu ${20 - form.reason.length})`}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Bằng chứng
-                <span className="ml-1.5 text-xs text-gray-400 font-normal">ảnh / video từ thiết bị, tối đa 10</span>
-              </Label>
-              <EvidenceUploader
-                urls={evidenceUrls}
-                onChange={setEvidenceUrls}
-                disabled={creating}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="amount">Số tiền yêu cầu hoàn (₫)</Label>
-              <Input
-                id="amount"
-                type="number"
-                min={0}
-                placeholder="0"
-                value={form.requestedAmount}
-                onChange={(e) => setForm((f) => ({ ...f, requestedAmount: e.target.value }))}
-              />
-              <p className="text-xs text-gray-400">Để trống hoặc nhập 0 nếu chỉ yêu cầu đổi/trả hàng</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>Hủy</Button>
-            <Button onClick={handleCreate} disabled={creating}
-              style={{ backgroundColor: "var(--color-primary)", color: "white" }}>
-              {creating ? "Đang tạo..." : "Tạo khiếu nại"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Cancel Dialog */}
       <Dialog open={cancelTarget !== null} onOpenChange={(v) => { if (!v) setCancelTarget(null) }}>

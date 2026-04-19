@@ -533,25 +533,10 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {/* ── Product info ── */}
               <div className="flex flex-col gap-5">
-                {/* Category badge */}
-                {product.categoryName && (
-                  <Link
-                    href={`/?category=${product.categoryId}`}
-                    className="self-start text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide transition-colors hover:opacity-80"
-                    style={{ backgroundColor: "rgba(236,127,19,0.12)", color: "var(--color-text-secondary)" }}
-                  >
-                    {product.categoryName}
-                  </Link>
-                )}
-
-                {/* Name */}
                 <h1 className="text-2xl md:text-3xl font-bold leading-tight" style={{ color: "var(--color-text-main)" }}>
                   {product.name}
                 </h1>
-
-                {/* Rating + sold */}
                 <div className="flex items-center flex-wrap gap-4 text-sm">
                   <StarRating rating={product.averageRating} count={product.reviewCount} />
                   {product.soldCount > 0 && (
@@ -569,7 +554,6 @@ export default function ProductDetailPage() {
 
                 <Separator className="bg-gray-100" />
 
-                {/* Price */}
                 <div className="flex items-end gap-3 flex-wrap">
                   <span className="text-4xl font-bold" style={{ color: "#E07A5F" }}>
                     {formatPrice(displayPrice)}
@@ -718,26 +702,31 @@ export default function ProductDetailPage() {
                   )}
                 </div>
 
-                {/* Perks */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { icon: "local_shipping", text: "Miễn phí vận chuyển" },
-                    { icon: "verified", text: "Hàng chính hãng" },
-                    { icon: "autorenew", text: "Đổi trả trong 7 ngày" },
-                    { icon: "support_agent", text: "Hỗ trợ 24/7" },
-                  ].map((perk) => (
-                    <div key={perk.text} className="flex items-center gap-2 text-xs text-gray-500">
-                      <span
-                        className="material-symbols-outlined text-base"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        {perk.icon}
-                      </span>
-                      {perk.text}
-                    </div>
-                  ))}
-                </div>
-
+                {/* Tags & Materials */}
+                {(product.tags?.length || product.materials?.length) ? (
+                  <div className="flex flex-col gap-3 py-4 border-y border-gray-100">
+                    {product.tags && product.tags.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm font-medium text-gray-600 min-w-[70px]">Từ khóa:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {product.tags.map(t => (
+                            <span key={t} className="px-2.5 py-1 text-xs rounded-md bg-orange-50 text-orange-700 border border-orange-100">#{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {product.materials && product.materials.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <span className="text-sm font-medium text-gray-600 min-w-[70px] mt-0.5">Chất liệu:</span>
+                        <div className="flex flex-wrap gap-2">
+                          {product.materials.map(m => (
+                            <span key={m} className="px-2.5 py-1 text-xs rounded-md bg-gray-100 text-gray-700 border border-gray-200">{m}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

@@ -40,6 +40,7 @@ function SearchPageContent() {
   const [activeParentCategory, setActiveParentCategory] = useState<StorefrontCategory | null>(null)
   const [subCategories, setSubCategories] = useState<StorefrontCategory[]>([])
   const [searchCategories, setSearchCategories] = useState<StorefrontCategory[]>([])
+  const [shopResults, setShopResults] = useState<Array<{ slug: string; name: string; logoUrl?: string | null }>>([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -73,6 +74,29 @@ function SearchPageContent() {
       if (res.success) {
         setProducts(res.products)
         setTotalCount(res.totalCount)
+        if (p === 1) {
+          const uniqueShops = new Map<string, { slug: string; name: string; logoUrl?: string | null }>()
+          for (const prod of res.products) {
+            if (prod.shopSlug && !uniqueShops.has(prod.shopSlug)) {
+              if (q && prod.shopName.toLowerCase().includes(q.trim().toLowerCase())) {
+                uniqueShops.set(prod.shopSlug, { slug: prod.shopSlug, name: prod.shopName, logoUrl: prod.shopLogoUrl })
+              }
+            }
+          }
+          let shops = Array.from(uniqueShops.values())
+          if (shops.length === 0 && q) {
+            const fallbackShops = new Map<string, { slug: string; name: string; logoUrl?: string | null }>()
+            for (const prod of res.products) {
+              if (prod.shopSlug && !fallbackShops.has(prod.shopSlug)) {
+                fallbackShops.set(prod.shopSlug, { slug: prod.shopSlug, name: prod.shopName, logoUrl: prod.shopLogoUrl })
+              }
+            }
+            shops = Array.from(fallbackShops.values())
+          }
+          setShopResults(shops.slice(0, 4))
+        } else {
+          setShopResults([])
+        }
       }
     } catch { }
     finally { setLoading(false) }
@@ -484,6 +508,35 @@ function SearchPageContent() {
               </div>
             ) : (
               <>
+                {shopResults.length > 0 && page === 1 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Gian hàng liên quan</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {shopResults.map(shop => (
+                        <Link 
+                          key={shop.slug} 
+                          href={`/shop/${shop.slug}`}
+                          className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-200 hover:border-[var(--color-primary)] hover:shadow-sm transition-all"
+                        >
+                          <div className="size-12 rounded-full overflow-hidden shrink-0 border border-gray-100 flex items-center justify-center bg-gray-50 text-[var(--color-primary)]">
+                            {shop.logoUrl ? (
+                              <img src={shop.logoUrl} alt={shop.name} className="size-full object-cover" />
+                            ) : (
+                              <span className="material-symbols-outlined text-2xl">storefront</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm font-bold truncate" style={{ color: "var(--color-text-main)" }}>{shop.name}</h4>
+                            <span className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                              Xem gian hàng <span className="material-symbols-outlined" style={{ fontSize: 12 }}>chevron_right</span>
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {products.map((product) => {
                     const img = product.imageUrls?.[0]
