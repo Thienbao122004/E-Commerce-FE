@@ -81,3 +81,28 @@ export type TagSuggestionLogResponse = {
   modified: number
   rejected: number
 }
+
+export type MaterialLogSuggested = {
+  materialId: string | null
+  materialName: string
+  confidence: number
+}
+
+export type MaterialSuggestionLogItem = {
+  id: string
+  productId: string
+  productName: string | null
+  suggestedMaterials: MaterialLogSuggested[]
+  chosenMaterialIds: string[]
+  chosenMaterialNames: string[]
+  action: "accepted" | "modified" | "rejected"
+  createdAt: string
+}
+
+export type MaterialSuggestionLogResponse = {
+  items: MaterialSuggestionLogItem[]
+  total: number
+  accepted: number
+  modified: number
+  rejected: number
+}

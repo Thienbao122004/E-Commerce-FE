@@ -37,6 +37,7 @@ import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
   aiAnalyzeProduct,
   aiAnalyzeImage,
+  aiCommitProductTagSession,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import { supabase } from "@/lib/supabase"
@@ -132,11 +133,55 @@ function parseTagIdFromSuggestion(tag: TagSuggestion & { tag_id?: unknown }): nu
   return null
 }
 
+/** Độ tin cậy gửi lên API commit (0–1 hoặc 0–100 đều được). */
+function tagConfidenceForCommit(s: TagSuggestion): number {
+  const ext = s as TagSuggestion & { confidenceScore?: number }
+  const raw = ext.confidenceScore ?? ext.confidence
+  if (raw == null || !Number.isFinite(raw)) return 0
+  return raw
+}
+
+function resolveChosenTagNames(
+  selTagIds: number[],
+  tagSuggestions: TagSuggestion[],
+  platformTags: Tag[],
+): string[] {
+  const byId = new Map<number, string>()
+  for (const t of platformTags) byId.set(t.id, t.name)
+  for (const sug of tagSuggestions) {
+    const id = parseTagIdFromSuggestion(sug as TagSuggestion & { tag_id?: unknown })
+    if (id != null && sug.tagName?.trim()) byId.set(id, sug.tagName.trim())
+  }
+  const names: string[] = []
+  for (const id of selTagIds) {
+    const n = byId.get(id)
+    if (n) names.push(n)
+  }
+  return names
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function isPersistableMaterialId(id: string): boolean {
   return UUID_RE.test(id)
+}
+
+function materialConfidenceForCommit(m: MaterialSuggestion): number {
+  const ext = m as MaterialSuggestion & { confidenceScore?: number }
+  const raw = ext.confidenceScore ?? ext.confidence
+  if (raw == null || !Number.isFinite(raw)) return 0
+  return raw
+}
+
+function buildSuggestedMaterialsForCommit(matSuggestions: MaterialSuggestion[]) {
+  return matSuggestions
+    .filter((m) => isPersistableMaterialId(m.materialId) || (m.materialName?.trim()?.length ?? 0) > 0)
+    .map((m) => ({
+      materialId: isPersistableMaterialId(m.materialId) ? m.materialId : null,
+      materialName: (m.materialName ?? "").trim() || "—",
+      confidenceScore: materialConfidenceForCommit(m),
+    }))
 }
 
 /** Chọn được cả khi AI chỉ trả tên, không trả UUID */
@@ -550,7 +595,7 @@ export default function CreateProductPage() {
       materialIds: selMatIds.length > 0 ? selMatIds : undefined,
     }
 
-    const ok = useVariants
+    const createResult = useVariants
       ? await create({
           ...basePayload,
           variants: variantRows
@@ -572,7 +617,40 @@ export default function CreateProductPage() {
           quantity: Math.max(0, Math.floor(Number(baseStock) || 0)),
         })
 
-    if (ok) {
+    if (createResult.success && createResult.productId && hasAnalyzed) {
+      const chosenTagNames = resolveChosenTagNames(selTagIds, tagSuggestions, platformTags)
+      const suggestedTags = tagSuggestions
+        .filter((s) => s.tagName?.trim())
+        .map((s) => ({
+          tagName: s.tagName.trim(),
+          confidenceScore: tagConfidenceForCommit(s),
+        }))
+      const suggestedMaterials = buildSuggestedMaterialsForCommit(matSuggestions)
+      const chosenMaterialIds = selMatIds.filter(isPersistableMaterialId)
+      if (
+        suggestedTags.length > 0 ||
+        chosenTagNames.length > 0 ||
+        suggestedMaterials.length > 0 ||
+        chosenMaterialIds.length > 0
+      ) {
+        try {
+          await aiCommitProductTagSession({
+            productId: createResult.productId,
+            title: name.trim(),
+            description: description.trim() || undefined,
+            categoryId: selCategory?.categoryId,
+            suggestedTags,
+            chosenTagNames,
+            suggestedMaterials,
+            chosenMaterialIds,
+          })
+        } catch {
+          toast.warning("Đã tạo sản phẩm nhưng chưa lưu được lịch sử gợi ý AI (tag/chất liệu).")
+        }
+      }
+    }
+
+    if (createResult.success) {
       router.push("/seller/products")
     }
   }
