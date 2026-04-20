@@ -59,6 +59,8 @@ export type ShopDocument = {
 
 export type ShopVerification = {
   id: string
+  /** Mã shop nội bộ (VD: SH-202604-00001) */
+  shopCode?: string | null
   ownerId: string
   ownerName: string | null
   ownerEmail: string | null
@@ -66,6 +68,20 @@ export type ShopVerification = {
   slug: string
   description: string | null
   logoUrl: string | null
+  /** Thông tin seller đã nhập lúc đăng ký — API admin đã trả về, cần hiển thị đầy đủ */
+  phone?: string | null
+  addressLine?: string | null
+  wardCode?: string | null
+  districtId?: number | null
+  provinceId?: number | null
+  city?: string | null
+  ghnShopId?: number | null
+  businessType?: string | null
+  businessLicenseNumber?: string | null
+  taxCode?: string | null
+  bankName?: string | null
+  bankAccountNumber?: string | null
+  bankAccountName?: string | null
   status: number
   statusName: string
   verificationStatus: number

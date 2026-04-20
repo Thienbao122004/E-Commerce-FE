@@ -38,6 +38,12 @@ const BUSINESS_TYPE_LABELS: Record<string, string> = {
   company: "Công ty",
 }
 
+function displayVal(v: string | number | null | undefined): string {
+  if (v === null || v === undefined) return "—"
+  const s = String(v).trim()
+  return s.length > 0 ? s : "—"
+}
+
 export function SellerDetailView({
   shop, detailLoading, busy,
   onBack, onApprove, onReject, onActivate, onSuspend, onClose,
@@ -47,14 +53,14 @@ export function SellerDetailView({
   const [reason, setReason] = React.useState("")
   const [note, setNote] = React.useState("")
 
-  const businessType = React.useMemo(() => {
+  const businessTypeLabel = React.useMemo(() => {
+    const raw = (shop.businessType ?? "").trim().toLowerCase()
+    if (raw && BUSINESS_TYPE_LABELS[raw]) return BUSINESS_TYPE_LABELS[raw]
     const match = shop.description?.match(/Business\s*Type:\s*([A-Za-z_]+)/i)
-    return match?.[1]?.toLowerCase() ?? null
-  }, [shop.description])
-
-  const businessTypeLabel = businessType
-    ? (BUSINESS_TYPE_LABELS[businessType] ?? businessType)
-    : null
+    const fromDesc = match?.[1]?.toLowerCase()
+    if (fromDesc && BUSINESS_TYPE_LABELS[fromDesc]) return BUSINESS_TYPE_LABELS[fromDesc]
+    return raw || fromDesc || null
+  }, [shop.businessType, shop.description])
 
   const displayDescription = React.useMemo(() => {
     if (!shop.description) return null
@@ -199,6 +205,12 @@ export function SellerDetailView({
                     </p>
                   )}
 
+                  {shop.shopCode && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Mã shop: </span>
+                      <span className="font-mono text-xs">{shop.shopCode}</span>
+                    </div>
+                  )}
                   <div className="text-sm">
                     <span className="text-muted-foreground">Ngày đăng ký: </span>
                     <span className="tabular-nums">{formatDateTimeVN(shop.createdAt, "—")}</span>
@@ -252,6 +264,74 @@ export function SellerDetailView({
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-3">
+                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Thông tin đăng ký &amp; liên hệ
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Các trường seller đã điền khi đăng ký (địa chỉ lấy hàng, giấy tờ doanh nghiệp, ngân hàng). Mã phường/quận/tỉnh hiển thị theo dữ liệu GHN đã chọn lúc đăng ký.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Số điện thoại shop</span>
+                    <p className="font-medium break-all">{displayVal(shop.phone)}</p>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2 lg:col-span-2">
+                    <span className="text-muted-foreground text-xs">Địa chỉ (số nhà, đường)</span>
+                    <p className="font-medium break-words">{displayVal(shop.addressLine)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Tỉnh / Thành (text)</span>
+                    <p className="font-medium">{displayVal(shop.city)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Mã tỉnh (provinceId)</span>
+                    <p className="font-medium tabular-nums">{shop.provinceId != null ? String(shop.provinceId) : "—"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Mã quận (districtId)</span>
+                    <p className="font-medium tabular-nums">{shop.districtId != null ? String(shop.districtId) : "—"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Mã phường (wardCode)</span>
+                    <p className="font-mono text-xs break-all">{displayVal(shop.wardCode)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Loại hình kinh doanh</span>
+                    <p className="font-medium">{displayVal(businessTypeLabel)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Số giấy phép / ĐKKD</span>
+                    <p className="font-medium break-all">{displayVal(shop.businessLicenseNumber)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Mã số thuế</span>
+                    <p className="font-medium break-all">{displayVal(shop.taxCode)}</p>
+                  </div>
+                  <div className="space-y-1 lg:col-span-3 border-t pt-3 mt-1">
+                    <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Tài khoản ngân hàng nhận thanh toán</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Ngân hàng</span>
+                    <p className="font-medium">{displayVal(shop.bankName)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Số tài khoản</span>
+                    <p className="font-mono text-xs break-all">{displayVal(shop.bankAccountNumber)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground text-xs">Chủ tài khoản</span>
+                    <p className="font-medium break-words">{displayVal(shop.bankAccountName)}</p>
+                  </div>
+                  {shop.ghnShopId != null && shop.ghnShopId > 0 && (
+                    <div className="space-y-1 lg:col-span-3">
+                      <span className="text-muted-foreground text-xs">GHN Shop ID (sau khi đồng bộ)</span>
+                      <p className="font-mono text-xs">{shop.ghnShopId}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

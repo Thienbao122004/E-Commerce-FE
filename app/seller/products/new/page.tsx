@@ -382,7 +382,6 @@ export default function CreateProductPage() {
   const [platformTagQuery, setPlatformTagQuery] = React.useState("")
   const [platformMatLoading, setPlatformMatLoading] = React.useState(false)
   const [platformTagLoading, setPlatformTagLoading] = React.useState(false)
-  const [hasAnalyzed, setHasAnalyzed] = React.useState(false)
   const [matDialogOpen, setMatDialogOpen] = React.useState(false)
   const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
 
@@ -582,7 +581,6 @@ export default function CreateProductPage() {
         new Set((materials ?? []).map((m, idx) => materialSelectionKey(m, idx))),
       ),
     )
-    setHasAnalyzed(true)
   }, [])
 
   const runAiAnalysis = React.useCallback(async () => {
@@ -650,10 +648,21 @@ export default function CreateProductPage() {
         }
         const mergedTags = [...tagMap.values()].slice(0, 10)
 
-        // Merge materials: dedup theo materialId, top 5
+        // Merge materials: ưu tiên ảnh trước, dùng cả ID lẫn tên để dedup
+        // — key theo materialId nếu có, ngược lại theo __name__:lowercaseName
+        const matKey = (m: MaterialSuggestion): string =>
+          m.materialId ?? `__name__:${(m.materialName ?? "").trim().toLowerCase()}`
         const matMap = new Map<string, MaterialSuggestion>()
-        for (const mat of [...(imageRes?.suggestedMaterials ?? []), ...(textRes?.materials ?? [])]) {
-          if (mat.materialId && !matMap.has(mat.materialId)) matMap.set(mat.materialId, mat)
+        // Ảnh trước (độ tin cậy cao hơn về chất liệu vật lý)
+        for (const mat of (imageRes?.suggestedMaterials ?? [])) {
+          const k = matKey(mat); if (k && !matMap.has(k)) matMap.set(k, mat)
+        }
+        // Text bổ sung: nếu chất liệu đó chưa có trong map (theo ID hoặc tên)
+        const imageNames = new Set([...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()))
+        for (const mat of (textRes?.materials ?? [])) {
+          const k = matKey(mat)
+          const nameLow = (mat.materialName ?? "").trim().toLowerCase()
+          if (k && !matMap.has(k) && !imageNames.has(nameLow)) matMap.set(k, mat)
         }
         const mergedMats = [...matMap.values()].slice(0, 5)
 
@@ -776,7 +785,7 @@ export default function CreateProductPage() {
           quantity: Math.max(0, Math.floor(Number(baseStock) || 0)),
         })
 
-    if (createResult.success && createResult.productId && hasAnalyzed) {
+    if (createResult.success && createResult.productId) {
       const chosenTagNames = resolveChosenTagNames(selTagIds, tagSuggestions, platformTags)
       const suggestedTags = tagSuggestions
         .filter((s) => s.tagName?.trim())
@@ -1322,54 +1331,66 @@ export default function CreateProductPage() {
                       <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
                       Đang phân tích danh mục...
                     </div>
-                  ) : catError ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
-                      <IconAlertCircle className="size-3.5 shrink-0" />
-                      Không thể kết nối AI. Kiểm tra microservice.
-                    </div>
-                  ) : catSuggestions.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
-                      {catError ? "Không có gợi ý" : "Chưa phân tích"}
-                    </div>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {catSuggestions.map((cat, idx) => {
-                        const active = selCategory?.categoryId === cat.categoryId
-                        return (
-                          <button
-                            key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
-                            type="button"
-                            onClick={() => handleSelectCategory(cat)}
-                            className={`flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                              active
-                                ? "border-[#9db183] bg-white"
-                                : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
-                            }`}
-                          >
-                            <div className="min-w-0 flex-1 overflow-hidden">
-                              <p className="line-clamp-2 text-sm font-semibold text-[#2d3a25] break-words">{cat.categoryName}</p>
-                              <p className="line-clamp-1 text-xs text-[#7f8f74] break-words">{cat.categoryPath}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0 mt-0.5">
-                              <ConfidenceDot score={cat.confidenceScore} />
-                              {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
-                            </div>
-                          </button>
-                        )
-                      })}
-
-                      {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
-                        <div
-                          key={`empty-cat-${idx}`}
-                          className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
-                        >
-                          <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                      {catError && (
+                        <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
+                          <IconAlertCircle className="size-3.5 shrink-0" />
+                          <span>
+                            Không thể kết nối AI. Kiểm tra microservice. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
+                          </span>
                         </div>
-                      ))}
+                      )}
+
+                      {!catError && catSuggestions.length > 0 && (
+                        <>
+                          {catSuggestions.map((cat, idx) => {
+                            const active = selCategory?.categoryId === cat.categoryId
+                            return (
+                              <button
+                                key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
+                                type="button"
+                                onClick={() => handleSelectCategory(cat)}
+                                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                                  active
+                                    ? "border-[#9db183] bg-white"
+                                    : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
+                                  <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <ConfidenceDot score={cat.confidenceScore} />
+                                  {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
+                                </div>
+                              </button>
+                            )
+                          })}
+
+                          {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
+                            <div
+                              key={`empty-cat-${idx}`}
+                              className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
+                            >
+                              <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {!catError && catSuggestions.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] text-[#7c8f72]">
+                          Chưa phân tích AI — bấm &quot;Bắt đầu phân tích&quot; hoặc chọn danh mục thủ công bên dưới.
+                        </div>
+                      )}
 
                       <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
                         <p className="mb-2 text-[11px] text-[#6d7f62]">
-                          Không đúng gợi ý? Chọn danh mục thủ công:
+                          {catSuggestions.length > 0
+                            ? "Không đúng gợi ý? Chọn danh mục thủ công:"
+                            : "Chọn danh mục thủ công:"}
                         </p>
                         <div className="relative">
                           <Input
@@ -1426,10 +1447,8 @@ export default function CreateProductPage() {
                 <div>
                   <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
                   {!selCategory ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-7 w-16 rounded-full bg-[#dfe8d6] opacity-60" />
-                      ))}
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fafcf8] p-3 text-[11px] text-[#7c8f72]">
+                      Chọn danh mục ở trên để thêm chất liệu (gợi ý AI hoặc nút + chọn từ nền tảng).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1494,8 +1513,7 @@ export default function CreateProductPage() {
                         </span>
                       )}
 
-                      {hasAnalyzed && (
-                        <>
+                      <>
                           <button
                             type="button"
                             onClick={() => setMatDialogOpen(true)}
@@ -1578,8 +1596,7 @@ export default function CreateProductPage() {
                               </p>
                             </DialogContent>
                           </Dialog>
-                        </>
-                      )}
+                      </>
                     </div>
                   )}
                 </div>
@@ -1587,10 +1604,8 @@ export default function CreateProductPage() {
                 <div className="border-t border-[#dce3d5] pt-3">
                   <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
                   {!selCategory ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-7 w-14 rounded-full bg-[#dfe8d6] opacity-60" />
-                      ))}
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fffdfb] p-3 text-[11px] text-[#7c8f72]">
+                      Chọn danh mục ở trên để thêm thẻ (gợi ý AI hoặc nút + chọn từ nền tảng).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1656,8 +1671,7 @@ export default function CreateProductPage() {
                       )}
 
                       {/* „+" badge mở Popover chọn từ nền tảng */}
-                      {hasAnalyzed && (
-                        <>
+                      <>
                           <button
                             type="button"
                             onClick={() => setTagDialogOpen(true)}
@@ -1736,8 +1750,7 @@ export default function CreateProductPage() {
                               </p>
                             </DialogContent>
                           </Dialog>
-                        </>
-                      )}
+                      </>
                     </div>
                   )}
 
