@@ -10,6 +10,7 @@ import {
   type StorefrontProduct,
   type ProductVariantStorefront,
 } from "@/services/storefront-products"
+import { getCategoryById } from "@/services/storefront-categories"
 import { getShopBySlug, type ShopPublicDto } from "@/services/storefront-shops"
 import { useFavorites } from "@/contexts/favorites-context"
 import { cartService } from "@/services/cart"
@@ -245,6 +246,11 @@ export default function ProductDetailPage() {
 
   const [relatedProducts, setRelatedProducts] = useState<StorefrontProduct[]>([])
   const [loadingRelated, setLoadingRelated] = useState(false)
+  const [categoryParent, setCategoryParent] = useState<{
+    id: number
+    name: string
+    slug: string
+  } | null>(null)
 
   const [search, setSearch] = useState("")
   const [addingToCart, setAddingToCart] = useState(false)
@@ -254,6 +260,7 @@ export default function ProductDetailPage() {
     if (!slug) return
     setLoading(true)
     setError(null)
+    setCategoryParent(null)
     try {
       const res = await getProductBySlug(slug)
       if (res.success && res.product) {
@@ -278,6 +285,23 @@ export default function ProductDetailPage() {
         if (res.product.categoryId) {
           setLoadingRelated(true)
           try {
+            const catRes = await getCategoryById(res.product.categoryId)
+            if (catRes.success && catRes.category?.parentId) {
+              const parentRes = await getCategoryById(catRes.category.parentId)
+              if (parentRes.success && parentRes.category) {
+                const p = parentRes.category
+                setCategoryParent({
+                  id: p.id,
+                  name: p.name,
+                  slug: p.slug || String(p.id),
+                })
+              } else {
+                setCategoryParent(null)
+              }
+            } else {
+              setCategoryParent(null)
+            }
+
             const rel = await getProducts({
               categoryId: res.product.categoryId,
               pageSize: 6,
@@ -287,6 +311,7 @@ export default function ProductDetailPage() {
               setRelatedProducts(rel.products.filter((p) => p.slug !== slug))
             }
           } catch {
+            setCategoryParent(null)
           } finally {
             setLoadingRelated(false)
           }
@@ -497,11 +522,22 @@ export default function ProductDetailPage() {
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>home</span>
               Trang chủ
             </Link>
+            {categoryParent && (
+              <>
+                <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>chevron_right</span>
+                <Link
+                  href={`/search?category=${encodeURIComponent(categoryParent.slug || String(categoryParent.id))}`}
+                  className="hover:text-[var(--color-primary)] transition-colors"
+                >
+                  {categoryParent.name}
+                </Link>
+              </>
+            )}
             {product.categoryName && (
               <>
                 <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>chevron_right</span>
                 <Link
-                  href={`/?category=${product.categoryId}`}
+                  href={`/search?category=${encodeURIComponent(product.categorySlug || String(product.categoryId))}`}
                   className="hover:text-[var(--color-primary)] transition-colors"
                 >
                   {product.categoryName}
@@ -509,7 +545,7 @@ export default function ProductDetailPage() {
               </>
             )}
             <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>chevron_right</span>
-            <span className="text-gray-600 truncate max-w-[200px]">{product.name}</span>
+            <span className="text-gray-600 truncate max-w-[600px]">{product.name}</span>
           </nav>
         )}
 

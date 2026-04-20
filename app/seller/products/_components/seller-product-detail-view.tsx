@@ -5,7 +5,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useTheme } from "next-themes"
 import {
-  IconArrowLeft,
   IconCalendar,
   IconEdit,
   IconRefresh,
@@ -57,6 +56,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet"
 
 import {
   fetchMyProductById,
@@ -65,11 +72,20 @@ import {
   addMyProductVariant,
   updateMyInventory,
   updateMyVariant,
+  fetchSellerMaterials,
+  fetchSellerTags,
 } from "@/services/seller-dashboard"
 import { ProductStatus } from "@/types/seller-dashboard"
 import type { SellerProductDetail, SellerProductVariant, SellerProductVariantPayload } from "@/types/seller-dashboard"
+import {
+  getCategoryTree,
+  type StorefrontCategory,
+  type StorefrontCategoryTreeResponse,
+} from "@/services/storefront-categories"
+import type { MaterialDto } from "@/types/material"
+import type { Tag } from "@/types/tag"
 import { supabase } from "@/lib/supabase"
-import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
+import { formatDateTimeVN as fmtDate, formatPriceVND as currency, formatNumberVN } from "@/lib/formatters"
 
 const statusMap: Record<number, { label: string; cls: string; dotCls: string }> = {
   [ProductStatus.Draft]: {
@@ -106,7 +122,7 @@ type Props = { productId: string; onBack: () => void }
 
 function DetailSkeleton() {
   return (
-    <div className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
+    <div className="grid gap-4 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
       <div className="flex flex-col gap-4">
         <Skeleton className="aspect-[4/3] w-full" />
         <div className="grid grid-cols-4 gap-2">
@@ -128,6 +144,78 @@ function DetailSkeleton() {
   )
 }
 
+function parseAttributesStr(attrStr: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const leftoverSegments: string[] = [];
+  
+  if (attrStr.startsWith('{') || attrStr.startsWith('[')) {
+     try {
+       const parsed = JSON.parse(attrStr);
+       return typeof parsed === 'object' && parsed !== null ? parsed : { "Thuộc tính": attrStr };
+     } catch {
+       return { "Thuộc tính": attrStr };
+     }
+  }
+
+  const segments = attrStr.split(',');
+  for (const seg of segments) {
+     let text = seg.trim();
+     if (!text) continue;
+     
+     const firstColon = text.indexOf(':');
+     if (firstColon > 0) {
+        let k = text.substring(0, firstColon).trim();
+        let v = text.substring(firstColon + 1).trim();
+        
+        if (k.toLowerCase() === 'size') {
+           k = 'Size';
+           v = v.toUpperCase();
+        } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
+           k = 'Màu';
+           v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+        } else {
+           k = k.charAt(0).toUpperCase() + k.slice(1);
+        }
+
+        if (k) {
+           if (result[k]) result[k] += `, ${v}`;
+           else result[k] = v;
+        } else {
+           leftoverSegments.push(text);
+        }
+     } else {
+        const lower = text.toLowerCase();
+        if (lower.startsWith('size ') || lower.startsWith('size')) {
+           const val = text.substring(4).trim();
+           if (val) {
+             const finalVal = val.toUpperCase();
+             if (result['Size']) result['Size'] += `, ${finalVal}`;
+             else result['Size'] = finalVal;
+             continue;
+           }
+        } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
+           const idx = lower.startsWith('màu sắc') ? 7 : 3;
+           const val = text.substring(idx).trim();
+           if (val) {
+             const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+             if (result['Màu']) result['Màu'] += `, ${finalVal}`;
+             else result['Màu'] = finalVal;
+             continue;
+           }
+        }
+        
+        const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
+        leftoverSegments.push(capitalizedText);
+     }
+  }
+  
+  if (leftoverSegments.length > 0) {
+     result["Thuộc tính"] = leftoverSegments.join(', ');
+  }
+  
+  return result;
+}
+
 export function SellerProductDetailView({ productId, onBack }: Props) {
   const { resolvedTheme } = useTheme()
 
@@ -136,6 +224,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [saving, setSaving] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [descSheetOpen, setDescSheetOpen] = React.useState(false)
   const [addVariantOpen, setAddVariantOpen] = React.useState(false)
   const [addVariantLoading, setAddVariantLoading] = React.useState(false)
   const [vName, setVName] = React.useState("")
@@ -149,11 +238,26 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [editDesc, setEditDesc] = React.useState("")
   const [editPrice, setEditPrice] = React.useState("")
   const [editStatus, setEditStatus] = React.useState("")
+  const [editCategoryId, setEditCategoryId] = React.useState<number | null>(null)
+  const [editTagIds, setEditTagIds] = React.useState<number[]>([])
+  const [editMaterialIds, setEditMaterialIds] = React.useState<string[]>([])
   const [dirty, setDirty] = React.useState(false)
 
   const [fileList, setFileList] = React.useState<NativeImageFile[]>([])
   const [previewOpen, setPreviewOpen] = React.useState(false)
   const [previewUrl, setPreviewUrl] = React.useState("")
+
+  // ── Modals & Pickers ──────────────────────────────────────────────────────
+  const [catDialogOpen, setCatDialogOpen] = React.useState(false)
+  const [categoriesList, setCategoriesList] = React.useState<(StorefrontCategory & { level: number; pathLabel: string })[]>([])
+  
+  const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
+  const [platformTags, setPlatformTags] = React.useState<Tag[]>([])
+  
+  const [matDialogOpen, setMatDialogOpen] = React.useState(false)
+  const [platformMaterials, setPlatformMaterials] = React.useState<MaterialDto[]>([])
+
+  const [attrLoading, setAttrLoading] = React.useState(false)
 
   // ── Inline stock editing ──────────────────────────────────────────────────
   const [editingStockVarId, setEditingStockVarId] = React.useState<string | null>(null)
@@ -176,7 +280,26 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchMyProductById(productId)
+      const [res, catTreeRes, tagsRes, matsRes] = await Promise.all([
+        fetchMyProductById(productId),
+        getCategoryTree().catch(
+          (): StorefrontCategoryTreeResponse => ({ success: false, tree: [] })
+        ),
+        fetchSellerTags(1, 100).catch(()=>({ success: false, tags: [], totalCount: 0, page: 1, pageSize: 100 })),
+        fetchSellerMaterials(1, 50).catch(()=>({ success: false, materials: [], totalCount: 0, page: 1, pageSize: 50 }))
+      ])
+
+      const flatten = (arr: any[], level = 1): (StorefrontCategory & { level: number; pathLabel: string })[] => {
+          return arr.reduce((acc: any[], cat: any) => {
+              const flatCat = { ...cat, level, pathLabel: "- ".repeat(level-1) + cat.name }
+              const kids = cat.subcategories ?? cat.children ?? []
+              return acc.concat(flatCat, flatten(kids, level + 1))
+          }, [])
+      }
+      if (catTreeRes.success && catTreeRes.tree?.length) setCategoriesList(flatten(catTreeRes.tree))
+      if (tagsRes.success && tagsRes.tags) setPlatformTags(tagsRes.tags)
+      if (matsRes.success && matsRes.materials) setPlatformMaterials(matsRes.materials)
+
       if (res.success && res.data) {
         const p = res.data
         setProduct(p)
@@ -184,6 +307,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         setEditDesc(p.description ?? "")
         setEditPrice(String(p.basePrice))
         setEditStatus(String(p.status))
+        setEditCategoryId(p.categoryId ?? null)
+        setEditTagIds(p.tagIds ?? [])
+        setEditMaterialIds(p.materialIds ?? [])
         setDirty(false)
         setSelectedImg(0)
         setFileList(
@@ -203,6 +329,10 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
       setLoading(false)
     }
   }, [productId, onBack])
+
+  const openCategoryPicker = () => setCatDialogOpen(true)
+  const openTagPicker = () => setTagDialogOpen(true)
+  const openMatPicker = () => setMatDialogOpen(true)
 
   React.useEffect(() => {
     load()
@@ -261,8 +391,15 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     setEvName(v.variantName)
     setEvSku(v.sku ?? "")
     setEvPrice(v.price != null ? String(v.price) : "")
-    setEvAttrs(v.attributes ?? "")
     setEvActive(v.isActive)
+    
+    if (v.attributes) {
+      const parsed = parseAttributesStr(v.attributes)
+      const formatted = Object.entries(parsed).map(([k, val]) => `${k}: ${val}`).join(", ")
+      setEvAttrs(formatted)
+    } else {
+      setEvAttrs("")
+    }
   }
 
   const handleUpdateVariant = async () => {
@@ -272,11 +409,17 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     setSavingVariant(true)
     try {
       const price = evPrice.trim() ? Number(evPrice) : null
+      
+      let finalAttrsRaw = evAttrs.trim() || undefined
+      let finalAttrsStr: string | null = null
+      const parsedUser = finalAttrsRaw ? parseAttributesStr(finalAttrsRaw) : parseAttributesStr(name)
+      if (Object.keys(parsedUser).length > 0) finalAttrsStr = JSON.stringify(parsedUser)
+
       const res = await updateMyVariant(productId, editVariant.id, {
         variantName: name,
         sku: evSku.trim() || null,
         price,
-        attributes: evAttrs.trim() || null,
+        attributes: finalAttrsStr,
         isActive: evActive,
       })
       if (!res.success) throw new Error(res.message ?? "Lỗi cập nhật biến thể")
@@ -286,7 +429,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           ...prev,
           variants: prev.variants?.map(v =>
             v.id === editVariant.id
-              ? { ...v, variantName: name, sku: evSku.trim() || null, price: price, attributes: evAttrs.trim() || null, isActive: evActive }
+              ? { ...v, variantName: name, sku: evSku.trim() || null, price: price, attributes: finalAttrsStr, isActive: evActive }
               : v
           ) ?? null
         }
@@ -322,11 +465,16 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
       }
     }
 
+    let finalAttrsRaw = vAttrs.trim() || undefined
+    let finalAttrsStr: string | undefined = undefined
+    const parsedUser = finalAttrsRaw ? parseAttributesStr(finalAttrsRaw) : parseAttributesStr(name)
+    if (Object.keys(parsedUser).length > 0) finalAttrsStr = JSON.stringify(parsedUser)
+
     const payload: SellerProductVariantPayload = {
       variantName: name,
       quantity: qty,
       sku: vSku.trim() || undefined,
-      attributes: vAttrs.trim() || undefined,
+      attributes: finalAttrsStr,
     }
     if (priceNum !== undefined) payload.price = priceNum
 
@@ -357,6 +505,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         basePrice: Number(editPrice),
         status: Number(editStatus),
         imageUrls: fileList.map((f) => f.url).filter(Boolean),
+        categoryId: editCategoryId ?? undefined,
+        tagIds: editTagIds,
+        materialIds: editMaterialIds,
       })
       if (res.success) {
         toast.success("Cập nhật thành công")
@@ -438,6 +589,18 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const st = product ? statusMap[product.status] : null
   const stockLevel = product?.totalStock ?? 0
 
+  const categoryChain = React.useMemo(() => {
+    const id = editCategoryId ?? product?.categoryId ?? null
+    if (id == null) {
+      return { parentName: null as string | null, currentName: product?.categoryName ?? null }
+    }
+    const cat = categoriesList.find((c) => c.id === id)
+    const currentName = cat?.name ?? product?.categoryName ?? null
+    if (!cat?.parentId) return { parentName: null, currentName }
+    const par = categoriesList.find((c) => c.id === cat.parentId)
+    return { parentName: par?.name ?? null, currentName }
+  }, [editCategoryId, product?.categoryId, product?.categoryName, categoriesList])
+
   return (
     <>
       <div className="flex flex-1 flex-col gap-5 p-4 lg:p-6 pb-28 md:pb-6">
@@ -485,8 +648,22 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
               {!loading && product && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Mã SP: <span className="font-mono">{product.productCode}</span>
-                  {product.categoryName && (
-                    <> · <span className="text-foreground/70">{product.categoryName}</span></>
+                  {categoryChain.currentName && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="text-foreground/70">
+                        {categoryChain.parentName ? (
+                          <>
+                            <span>{categoryChain.parentName}</span>
+                            <span className="text-muted-foreground mx-1">/</span>
+                            <span>{categoryChain.currentName}</span>
+                          </>
+                        ) : (
+                          categoryChain.currentName
+                        )}
+                      </span>
+                    </>
                   )}
                 </p>
               )}
@@ -496,10 +673,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           {/* Desktop quick actions */}
           {!loading && product && (
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5 h-9 rounded-xl">
-                <IconRefresh className="size-3.5" />
-                Tải lại
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -529,8 +702,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         {loading ? (
           <DetailSkeleton />
         ) : product ? (
-          <div className="grid gap-6 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
-
+          <div className="grid gap-4 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
             {/* ══ LEFT COLUMN ══ */}
             <div className="flex flex-col gap-4">
               <Card className="overflow-hidden rounded border shadow-sm">
@@ -755,7 +927,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                 <CardContent className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="ed-name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <IconBox className="size-3.5" />
                       Tên sản phẩm <span className="text-red-500 normal-case font-normal tracking-normal">*</span>
                     </Label>
                     <Input
@@ -771,22 +942,26 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="ed-price" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <IconReceipt2 className="size-3.5" />
                         Giá bán (VND) <span className="text-red-500 normal-case font-normal tracking-normal">*</span>
                       </Label>
-                      <Input
-                        id="ed-price"
-                        type="number"
-                        min={0}
-                        value={editPrice}
-                        onChange={(e) => { setEditPrice(e.target.value); mark() }}
-                        className="h-10 text-sm font-semibold text-primary rounded-xl bg-muted/20 border-muted focus-visible:bg-background tabular-nums"
-                        placeholder="0"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="ed-price"
+                          inputMode="numeric"
+                          value={editPrice === "" ? "" : formatNumberVN(Number(editPrice))}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, "")
+                            setEditPrice(digits)
+                            mark()
+                          }}
+                          className="h-10 text-sm font-semibold text-primary rounded-xl bg-muted/20 border-muted focus-visible:bg-background tabular-nums pr-8"
+                          placeholder="0"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₫</span>
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="ed-status" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <IconStatusChange className="size-3.5" />
                         Trạng thái
                       </Label>
                       <Select
@@ -805,39 +980,108 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                     </div>
                   </div>
 
-                  {/* Category + Date info row */}
-                  {(product.categoryName) && (
-                    <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/20 rounded-xl border">
-                      {product.categoryName && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            <IconTag className="size-3.5" />
-                          </span>
-                          <div>
-                            <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider leading-none mb-0.5">Danh mục</p>
-                            <p className="text-sm font-semibold text-foreground leading-none">{product.categoryName}</p>
-                          </div>
+                  {/* Categorization block
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <IconBox className="size-3.5" /> Phân loại mở rộng
+                    </Label>
+                    
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div 
+                        onClick={openCategoryPicker}
+                        className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">Danh mục</p>
+                          <IconEdit className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                      )}
+                        {editCategoryId ? (() => {
+                          const cat = categoriesList.find(c => c.id === editCategoryId)
+                          return cat ? (
+                             <p className="text-sm font-semibold truncate text-primary">{cat.pathLabel || cat.name}</p>
+                          ) : (
+                             <p className="text-sm italic text-muted-foreground">Đang tải...</p>
+                          )
+                        })() : (
+                          <p className="text-sm italic text-muted-foreground">Chưa chọn</p>
+                        )}
+                      </div>
+
+                      <div 
+                        onClick={openTagPicker}
+                        className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group sm:col-span-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">Thẻ (Tags)</p>
+                          <IconEdit className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {editTagIds.length === 0 ? (
+                            <p className="text-sm italic text-muted-foreground">Chưa chọn</p>
+                          ) : (
+                            editTagIds.slice(0, 2).map((tid) => {
+                              const tg = platformTags.find(t => t.id === tid)
+                              return (
+                                <span key={tid} className="inline-block px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] rounded-md font-medium truncate max-w-full">
+                                  #{tg?.name || tid}
+                                </span>
+                              )
+                            })
+                          )}
+                          {editTagIds.length > 2 && (
+                            <span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground text-[10px] rounded-md font-medium">+{editTagIds.length - 2}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div 
+                        onClick={openMatPicker}
+                        className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group sm:col-span-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">Chất liệu</p>
+                          <IconEdit className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {editMaterialIds.length === 0 ? (
+                            <p className="text-sm italic text-muted-foreground">Chưa chọn</p>
+                          ) : (
+                            editMaterialIds.slice(0, 2).map((mid) => {
+                              const mat = platformMaterials.find(m => m.id === mid)
+                              return (
+                                <span key={mid} className="inline-block px-1.5 py-0.5 border border-muted-foreground/20 text-foreground text-[10px] rounded-md font-medium truncate max-w-full">
+                                  {mat?.name || "Đang tải"}
+                                </span>
+                              )
+                            })
+                          )}
+                          {editMaterialIds.length > 2 && (
+                            <span className="inline-block px-1.5 py-0.5 bg-muted text-muted-foreground text-[10px] rounded-md font-medium">+{editMaterialIds.length - 2}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div> */}
 
-                  <Separator className="my-1" />
-
-                  {/* Description */}
                   <div className="space-y-1.5">
-                    <Label htmlFor="ed-desc" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <IconAlignLeft className="size-3.5" />
                       Mô tả sản phẩm
                     </Label>
-                    <Textarea
-                      id="ed-desc"
-                      rows={6}
-                      value={editDesc}
-                      onChange={(e) => { setEditDesc(e.target.value); mark() }}
-                      placeholder="Nhập mô tả chi tiết sản phẩm..."
-                      className="text-sm resize-y min-h-[120px] rounded-xl bg-muted/20 border-muted focus-visible:bg-background"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setDescSheetOpen(true)}
+                      className="w-full text-left rounded-xl border bg-muted/20 border-muted hover:border-primary/50 transition-colors px-3 py-2.5 min-h-[80px] group"
+                    >
+                      {editDesc ? (
+                        <p className="text-sm text-foreground line-clamp-3 whitespace-pre-wrap">{editDesc}</p>
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground">Nhấn để nhập mô tả sản phẩm...</p>
+                      )}
+                      <span className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
+                        <IconEdit className="size-3" /> Nhấn để chỉnh sửa
+                      </span>
+                    </button>
                   </div>
                 </CardContent>
               </Card>
@@ -870,6 +1114,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         <thead className="sticky top-0 z-10">
                           <tr className="bg-muted/30 text-muted-foreground text-[11px] uppercase tracking-wider font-semibold border-b">
                             <th className="text-left py-2.5 px-5">Tên loại</th>
+                            <th className="text-left py-2.5 px-5 hidden sm:table-cell">SKU</th>
+                            <th className="text-left py-2.5 px-5 hidden md:table-cell">Thuộc tính</th>
                             <th className="text-right py-2.5 px-5">Giá</th>
                             <th className="text-right py-2.5 px-5">Tồn kho</th>
                             <th className="w-10" />
@@ -881,18 +1127,39 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                             const isSaving = savingStockId === v.id
                             return (
                               <tr key={v.id} className="hover:bg-muted/20 transition-colors group">
-                                <td className="py-3 px-5 max-w-[160px]">
+                                <td className="py-3 px-5 max-w-[160px] align-middle">
                                   <div className="font-semibold text-[12px] truncate" title={v.variantName}>
                                     {v.variantName}
                                   </div>
-                                  {v.sku && (
-                                    <div className="text-[10px] text-muted-foreground font-mono truncate mt-0.5" title={v.sku}>
-                                      {v.sku}
-                                    </div>
+                                </td>
+                                <td className="py-3 px-5 hidden sm:table-cell align-middle whitespace-nowrap">
+                                  {v.sku ? (
+                                    <span className="text-[11px] font-mono bg-muted/60 px-1.5 py-0.5 rounded text-muted-foreground">{v.sku}</span>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground italic">—</span>
                                   )}
                                 </td>
-                                <td className="py-3 px-5 text-right font-bold text-primary tabular-nums text-[12px]">
-                                  {v.price != null ? currency(v.price) : "—"}
+                                <td className="py-3 px-5 hidden md:table-cell max-w-[140px] align-middle">
+                                  {v.attributes ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {Object.entries(parseAttributesStr(v.attributes)).map(([k, val]) => (
+                                        <Badge key={k} variant="outline" className="text-[9px] px-1.5 py-0 shadow-none border-dashed bg-muted/40 uppercase font-semibold text-muted-foreground cursor-default transition-colors hover:text-primary hover:border-primary">
+                                          {k}: {val}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground italic">—</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-5 text-right font-bold text-primary tabular-nums text-[12px] align-middle">
+                                  {v.price != null ? (
+                                    currency(v.price)
+                                  ) : (
+                                    <span className="text-muted-foreground font-medium" title="Sử dụng giá gốc">
+                                      {currency(product.basePrice)}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-2 px-3 text-right">
                                   {isEditing ? (
@@ -1113,7 +1380,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                 value={evAttrs}
                 onChange={e => setEvAttrs(e.target.value)}
                 placeholder='Ví dụ: {"color":"red","size":"M"}'
-                className="rounded-xl font-mono text-xs"
+                className="rounded-xl text-xs"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -1279,6 +1546,159 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* === Category Picker Modal ===
+      <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-5 pt-5 pb-2">
+            <DialogTitle>Chọn danh mục</DialogTitle>
+            <DialogDescription>
+              Chọn một danh mục phù hợp nhất cho sản phẩm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto px-5 pb-5">
+            {attrLoading ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">Đang tải...</p>
+            ) : (
+              <div className="space-y-1">
+                {categoriesList.map(c => {
+                   const active = editCategoryId === c.id
+                   return (
+                     <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => { setEditCategoryId(c.id); mark(); setCatDialogOpen(false) }}
+                        className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                          active
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : "hover:bg-muted font-medium text-foreground"
+                        }`}
+                      >
+                        {c.pathLabel || c.name}
+                      </button>
+                   )
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-5 pt-5 pb-2 border-b">
+            <DialogTitle>Chọn thẻ (tags)</DialogTitle>
+            <DialogDescription>
+              Gắn nhãn để tăng độ hiển thị tìm kiếm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto px-5 py-4 flex flex-wrap gap-2">
+             {attrLoading ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">Đang tải...</p>
+             ) : (
+               platformTags.map(tag => {
+                 const active = editTagIds.includes(tag.id)
+                 return (
+                   <button
+                     key={tag.id}
+                     onClick={() => {
+                        setEditTagIds(prev => active ? prev.filter(x => x !== tag.id) : [...prev, tag.id])
+                        mark()
+                     }}
+                     className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-all ${
+                       active 
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "bg-white text-muted-foreground hover:bg-muted"
+                     }`}
+                   >
+                     #{tag.name}
+                     {active && <IconCheck className="size-3.5" />}
+                   </button>
+                 )
+               })
+             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={matDialogOpen} onOpenChange={setMatDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-5 pt-5 pb-2 border-b">
+            <DialogTitle>Chọn chất liệu</DialogTitle>
+            <DialogDescription>
+              Mô tả thành phần chất liệu cho sản phẩm.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto px-5 py-4 flex flex-wrap gap-2">
+             {attrLoading ? (
+                <p className="text-sm text-muted-foreground p-4 text-center">Đang tải...</p>
+             ) : (
+               platformMaterials.map(m => {
+                 const active = editMaterialIds.includes(m.id)
+                 return (
+                   <button
+                     key={m.id}
+                     onClick={() => {
+                        setEditMaterialIds(prev => active ? prev.filter(x => x !== m.id) : [...prev, m.id])
+                        mark()
+                     }}
+                     className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-all ${
+                       active 
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "bg-white text-muted-foreground hover:bg-muted"
+                     }`}
+                   >
+                     {m.name}
+                     {active && <IconCheck className="size-3.5" />}
+                   </button>
+                 )
+               })
+             )}
+          </div>
+        </DialogContent>
+      </Dialog> */}
+
+      {/* === Description Sheet === */}
+      <Sheet open={descSheetOpen} onOpenChange={setDescSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <IconAlignLeft className="size-4 text-muted-foreground" />
+              Mô tả sản phẩm
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              Nhập mô tả chi tiết — hỗ trợ xuống dòng, không giới hạn ký tự.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <Textarea
+              id="desc-sheet-textarea"
+              value={editDesc}
+              onChange={(e) => { setEditDesc(e.target.value); mark() }}
+              placeholder="Nhập mô tả chi tiết sản phẩm: chất liệu, kích thước, hướng dẫn sử dụng..."
+              className="text-sm resize-none h-full min-h-[400px] rounded-xl bg-muted/20 border-muted focus-visible:bg-background"
+            />
+          </div>
+
+          <SheetFooter className="px-6 py-4 border-t flex-row gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 rounded-xl"
+              onClick={() => setDescSheetOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              className="flex-1 rounded-xl gap-1.5"
+              onClick={() => setDescSheetOpen(false)}
+            >
+              <IconCheck className="size-3.5" />
+              Xác nhận
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

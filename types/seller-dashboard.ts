@@ -72,6 +72,8 @@ export type SellerProduct = {
   updatedAt: string
   images: SellerProductImage[] | null
   totalStock: number | null
+  tagIds?: number[] | null
+  materialIds?: string[] | null
 }
 
 export type SellerProductsResponse = {
@@ -261,6 +263,8 @@ export type UpdateSellerProductPayload = {
   basePrice?: number
   status?: number
   imageUrls?: string[]
+  tagIds?: number[]
+  materialIds?: string[]
 }
 
 export type UpdateInventoryPayload = {

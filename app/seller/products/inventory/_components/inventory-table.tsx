@@ -55,16 +55,23 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead className="w-[60px]">Ảnh</TableHead>
-              <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Sản phẩm</SortableTableHead>
-              <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
-              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn kho</SortableTableHead>
-              <TableHead>Trạng thái</TableHead>
+              <SortableTableHead
+                sortKey="name"
+                currentSort={sort}
+                onSort={onSort}
+                className="min-w-[12rem] max-w-[min(28rem,55vw)]"
+              >
+                Sản phẩm
+              </SortableTableHead>
+              <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort} className="w-[200px]">Giá</SortableTableHead>
+              <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort} className="w-[100px]">Tồn kho</SortableTableHead>
+              <TableHead className="w-[120px]">Trạng thái</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -100,10 +107,15 @@ export function InventoryTable({ products, loading, totalCount, totalPages, page
                         <div className="bg-muted flex size-10 items-center justify-center rounded border text-xs text-muted-foreground">N/A</div>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="max-w-[250px]">
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                    <TableCell className="min-w-0 max-w-[min(28rem,55vw)] whitespace-normal align-top">
+                      <div className="min-w-0 space-y-1">
+                        <p className="line-clamp-2 break-words font-medium leading-snug" title={product.name}>
+                          {product.name}
+                        </p>
+                        <p
+                          className="text-muted-foreground line-clamp-1 break-words text-xs"
+                          title={`${product.categoryName ?? "Chưa phân loại"} · ${product.currency}`}
+                        >
                           {product.categoryName ?? "Chưa phân loại"} · {product.currency}
                         </p>
                       </div>

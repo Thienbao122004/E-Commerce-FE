@@ -161,14 +161,21 @@ export default function ProductsPage() {
             filters={filters}
           />
 
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
                 <TableRow>
                   <TableHead className="w-12 text-center">STT</TableHead>
                   <TableHead className="w-[60px]">Ảnh</TableHead>
                   <TableHead className="w-28">Mã SP</TableHead>
-                  <SortableTableHead sortKey="name" currentSort={sort} onSort={handleSort}>Tên sản phẩm</SortableTableHead>
+                  <SortableTableHead
+                    sortKey="name"
+                    currentSort={sort}
+                    onSort={handleSort}
+                    className="min-w-[12rem] max-w-[min(28rem,55vw)]"
+                  >
+                    Tên sản phẩm
+                  </SortableTableHead>
                   <SortableTableHead sortKey="shopName" currentSort={sort} onSort={handleSort}>Cửa hàng</SortableTableHead>
                   <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={handleSort}>Giá</SortableTableHead>
                   <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
@@ -206,10 +213,19 @@ export default function ProductsPage() {
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
-                    <TableCell>
-                      <div>
-                        <span className="font-medium max-w-[250px]">{product.name}</span>
-                        {product.categoryName && <p className="text-muted-foreground text-xs mt-0.5">{product.categoryName}</p>}
+                    <TableCell className="min-w-0 max-w-[min(28rem,55vw)] whitespace-normal align-top">
+                      <div className="min-w-0 space-y-1">
+                        <p className="line-clamp-2 truncate font-medium leading-snug" title={product.name}>
+                          {product.name}
+                        </p>
+                        {product.categoryName && (
+                          <p
+                            className="text-muted-foreground line-clamp-1 truncate text-xs"
+                            title={product.categoryName}
+                          >
+                            {product.categoryName}
+                          </p>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell><span className="text-sm">{product.shopName}</span></TableCell>

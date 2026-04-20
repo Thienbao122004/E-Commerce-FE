@@ -85,8 +85,12 @@ const productColumns: ColumnDef<TopProduct & { rank: number }>[] = [
   {
     accessorKey: "shopName",
     header: "Cửa hàng",
+    meta: {
+      headerClassName: "hidden md:table-cell",
+      cellClassName: "hidden md:table-cell",
+    },
     cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground">
+      <Badge variant="outline" className="max-w-[140px] truncate text-muted-foreground sm:max-w-none">
         {row.original.shopName}
       </Badge>
     ),
@@ -163,7 +167,9 @@ const activityColumns: ColumnDef<RecentActivity>[] = [
     accessorKey: "description",
     header: "Mô tả",
     cell: ({ row }) => (
-      <span className="max-w-[300px] truncate block">{row.original.description}</span>
+      <span className="max-w-[200px] truncate block sm:max-w-[280px] md:max-w-[320px]">
+        {row.original.description}
+      </span>
     ),
   },
   {
@@ -226,10 +232,13 @@ function PaginatedTable<T>({
   data,
   columns,
   loading,
+  tableClassName,
 }: {
   data: T[]
   columns: ColumnDef<T, unknown>[]
   loading: boolean
+  /** e.g. min-w-[560px] để cuộn ngang gọn trên mobile */
+  tableClassName?: string
 }) {
   const table = useReactTable({
     data,
@@ -241,13 +250,20 @@ function PaginatedTable<T>({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
+      <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
+        <Table className={tableClassName ?? "min-w-[560px]"}>
           <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((h) => (
-                  <TableHead key={h.id} colSpan={h.colSpan}>
+                  <TableHead
+                    key={h.id}
+                    colSpan={h.colSpan}
+                    className={
+                      (h.column.columnDef.meta as { headerClassName?: string } | undefined)
+                        ?.headerClassName
+                    }
+                  >
                     {h.isPlaceholder
                       ? null
                       : flexRender(h.column.columnDef.header, h.getContext())}
@@ -263,7 +279,13 @@ function PaginatedTable<T>({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={
+                        (cell.column.columnDef.meta as { cellClassName?: string } | undefined)
+                          ?.cellClassName
+                      }
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -280,28 +302,32 @@ function PaginatedTable<T>({
         </Table>
       </div>
       {!loading && data.length > 10 && (
-        <div className="flex items-center justify-end gap-2 px-2">
-          <span className="text-muted-foreground text-sm">
+        <div className="flex flex-col-reverse gap-2 px-0 sm:flex-row sm:items-center sm:justify-end sm:gap-3 sm:px-2">
+          <span className="text-muted-foreground text-center text-sm sm:text-right">
             Trang {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
           </span>
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-8"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            <IconChevronLeft className="size-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-8"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            <IconChevronRight className="size-4" />
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8 shrink-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              aria-label="Trang trước"
+            >
+              <IconChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8 shrink-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              aria-label="Trang sau"
+            >
+              <IconChevronRight className="size-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -346,9 +372,9 @@ export function DataTable({
   }, [stats])
 
   return (
-    <Tabs defaultValue="products" className="w-full flex-col justify-start gap-6">
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 flex flex-wrap">
+    <Tabs defaultValue="products" className="w-full min-w-0 flex-col justify-start gap-6">
+      <div className="flex flex-col gap-3 px-4 sm:flex-row sm:items-start sm:justify-between lg:px-6">
+        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 flex h-auto w-full min-w-0 shrink flex-wrap justify-start gap-1 p-1 sm:w-auto">
           <TabsTrigger value="products" className="gap-1.5">
             <IconPackage className="size-4" />
             <span className="hidden sm:inline">Sản phẩm bán chạy</span>
@@ -381,35 +407,39 @@ export function DataTable({
         </TabsList>
       </div>
 
-      <TabsContent value="products" className="px-4 lg:px-6">
+      <TabsContent value="products" className="mt-0 min-w-0 px-4 lg:px-6">
         <PaginatedTable
           data={rankedProducts}
           columns={productColumns}
           loading={productsLoading}
+          tableClassName="min-w-[520px]"
         />
       </TabsContent>
 
-      <TabsContent value="shops" className="px-4 lg:px-6">
+      <TabsContent value="shops" className="mt-0 min-w-0 px-4 lg:px-6">
         <PaginatedTable
           data={rankedShops}
           columns={shopColumns}
           loading={shopsLoading}
+          tableClassName="min-w-[520px]"
         />
       </TabsContent>
 
-      <TabsContent value="activities" className="px-4 lg:px-6">
+      <TabsContent value="activities" className="mt-0 min-w-0 px-4 lg:px-6">
         <PaginatedTable
           data={activities}
           columns={activityColumns}
           loading={activitiesLoading}
+          tableClassName="min-w-[520px]"
         />
       </TabsContent>
 
-      <TabsContent value="orders" className="px-4 lg:px-6">
+      <TabsContent value="orders" className="mt-0 min-w-0 px-4 lg:px-6">
         <PaginatedTable
           data={orderOverview}
           columns={orderOverviewColumns}
           loading={statsLoading}
+          tableClassName="min-w-[280px]"
         />
       </TabsContent>
     </Tabs>
