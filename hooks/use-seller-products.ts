@@ -79,14 +79,18 @@ export function useSellerProducts(initialParams?: Partial<Params>) {
       if (res.success) {
         toast.success(res.message ?? "Tạo sản phẩm thành công")
         await load()
-        return true
+        const productId =
+          res.data && typeof res.data === "object" && res.data !== null && "id" in res.data
+            ? String((res.data as { id: unknown }).id)
+            : undefined
+        return { success: true as const, productId }
       } else {
         toast.error(res.message ?? "Lỗi tạo sản phẩm")
-        return false
+        return { success: false as const, productId: undefined }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Lỗi tạo sản phẩm")
-      return false
+      return { success: false as const, productId: undefined }
     } finally {
       setActionLoading(false)
     }

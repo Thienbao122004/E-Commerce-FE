@@ -10,6 +10,7 @@ import type {
   AnalyzeImageResponse,
   AnalyzeProductResponse,
   TagSuggestionLogResponse,
+  MaterialSuggestionLogResponse,
 } from "@/types/ai-seller"
 
 export type {
@@ -24,6 +25,9 @@ export type {
   TagSuggestionItem,
   TagSuggestionLogItem,
   TagSuggestionLogResponse,
+  MaterialLogSuggested,
+  MaterialSuggestionLogItem,
+  MaterialSuggestionLogResponse,
 } from "@/types/ai-seller"
 
 async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
@@ -83,6 +87,33 @@ export function aiSuggestMaterials(params: {
     description: params.description,
     categoryId: params.categoryId,
     productId: params.productId ?? null,
+  })
+}
+
+/** Lưu lịch sử gợi ý tag + chất liệu sau khi tạo sản phẩm (đã dùng AI trên form) */
+export function aiCommitProductTagSession(params: {
+  productId: string
+  title: string
+  description?: string
+  categoryId?: number
+  suggestedTags: { tagName: string; confidenceScore: number }[]
+  chosenTagNames: string[]
+  suggestedMaterials: { materialId: string | null; materialName: string; confidenceScore: number }[]
+  chosenMaterialIds: string[]
+}) {
+  return aiPost<{ message?: string }>("/api/ai/seller/commit-product-ai-tags", {
+    productId: params.productId,
+    title: params.title,
+    description: params.description ?? null,
+    categoryId: params.categoryId ?? null,
+    suggestedTags: params.suggestedTags,
+    chosenTagNames: params.chosenTagNames,
+    suggestedMaterials: params.suggestedMaterials.map((m) => ({
+      materialId: m.materialId,
+      materialName: m.materialName,
+      confidenceScore: m.confidenceScore,
+    })),
+    chosenMaterialIds: params.chosenMaterialIds,
   })
 }
 
@@ -152,5 +183,12 @@ async function aiGet<T>(endpoint: string): Promise<T> {
 export function aiGetTagSuggestionLogs(page = 1, pageSize = 20) {
   return aiGet<TagSuggestionLogResponse>(
     `/api/ai/seller/tag-suggestions?page=${page}&pageSize=${pageSize}`
+  )
+}
+
+/** Lấy lịch sử gợi ý chất liệu của seller */
+export function aiGetMaterialSuggestionLogs(page = 1, pageSize = 20) {
+  return aiGet<MaterialSuggestionLogResponse>(
+    `/api/ai/seller/material-suggestions?page=${page}&pageSize=${pageSize}`
   )
 }
