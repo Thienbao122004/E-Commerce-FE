@@ -789,17 +789,13 @@ export default function UserDetailPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
                         <IconActivity className="size-5 text-primary" />
-                        Supabase Auth
+                        Lịch sử hoạt động
                       </CardTitle>
-                      <CardDescription>
-                        Dữ liệu từ GoTrue (cùng nguồn với Dashboard → Authentication → Users). Địa chỉ IP
-                        từng phiên cần bật log nâng cao / gói phù hợp trên Supabase.
-                      </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       {!user.supabase ? (
                         <p className="text-muted-foreground">
-                          Không lấy được thông tin Auth (kiểm tra Service Role và URL Supabase trên API).
+                          Không lấy được thông tin Auth.
                         </p>
                       ) : (
                         <>
@@ -818,12 +814,12 @@ export default function UserDetailPage() {
                             </div>
                           </div>
                           <RowKV
-                            label="Tên hiển thị (metadata)"
+                            label="Tên hiển thị"
                             value={user.supabase.authDisplayName}
                           />
-                          <RowKV label="SĐT trên Auth" value={user.supabase.authPhone} />
+                          <RowKV label="SĐT" value={user.supabase.authPhone} />
                           <RowKV
-                            label="Tạo tài khoản Auth"
+                            label="Tạo tài khoản"
                             value={
                               user.supabase.authUserCreatedAt
                                 ? fmtDate(user.supabase.authUserCreatedAt)

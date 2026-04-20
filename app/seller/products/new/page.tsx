@@ -18,6 +18,7 @@ import {
   IconAlertCircle,
   IconPencil,
   IconSearch,
+  IconAlignLeft,
 } from "@tabler/icons-react"
 
 import { toast } from "sonner"
@@ -33,6 +34,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from "@/components/ui/sheet"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import {
   aiAnalyzeProduct,
@@ -343,6 +352,7 @@ export default function CreateProductPage() {
   const [useVariants, setUseVariants] = React.useState(false)
   const [variantRows, setVariantRows] = React.useState<VariantDraftRow[]>(() => [newVariantDraftRow()])
   const [description, setDescription] = React.useState("")
+  const [descSheetOpen, setDescSheetOpen] = React.useState(false)
   const [imageUrls, setImageUrls] = React.useState<string[]>([])
   const [imageInput, setImageInput] = React.useState("")
   const [isDragging, setIsDragging] = React.useState(false)
@@ -701,16 +711,8 @@ export default function CreateProductPage() {
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
     
-    if (!selCategory) {
-      toast.error("Vui lòng chọn Danh mục sản phẩm (Category)");
-      return;
-    }
-    if (selMatIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 Chất liệu (Material)");
-      return;
-    }
-    if (selTagIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 Thẻ (Tag)");
+    if (!selCategory && selMatIds.length ===0 && selTagIds.length ===0) {
+      toast.error("Vui lòng chọn đầy đủ thông tin trước khi đăng bán");
       return;
     }
 
@@ -1111,15 +1113,21 @@ export default function CreateProductPage() {
                   </div>
                 )}
                 <div className="grid gap-2">
-                  <Label htmlFor="description" className="text-xs">Mô tả sản phẩm</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Mô tả chi tiết về chất liệu, kích thước, màu sắc..."
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="text-sm resize-none"
-                  />
+                  <Label className="text-xs">Mô tả sản phẩm</Label>
+                  <button
+                    type="button"
+                    onClick={() => setDescSheetOpen(true)}
+                    className="w-full text-left rounded-xl border bg-muted/20 border-muted hover:border-primary/50 transition-colors px-3 py-2.5 min-h-[72px] group"
+                  >
+                    {description ? (
+                      <p className="text-sm text-foreground line-clamp-3 whitespace-pre-wrap">{description}</p>
+                    ) : (
+                      <p className="text-sm italic text-muted-foreground">Nhấn để nhập mô tả sản phẩm...</p>
+                    )}
+                    <span className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
+                      <IconAlignLeft className="size-3" /> Nhấn để chỉnh sậa
+                    </span>
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -1248,7 +1256,7 @@ export default function CreateProductPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 lg:h-full">
+          <div className="flex flex-col gap-4 lg:h-full min-w-0">
             <Card className="!rounded">
               <CardHeader>
                 <div className="flex items-start gap-2">
@@ -1332,17 +1340,17 @@ export default function CreateProductPage() {
                             key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
                             type="button"
                             onClick={() => handleSelectCategory(cat)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                            className={`flex w-full items-start justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition-all ${
                               active
                                 ? "border-[#9db183] bg-white"
                                 : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
                             }`}
                           >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
-                              <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
+                            <div className="min-w-0 flex-1 overflow-hidden">
+                              <p className="line-clamp-2 text-sm font-semibold text-[#2d3a25] break-words">{cat.categoryName}</p>
+                              <p className="line-clamp-1 text-xs text-[#7f8f74] break-words">{cat.categoryPath}</p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 mt-0.5">
                               <ConfidenceDot score={cat.confidenceScore} />
                               {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
                             </div>
@@ -1395,7 +1403,7 @@ export default function CreateProductPage() {
                                     : "hover:bg-[#f2f6ee] text-[#5f7253]"
                                 }`}
                               >
-                                <span className="block truncate">{c.pathLabel}</span>
+                                <span className="block line-clamp-2 break-words">{c.pathLabel}</span>
                                 {c.level > 1 && (
                                   <span className="mt-0.5 block text-[10px] font-normal text-[#8a9a80]">
                                     Cấp {c.level}
@@ -1754,6 +1762,50 @@ export default function CreateProductPage() {
           </div>
         </div>
       </div>
+
+      {/* === Description Sheet === */}
+      <Sheet open={descSheetOpen} onOpenChange={setDescSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <IconAlignLeft className="size-4 text-muted-foreground" />
+              Mô tả sản phẩm
+            </SheetTitle>
+            <SheetDescription className="text-xs">
+              Nhập mô tả chi tiết — hỗ trợ xuống dòng, không giới hạn ký tự.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <Textarea
+              id="desc-sheet-new-textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Nhập mô tả chi tiết sản phẩm: chất liệu, kích thước, hướng dẫn sử dụng..."
+              className="text-sm resize-none h-full min-h-[400px] rounded-xl"
+            />
+          </div>
+
+          <SheetFooter className="px-6 py-4 border-t flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 rounded-xl"
+              onClick={() => setDescSheetOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 rounded-xl gap-1.5"
+              onClick={() => setDescSheetOpen(false)}
+            >
+              <IconCheck className="size-3.5" />
+              Xác nhận
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

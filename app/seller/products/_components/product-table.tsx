@@ -67,14 +67,21 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="overflow-x-auto rounded-lg border bg-card">
         <Table>
           <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead className="w-[60px]">Ảnh</TableHead>
               <TableHead className="w-28">Mã SP</TableHead>
-              <SortableTableHead sortKey="name" currentSort={sort} onSort={onSort}>Tên sản phẩm</SortableTableHead>
+              <SortableTableHead
+                sortKey="name"
+                currentSort={sort}
+                onSort={onSort}
+                className="min-w-[12rem] max-w-[min(28rem,55vw)]"
+              >
+                Tên sản phẩm
+              </SortableTableHead>
               <SortableTableHead sortKey="categoryName" currentSort={sort} onSort={onSort}>Danh mục</SortableTableHead>
               <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={onSort}>Giá</SortableTableHead>
               <SortableTableHead sortKey="totalStock" currentSort={sort} onSort={onSort}>Tồn kho</SortableTableHead>
@@ -122,17 +129,27 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
-                    <TableCell>
-                      <div className="max-w-[200px]">
-                        <p className="font-medium truncate">{product.name}</p>
+                    <TableCell className="min-w-0 max-w-[min(28rem,55vw)] whitespace-normal align-top">
+                      <div className="min-w-0 space-y-1">
+                        <p className="line-clamp-2 truncate font-medium leading-snug" title={product.name}>
+                          {product.name}
+                        </p>
                         {product.description && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{product.description}</p>
+                          <p
+                            className="text-muted-foreground line-clamp-1 truncate text-xs"
+                            title={product.description}
+                          >
+                            {product.description}
+                          </p>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="min-w-0 max-w-[9rem] whitespace-normal align-top text-sm text-muted-foreground sm:max-w-[11rem]">
                       {product.categoryName ? (
-                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs">
+                        <span
+                          className="block rounded-md bg-muted px-2 py-0.5 text-xs leading-snug line-clamp-2 truncate"
+                          title={product.categoryName}
+                        >
                           {product.categoryName}
                         </span>
                       ) : (
@@ -168,14 +185,6 @@ export function ProductTable({ products, loading, totalCount, totalPages, page, 
                           onClick={() => onViewDetail(product.id)}
                         >
                           <IconEdit className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon"
-                          className="size-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                          title="Xóa"
-                          onClick={() => onDeleteClick(product.id, product.name)}
-                        >
-                          <IconTrash className="size-4" />
                         </Button>
                       </div>
                     </TableCell>
