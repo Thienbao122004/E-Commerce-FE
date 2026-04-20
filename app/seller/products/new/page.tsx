@@ -640,10 +640,21 @@ export default function CreateProductPage() {
         }
         const mergedTags = [...tagMap.values()].slice(0, 10)
 
-        // Merge materials: dedup theo materialId, top 5
+        // Merge materials: ưu tiên ảnh trước, dùng cả ID lẫn tên để dedup
+        // — key theo materialId nếu có, ngược lại theo __name__:lowercaseName
+        const matKey = (m: MaterialSuggestion): string =>
+          m.materialId ?? `__name__:${(m.materialName ?? "").trim().toLowerCase()}`
         const matMap = new Map<string, MaterialSuggestion>()
-        for (const mat of [...(imageRes?.suggestedMaterials ?? []), ...(textRes?.materials ?? [])]) {
-          if (mat.materialId && !matMap.has(mat.materialId)) matMap.set(mat.materialId, mat)
+        // Ảnh trước (độ tin cậy cao hơn về chất liệu vật lý)
+        for (const mat of (imageRes?.suggestedMaterials ?? [])) {
+          const k = matKey(mat); if (k && !matMap.has(k)) matMap.set(k, mat)
+        }
+        // Text bổ sung: nếu chất liệu đó chưa có trong map (theo ID hoặc tên)
+        const imageNames = new Set([...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()))
+        for (const mat of (textRes?.materials ?? [])) {
+          const k = matKey(mat)
+          const nameLow = (mat.materialName ?? "").trim().toLowerCase()
+          if (k && !matMap.has(k) && !imageNames.has(nameLow)) matMap.set(k, mat)
         }
         const mergedMats = [...matMap.values()].slice(0, 5)
 
