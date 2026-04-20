@@ -25,24 +25,96 @@ import {
 const CART_UPDATED_EVENT = "cart:updated"
 
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
+import { StorefrontFooter } from "@/components/layout/storefront-footer"
 import { ProductReviewsSection } from "./_components/product-reviews-section"
 
 function parseVariantAttributes(raw?: string | null): Record<string, string> {
   if (!raw) return {}
+  let attrStr: string | null = null;
   try {
     const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {}
-
-    return Object.entries(parsed).reduce<Record<string, string>>((acc, [k, v]) => {
-      if (!k) return acc
-      if (typeof v === "string" || typeof v === "number") {
-        acc[k] = String(v)
-      }
-      return acc
-    }, {})
+    if (typeof parsed === "string") {
+      attrStr = parsed; // Legacy encoded string literals, e.g. "\"Màu đỏ\""
+    } else if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.entries(parsed).reduce<Record<string, string>>((acc, [k, v]) => {
+        if (!k) return acc
+        if (typeof v === "string" || typeof v === "number") {
+          acc[k] = String(v)
+        }
+        return acc
+      }, {})
+    } else {
+      return {}
+    }
   } catch {
-    return {}
+    attrStr = raw;
   }
+  
+  if (!attrStr) return {};
+
+  const result: Record<string, string> = {};
+  const leftoverSegments: string[] = [];
+  
+  const segments = attrStr.split(',');
+  for (const seg of segments) {
+     let text = seg.trim();
+     if (!text) continue;
+     const firstColon = text.indexOf(':');
+     if (firstColon > 0) {
+        let k = text.substring(0, firstColon).trim();
+        let v = text.substring(firstColon + 1).trim();
+        
+        if (k.toLowerCase() === 'size') {
+           k = 'Size';
+           v = v.toUpperCase();
+        } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
+           k = 'Màu';
+           v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+        } else {
+           k = k.charAt(0).toUpperCase() + k.slice(1);
+        }
+
+        if (k) {
+           if (result[k]) result[k] += `, ${v}`;
+           else result[k] = v;
+        } else {
+           leftoverSegments.push(text);
+        }
+     } else {
+        const lower = text.toLowerCase();
+        if (lower.startsWith('size ') || lower.startsWith('size')) {
+           const val = text.substring(4).trim();
+           if (val) {
+             const finalVal = val.toUpperCase();
+             if (result['Size']) result['Size'] += `, ${finalVal}`;
+             else result['Size'] = finalVal;
+             continue;
+           }
+        } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
+           const idx = lower.startsWith('màu sắc') ? 7 : 3;
+           const val = text.substring(idx).trim();
+           if (val) {
+             const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+             if (result['Màu']) result['Màu'] += `, ${finalVal}`;
+             else result['Màu'] = finalVal;
+             continue;
+           }
+        }
+        
+        const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
+        leftoverSegments.push(capitalizedText);
+     }
+  }
+  
+  if (leftoverSegments.length > 0) {
+      if (Object.keys(result).length === 0) {
+         result["Phân loại"] = leftoverSegments.join(", ");
+      } else {
+         result["Thuộc tính khác"] = leftoverSegments.join(", ");
+      }
+  }
+  
+  return result;
 }
 
 
@@ -312,10 +384,34 @@ export default function ProductDetailPage() {
     () => product?.variants?.filter((v) => v.isActive) ?? [],
     [product?.variants]
   )
-  const variantsWithParsedAttributes = useMemo(
-    () => activeVariants.map((v) => ({ ...v, parsedAttributes: parseVariantAttributes(v.attributes) })),
-    [activeVariants]
-  )
+  const variantsWithParsedAttributes = useMemo(() => {
+    let list = activeVariants.map((v) => ({ ...v, parsedAttributes: parseVariantAttributes(v.attributes) }))
+    
+    const attrSet = new Set<string>()
+    let hasCollision = false
+    for (const v of list) {
+       const key = JSON.stringify(v.parsedAttributes, Object.keys(v.parsedAttributes).sort())
+       if (attrSet.has(key)) {
+          hasCollision = true; break;
+       }
+       attrSet.add(key)
+    }
+
+    if (hasCollision) {
+       list = list.map(v => {
+          const nameValue = v.variantName.trim() || "Mặc định"
+          return {
+             ...v,
+             parsedAttributes: {
+                "Loại": nameValue,
+                ...v.parsedAttributes
+             }
+          }
+       })
+    }
+    
+    return list;
+  }, [activeVariants])
   const variantAttributeGroups = useMemo(() => {
     const map = new Map<string, Set<string>>()
     for (const variant of variantsWithParsedAttributes) {
@@ -332,17 +428,25 @@ export default function ProductDetailPage() {
     [selectedVariant?.stockQuantity, product?.totalStock]
   )
 
-  useEffect(() => {
-    if (!variantsWithParsedAttributes.length || !Object.keys(selectedAttributes).length) return
-
-    const matched = variantsWithParsedAttributes.find((variant) =>
-      Object.entries(selectedAttributes).every(([key, value]) => variant.parsedAttributes[key] === value)
+  const handleSelectAttribute = useCallback((groupKey: string, groupValue: string) => {
+    let nextAttributes = { ...selectedAttributes, [groupKey]: groupValue }
+    
+    let matched = variantsWithParsedAttributes.find((variant) =>
+      Object.entries(nextAttributes).every(([key, value]) => variant.parsedAttributes[key] === value)
     )
 
+    if (!matched) {
+      matched = variantsWithParsedAttributes.find((variant) => variant.parsedAttributes[groupKey] === groupValue)
+      if (matched) {
+         nextAttributes = { ...matched.parsedAttributes }
+      }
+    }
+
+    setSelectedAttributes(nextAttributes)
     if (matched && matched.id !== selectedVariant?.id) {
       setSelectedVariant(matched)
     }
-  }, [variantsWithParsedAttributes, selectedAttributes, selectedVariant?.id])
+  }, [selectedAttributes, variantsWithParsedAttributes, selectedVariant?.id])
 
   useEffect(() => {
     if (!product) return
@@ -354,60 +458,7 @@ export default function ProductDetailPage() {
 
   const header = <MainStorefrontHeader />
 
-  const footer = (
-    <>
-      <Separator className="bg-gray-200 mt-12" />
-      <footer className="pt-8 pb-8">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-3xl" style={{ color: "var(--color-primary)" }}>local_florist</span>
-                <h2 className="text-2xl font-bold">EcomViet</h2>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Kết nối bạn với trái tim Việt Nam. Khám phá hàng thủ công xác thực, thời trang và đặc sản từ khắp mọi miền đất nước.
-              </p>
-            </div>
-            {[
-              { title: "Mua sắm", links: ["Thời trang & Lụa", "Trang trí nhà", "Cà phê đặc sản", "Thực phẩm khô", "Flash Sales"] },
-              { title: "Hỗ trợ khách hàng", links: ["Trung tâm trợ giúp", "Chính sách giao hàng", "Đổi trả & hoàn tiền", "Trở thành người bán", "Liên hệ chúng tôi"] },
-            ].map((col) => (
-              <div key={col.title}>
-                <h3 className="font-bold text-lg mb-4">{col.title}</h3>
-                <ul className="flex flex-col gap-2 text-sm text-gray-400">
-                  {col.links.map((link) => (
-                    <li key={link}><a href="#" className="hover:text-[var(--color-primary)] transition-colors">{link}</a></li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            <div>
-              <h3 className="font-bold text-lg mb-4">Cập nhật mới nhất</h3>
-              <p className="text-gray-400 text-sm mb-4">Đăng ký nhận thông tin về sản phẩm mới và ưu đãi độc quyền.</p>
-              <div className="flex flex-col gap-2">
-                <input
-                  type="email"
-                  placeholder="Địa chỉ email của bạn"
-                  className="border-gray-400 border rounded-lg px-4 py-3 text-sm text-white focus:border-[var(--color-primary)] focus:outline-none placeholder:text-gray-500"
-                />
-                <button className="text-white font-bold py-3 px-4 rounded-lg transition-colors" style={{ backgroundColor: "var(--color-primary)" }}>
-                  Đăng ký
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
-            <p>© 2025 EcomViet Marketplace. Tất cả quyền được bảo lưu.</p>
-            <div className="flex gap-6">
-              <a href="#" className="hover:text-black transition-colors">Chính sách bảo mật</a>
-              <a href="#" className="hover:text-black transition-colors">Điều khoản dịch vụ</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </>
-  )
+  const footer = <StorefrontFooter />
 
   if (!loading && error) {
     return (
@@ -534,7 +585,7 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="flex flex-col gap-5">
-                <h1 className="text-2xl md:text-3xl font-bold leading-tight" style={{ color: "var(--color-text-main)" }}>
+                <h1 className="text-2xl md:text-2xl font-bold leading-tight" style={{ color: "var(--color-text-main)" }}>
                   {product.name}
                 </h1>
                 <div className="flex items-center flex-wrap gap-4 text-sm">
@@ -576,7 +627,7 @@ export default function ProductDetailPage() {
                               <button
                                 key={`${group.key}-${value}`}
                                 type="button"
-                                onClick={() => setSelectedAttributes((prev) => ({ ...prev, [group.key]: value }))}
+                                onClick={() => handleSelectAttribute(group.key, value)}
                                 className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${
                                   selected
                                     ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
@@ -704,7 +755,7 @@ export default function ProductDetailPage() {
 
                 {/* Tags & Materials */}
                 {(product.tags?.length || product.materials?.length) ? (
-                  <div className="flex flex-col gap-3 py-4 border-y border-gray-100">
+                  <div className="flex flex-col gap-3 py-4 border-t border-gray-100">
                     {product.tags && product.tags.length > 0 && (
                       <div className="flex items-start gap-3">
                         <span className="text-sm font-medium text-gray-600 min-w-[70px]">Từ khóa:</span>

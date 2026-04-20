@@ -41,6 +41,7 @@ import {
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import { supabase } from "@/lib/supabase"
+import { groupMaterialsForPicker, groupTagsForPicker } from "@/lib/seller-picker-groups"
 import {
   fetchSellerMaterials,
   fetchSellerTags,
@@ -193,6 +194,25 @@ function materialSelectionKey(m: MaterialSuggestion, idx: number): string {
   return `__idx__:${idx}`
 }
 
+/** Đồng bộ chip AI (__name__ / UUID) với dòng trong dialog chọn chất liệu nền tảng */
+function isPlatformMatSelected(
+  mat: MaterialDto,
+  selMatIds: string[],
+  matSuggestions: MaterialSuggestion[],
+): boolean {
+  if (selMatIds.includes(mat.id)) return true
+  const nameLower = mat.name.trim().toLowerCase()
+  if (nameLower && selMatIds.includes(`__name__:${nameLower}`)) return true
+  for (let idx = 0; idx < matSuggestions.length; idx++) {
+    const m = matSuggestions[idx]
+    if (!selMatIds.includes(materialSelectionKey(m, idx))) continue
+    const mid = m.materialId?.trim()
+    if (mid && mid === mat.id) return true
+    if (nameLower && (m.materialName?.trim().toLowerCase() ?? "") === nameLower) return true
+  }
+  return false
+}
+
 type VariantDraftRow = {
   id: string
   variantName: string
@@ -211,6 +231,82 @@ function newVariantDraftRow(): VariantDraftRow {
     quantity: "0",
     attributes: "",
   }
+}
+
+function parseAttributesStr(attrStr: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const leftoverSegments: string[] = [];
+  
+  if (attrStr.startsWith('{') || attrStr.startsWith('[')) {
+     try {
+       const parsed = JSON.parse(attrStr);
+       return typeof parsed === 'object' && parsed !== null ? parsed : { "Thuộc tính": attrStr };
+     } catch {
+       return { "Thuộc tính": attrStr };
+     }
+  }
+
+  const segments = attrStr.split(',');
+  for (const seg of segments) {
+     let text = seg.trim();
+     if (!text) continue;
+     
+     const firstColon = text.indexOf(':');
+     if (firstColon > 0) {
+        let k = text.substring(0, firstColon).trim();
+        let v = text.substring(firstColon + 1).trim();
+        
+        if (k.toLowerCase() === 'size') {
+           k = 'Size';
+           v = v.toUpperCase();
+        } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
+           k = 'Màu';
+           v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+        } else {
+           k = k.charAt(0).toUpperCase() + k.slice(1);
+        }
+
+        if (k) {
+           if (result[k]) result[k] += `, ${v}`;
+           else result[k] = v;
+        } else {
+           leftoverSegments.push(text);
+        }
+     } else {
+        const lower = text.toLowerCase();
+        if (lower.startsWith('size ') || lower.startsWith('size')) {
+           const val = text.substring(4).trim();
+           if (val) {
+             const finalVal = val.toUpperCase();
+             if (result['Size']) result['Size'] += `, ${finalVal}`;
+             else result['Size'] = finalVal;
+             continue;
+           }
+        } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
+           const idx = lower.startsWith('màu sắc') ? 7 : 3;
+           const val = text.substring(idx).trim();
+           if (val) {
+             const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+             if (result['Màu']) result['Màu'] += `, ${finalVal}`;
+             else result['Màu'] = finalVal;
+             continue;
+           }
+        }
+        
+        const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
+        leftoverSegments.push(capitalizedText);
+     }
+  }
+  
+  if (leftoverSegments.length > 0) {
+      if (Object.keys(result).length === 0) {
+         result["Phân loại"] = leftoverSegments.join(", ");
+      } else {
+         result["Khác"] = leftoverSegments.join(", ");
+      }
+  }
+  
+  return result;
 }
 
 /** Ảnh dán URL https — giữ nguyên; ảnh chọn từ máy (blob:) — upload lên bucket product-images. */
@@ -267,21 +363,20 @@ export default function CreateProductPage() {
   const [manualCatQuery, setManualCatQuery] = React.useState("")
   const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
+  // materials & tags: tải 1 lần toàn bộ khi dialog mở, filter client-side
+  const [allPlatformMaterials, setAllPlatformMaterials] = React.useState<MaterialDto[]>([])
   const [platformMaterials, setPlatformMaterials] = React.useState<MaterialDto[]>([])
+  const [allPlatformTags, setAllPlatformTags] = React.useState<Tag[]>([])
   const [platformTags, setPlatformTags] = React.useState<Tag[]>([])
   const [platformMatQuery, setPlatformMatQuery] = React.useState("")
-  const [debouncedPlatformMatQuery, setDebouncedPlatformMatQuery] = React.useState("")
   const [platformTagQuery, setPlatformTagQuery] = React.useState("")
-  const [debouncedPlatformTagQuery, setDebouncedPlatformTagQuery] = React.useState("")
   const [platformMatLoading, setPlatformMatLoading] = React.useState(false)
   const [platformTagLoading, setPlatformTagLoading] = React.useState(false)
-  const [matPage, setMatPage] = React.useState(1)
-  const [tagPage, setTagPage] = React.useState(1)
-  const [hasMoreMats, setHasMoreMats] = React.useState(true)
-  const [hasMoreTags, setHasMoreTags] = React.useState(true)
-  const [hasAnalyzed, setHasAnalyzed] = React.useState(false)
   const [matDialogOpen, setMatDialogOpen] = React.useState(false)
   const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
+
+  const matLoadingRef = React.useRef(false)
+  const tagLoadingRef = React.useRef(false)
 
   const [selCategory, setSelCategory] = React.useState<CategorySuggestion | null>(null)
   const [selTagIds, setSelTagIds] = React.useState<number[]>([])
@@ -299,25 +394,29 @@ export default function CreateProductPage() {
     return () => clearTimeout(timer)
   }, [manualCatQuery])
 
+  // Material: filter client-side (không phụ thuộc server search — tránh case-sensitive)
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedPlatformMatQuery(platformMatQuery)
-      setPlatformMaterials([])
-      setMatPage(1)
-      setHasMoreMats(true)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [platformMatQuery])
+    const removeDiacritics = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "")
+    const q = removeDiacritics(platformMatQuery.trim().toLowerCase().normalize("NFC"))
+    if (!q) { setPlatformMaterials(allPlatformMaterials); return }
+    setPlatformMaterials(
+      allPlatformMaterials.filter((m) =>
+        removeDiacritics(m.name.toLowerCase().normalize("NFC")).includes(q)
+      )
+    )
+  }, [platformMatQuery, allPlatformMaterials])
 
+  // Tag: filter client-side (bỏ dấu)
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedPlatformTagQuery(platformTagQuery)
-      setPlatformTags([])
-      setTagPage(1)
-      setHasMoreTags(true)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [platformTagQuery])
+    const removeDiacritics = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "")
+    const q = removeDiacritics(platformTagQuery.trim().toLowerCase().normalize("NFC"))
+    if (!q) { setPlatformTags(allPlatformTags); return }
+    setPlatformTags(
+      allPlatformTags.filter((t) =>
+        removeDiacritics(t.name.toLowerCase().normalize("NFC")).includes(q)
+      )
+    )
+  }, [platformTagQuery, allPlatformTags])
 
   const manualCategoryOptions = React.useMemo(() => {
     const q = debouncedManualCatQuery.trim().toLowerCase()
@@ -330,10 +429,23 @@ export default function CreateProductPage() {
       .slice(0, 24)
   }, [manualCategoryRows, debouncedManualCatQuery])
 
-  // Server handles filtering — just return what we have fetched
-  const filteredPlatformMaterials = platformMaterials
+  const groupedPlatformMaterials = React.useMemo(() => {
+    if (platformMatQuery.trim()) {
+      return platformMaterials.length > 0
+        ? [{ label: "Kết quả tìm kiếm", items: platformMaterials }]
+        : []
+    }
+    return groupMaterialsForPicker(platformMaterials)
+  }, [platformMaterials, platformMatQuery])
 
-  const filteredPlatformTags = platformTags
+  const groupedPlatformTags = React.useMemo(() => {
+    if (platformTagQuery.trim()) {
+      return platformTags.length > 0
+        ? [{ label: "Kết quả tìm kiếm", items: platformTags }]
+        : []
+    }
+    return groupTagsForPicker(platformTags)
+  }, [platformTags, platformTagQuery])
 
   React.useEffect(() => {
     let mounted = true
@@ -351,41 +463,59 @@ export default function CreateProductPage() {
     }
   }, [])
 
-  const loadPlatformMaterials = React.useCallback(async (page = 1) => {
-    if (platformMatLoading) return
+  // Tải toàn bộ materials 1 lần (không search server) → filter client-side
+  const loadPlatformMaterials = React.useCallback(async () => {
+    if (matLoadingRef.current || allPlatformMaterials.length > 0) return
+    matLoadingRef.current = true
     setPlatformMatLoading(true)
     try {
-      const res = await fetchSellerMaterials(page, 30, debouncedPlatformMatQuery || undefined)
+      const res = await fetchSellerMaterials(1, 500)
       if (res.success) {
         const items = res.materials ?? []
-        setPlatformMaterials((prev) => page === 1 ? items : [...prev, ...items])
-        setMatPage(page)
-        setHasMoreMats(items.length === 30)
+        setAllPlatformMaterials(items)
+        setPlatformMaterials(items)
       }
     } catch (err) {
       toast.error(`Không tải được chất liệu: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
+      matLoadingRef.current = false
       setPlatformMatLoading(false)
     }
-  }, [platformMatLoading, debouncedPlatformMatQuery])
+  }, [allPlatformMaterials.length])
 
-  const loadPlatformTags = React.useCallback(async (page = 1) => {
-    if (platformTagLoading) return
+  // Tải toàn bộ tags 1 lần → filter client-side (giống material)
+  const loadPlatformTags = React.useCallback(async () => {
+    if (tagLoadingRef.current || allPlatformTags.length > 0) return
+    tagLoadingRef.current = true
     setPlatformTagLoading(true)
     try {
-      const res = await fetchSellerTags(page, 30, debouncedPlatformTagQuery || undefined)
+      const res = await fetchSellerTags(1, 600)
       if (res.success) {
         const items = res.tags ?? []
-        setPlatformTags((prev) => page === 1 ? items : [...prev, ...items])
-        setTagPage(page)
-        setHasMoreTags(items.length === 30)
+        setAllPlatformTags(items)
+        setPlatformTags(items)
       }
     } catch (err) {
       toast.error(`Không tải được thẻ: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
+      tagLoadingRef.current = false
       setPlatformTagLoading(false)
     }
-  }, [platformTagLoading, debouncedPlatformTagQuery])
+  }, [allPlatformTags.length])
+
+  // Material: tải 1 lần khi dialog mở lần đầu
+  React.useEffect(() => {
+    if (matDialogOpen) {
+      loadPlatformMaterials()
+    }
+  }, [matDialogOpen, loadPlatformMaterials])
+
+  // Tag: tải 1 lần khi dialog mở lần đầu
+  React.useEffect(() => {
+    if (tagDialogOpen) {
+      loadPlatformTags()
+    }
+  }, [tagDialogOpen, loadPlatformTags])
 
 
   const blobUrlToDataUrl = React.useCallback(async (blobUrl: string) => {
@@ -437,9 +567,10 @@ export default function CreateProductPage() {
     )
     setMatSuggestions(materials ?? [])
     setSelMatIds(
-      (materials ?? []).map((m) => m.materialId).filter((id): id is string => typeof id === "string" && id.length > 0)
+      Array.from(
+        new Set((materials ?? []).map((m, idx) => materialSelectionKey(m, idx))),
+      ),
     )
-    setHasAnalyzed(true)
   }, [])
 
   const runAiAnalysis = React.useCallback(async () => {
@@ -507,10 +638,21 @@ export default function CreateProductPage() {
         }
         const mergedTags = [...tagMap.values()].slice(0, 10)
 
-        // Merge materials: dedup theo materialId, top 5
+        // Merge materials: ưu tiên ảnh trước, dùng cả ID lẫn tên để dedup
+        // — key theo materialId nếu có, ngược lại theo __name__:lowercaseName
+        const matKey = (m: MaterialSuggestion): string =>
+          m.materialId ?? `__name__:${(m.materialName ?? "").trim().toLowerCase()}`
         const matMap = new Map<string, MaterialSuggestion>()
-        for (const mat of [...(imageRes?.suggestedMaterials ?? []), ...(textRes?.materials ?? [])]) {
-          if (mat.materialId && !matMap.has(mat.materialId)) matMap.set(mat.materialId, mat)
+        // Ảnh trước (độ tin cậy cao hơn về chất liệu vật lý)
+        for (const mat of (imageRes?.suggestedMaterials ?? [])) {
+          const k = matKey(mat); if (k && !matMap.has(k)) matMap.set(k, mat)
+        }
+        // Text bổ sung: nếu chất liệu đó chưa có trong map (theo ID hoặc tên)
+        const imageNames = new Set([...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()))
+        for (const mat of (textRes?.materials ?? [])) {
+          const k = matKey(mat)
+          const nameLow = (mat.materialName ?? "").trim().toLowerCase()
+          if (k && !matMap.has(k) && !imageNames.has(nameLow)) matMap.set(k, mat)
         }
         const mergedMats = [...matMap.values()].slice(0, 5)
 
@@ -567,6 +709,20 @@ export default function CreateProductPage() {
 
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
+    
+    if (!selCategory) {
+      toast.error("Vui lòng chọn Danh mục sản phẩm (Category)");
+      return;
+    }
+    if (selMatIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 Chất liệu (Material)");
+      return;
+    }
+    if (selTagIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 Thẻ (Tag)");
+      return;
+    }
+
     setUploadingImages(true)
     let persistedImageUrls: string[] | undefined
     try {
@@ -592,7 +748,10 @@ export default function CreateProductPage() {
       imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
       categoryId: selCategory?.categoryId ?? undefined,
       tagIds: selTagIds.length > 0 ? selTagIds : undefined,
-      materialIds: selMatIds.length > 0 ? selMatIds : undefined,
+      materialIds: (() => {
+        const ids = selMatIds.filter(isPersistableMaterialId)
+        return ids.length > 0 ? ids : undefined
+      })(),
     }
 
     const createResult = useVariants
@@ -603,12 +762,19 @@ export default function CreateProductPage() {
             .map((r) => {
               const priceStr = r.price.replace(/[^0-9]/g, "")
               const rowPrice = priceStr ? Number(priceStr) : undefined
+
+              let finalAttributes: string | undefined = undefined;
+              const attrStr = r.attributes.trim();
+              if (attrStr) {
+                finalAttributes = JSON.stringify(parseAttributesStr(attrStr));
+              }
+
               return {
                 variantName: r.variantName.trim(),
                 sku: r.sku.trim() || undefined,
                 price: rowPrice !== undefined && Number.isFinite(rowPrice) && rowPrice > 0 ? rowPrice : undefined,
                 quantity: Math.max(0, Math.floor(Number(r.quantity) || 0)),
-                attributes: r.attributes.trim() || undefined,
+                attributes: finalAttributes,
               }
             }),
         })
@@ -617,7 +783,7 @@ export default function CreateProductPage() {
           quantity: Math.max(0, Math.floor(Number(baseStock) || 0)),
         })
 
-    if (createResult.success && createResult.productId && hasAnalyzed) {
+    if (createResult.success && createResult.productId) {
       const chosenTagNames = resolveChosenTagNames(selTagIds, tagSuggestions, platformTags)
       const suggestedTags = tagSuggestions
         .filter((s) => s.tagName?.trim())
@@ -715,7 +881,12 @@ export default function CreateProductPage() {
 
   const togglePlatformMat = (mat: MaterialDto) => {
     const key = mat.id
-    setSelMatIds((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key])
+    const nameKey = `__name__:${mat.name.trim().toLowerCase()}`
+    setSelMatIds((p) =>
+      p.includes(key)
+        ? p.filter((x) => x !== key)
+        : [...p.filter((x) => x !== nameKey), key],
+    )
   }
 
   const togglePlatformTag = (tag: Tag) => {
@@ -914,8 +1085,10 @@ export default function CreateProductPage() {
                               Xóa
                             </Button>
                           </div>
-                          <div className="sm:col-span-12 grid gap-1">
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Thuộc tính</span>
+                          <div className="sm:col-span-12 grid gap-1 mt-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                              Thuộc tính <span className="text-muted-foreground/60 normal-case tracking-normal">(Tùy chọn)</span>
+                            </span>
                             <Input
                               value={row.attributes}
                               onChange={(e) =>
@@ -923,9 +1096,23 @@ export default function CreateProductPage() {
                                   p.map((r) => (r.id === row.id ? { ...r, attributes: e.target.value } : r))
                                 )
                               }
-                              placeholder="Tùy chọn"
+                              placeholder="VD: Màu: Đỏ, Size: L"
                               className="h-8 text-xs"
                             />
+                            <p className="text-[10px] text-muted-foreground mt-0.5 mb-1.5">
+                              Hệ thống tự nhận diện các thuộc tính theo định dạng <strong className="font-semibold text-foreground/80">Khóa: Giá trị</strong>, phân tách bằng dấu phẩy.
+                            </p>
+                            {row.attributes.trim() && (
+                              <div className="rounded bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-[10px] mt-1 border border-emerald-100/50">
+                                <span className="font-semibold opacity-75 mr-1">Đã nhận diện:</span>
+                                {Object.entries(parseAttributesStr(row.attributes)).map(([k, v]) => (
+                                  <span key={k} className="inline-flex items-center gap-1 mr-2 px-1 rounded bg-white shadow-sm border border-emerald-100">
+                                    <span className="font-semibold opacity-80">{k}:</span>
+                                    <span>{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1136,54 +1323,66 @@ export default function CreateProductPage() {
                       <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
                       Đang phân tích danh mục...
                     </div>
-                  ) : catError ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
-                      <IconAlertCircle className="size-3.5 shrink-0" />
-                      Không thể kết nối AI. Kiểm tra microservice.
-                    </div>
-                  ) : catSuggestions.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] italic text-[#7c8f72]">
-                      {catError ? "Không có gợi ý" : "Chưa phân tích"}
-                    </div>
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {catSuggestions.map((cat, idx) => {
-                        const active = selCategory?.categoryId === cat.categoryId
-                        return (
-                          <button
-                            key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
-                            type="button"
-                            onClick={() => handleSelectCategory(cat)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                              active
-                                ? "border-[#9db183] bg-white"
-                                : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
-                              <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <ConfidenceDot score={cat.confidenceScore} />
-                              {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
-                            </div>
-                          </button>
-                        )
-                      })}
-
-                      {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
-                        <div
-                          key={`empty-cat-${idx}`}
-                          className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
-                        >
-                          <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                      {catError && (
+                        <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
+                          <IconAlertCircle className="size-3.5 shrink-0" />
+                          <span>
+                            Không thể kết nối AI. Kiểm tra microservice. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
+                          </span>
                         </div>
-                      ))}
+                      )}
+
+                      {!catError && catSuggestions.length > 0 && (
+                        <>
+                          {catSuggestions.map((cat, idx) => {
+                            const active = selCategory?.categoryId === cat.categoryId
+                            return (
+                              <button
+                                key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
+                                type="button"
+                                onClick={() => handleSelectCategory(cat)}
+                                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                                  active
+                                    ? "border-[#9db183] bg-white"
+                                    : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
+                                  <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <ConfidenceDot score={cat.confidenceScore} />
+                                  {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
+                                </div>
+                              </button>
+                            )
+                          })}
+
+                          {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
+                            <div
+                              key={`empty-cat-${idx}`}
+                              className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
+                            >
+                              <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {!catError && catSuggestions.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] text-[#7c8f72]">
+                          Chưa phân tích AI — bấm &quot;Bắt đầu phân tích&quot; hoặc chọn danh mục thủ công bên dưới.
+                        </div>
+                      )}
 
                       <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
                         <p className="mb-2 text-[11px] text-[#6d7f62]">
-                          Không đúng gợi ý? Chọn danh mục thủ công:
+                          {catSuggestions.length > 0
+                            ? "Không đúng gợi ý? Chọn danh mục thủ công:"
+                            : "Chọn danh mục thủ công:"}
                         </p>
                         <div className="relative">
                           <Input
@@ -1240,10 +1439,8 @@ export default function CreateProductPage() {
                 <div>
                   <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
                   {!selCategory ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-7 w-16 rounded-full bg-[#dfe8d6] opacity-60" />
-                      ))}
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fafcf8] p-3 text-[11px] text-[#7c8f72]">
+                      Chọn danh mục ở trên để thêm chất liệu (gợi ý AI hoặc nút + chọn từ nền tảng).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1274,8 +1471,12 @@ export default function CreateProductPage() {
                       {platformMaterials
                         .filter(
                           (mat) =>
-                            selMatIds.includes(mat.id) &&
-                            !matSuggestions.some((m) => m.materialId === mat.id)
+                            isPlatformMatSelected(mat, selMatIds, matSuggestions) &&
+                            !matSuggestions.some(
+                              (m) =>
+                                (m.materialId && m.materialId === mat.id) ||
+                                (m.materialName?.trim().toLowerCase() === mat.name.trim().toLowerCase()),
+                            )
                         )
                         .map((mat) => (
                           <button
@@ -1292,19 +1493,22 @@ export default function CreateProductPage() {
                       {matSuggestions.length === 0 &&
                         platformMaterials.filter(
                           (mat) =>
-                            selMatIds.includes(mat.id) &&
-                            !matSuggestions.some((m) => m.materialId === mat.id)
+                            isPlatformMatSelected(mat, selMatIds, matSuggestions) &&
+                            !matSuggestions.some(
+                              (m) =>
+                                (m.materialId && m.materialId === mat.id) ||
+                                (m.materialName?.trim().toLowerCase() === mat.name.trim().toLowerCase()),
+                            )
                         ).length === 0 && (
                         <span className="text-[11px] italic text-[#8a9a80]">
                           Không có gợi ý từ AI
                         </span>
                       )}
 
-                      {hasAnalyzed && (
-                        <>
+                      <>
                           <button
                             type="button"
-                            onClick={() => { setMatDialogOpen(true); loadPlatformMaterials(1) }}
+                            onClick={() => setMatDialogOpen(true)}
                             className="inline-flex items-center justify-center size-7 rounded-full border-2 border-dashed border-[#9db183] bg-white text-[#6b7f5e] hover:border-[#5a7248] hover:bg-[#f2f7ee] transition-all"
                             title="Chọn chất liệu từ nền tảng"
                           >
@@ -1312,9 +1516,12 @@ export default function CreateProductPage() {
                           </button>
 
                           <Dialog open={matDialogOpen} onOpenChange={setMatDialogOpen}>
-                            <DialogContent className="sm:max-w-md">
+                            <DialogContent className="sm:max-w-lg">
                               <DialogHeader>
                                 <DialogTitle className="text-sm font-semibold text-[#44553a]">Chọn chất liệu</DialogTitle>
+                                <p className="text-[11px] font-normal text-muted-foreground pt-0.5">
+                                  Đã gom nhóm theo loại (ước lượng từ tên). Dùng ô tìm kiếm để thu hẹp nhanh.
+                                </p>
                               </DialogHeader>
                               <div className="relative">
                                 <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -1326,48 +1533,53 @@ export default function CreateProductPage() {
                                   autoFocus
                                 />
                               </div>
-                              {platformMatLoading && platformMaterials.length === 0 ? (
+                              {platformMatLoading ? (
                                 <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                                   <IconLoader2 className="size-4 animate-spin" /> Đang tải...
                                 </div>
                               ) : (
-                                <div
-                                  className="flex flex-wrap gap-2 max-h-72 overflow-y-auto py-1 pr-1"
-                                  onScroll={(e) => {
-                                    const el = e.currentTarget
-                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && hasMoreMats && !platformMatLoading) {
-                                      loadPlatformMaterials(matPage + 1)
-                                    }
-                                  }}
-                                >
-                                  {filteredPlatformMaterials.map((mat) => {
-                                    const active = selMatIds.includes(mat.id)
+                                <div className="max-h-72 overflow-y-auto py-1 pr-1 space-y-2">
+                                  {groupedPlatformMaterials.map(({ label: matGroupLabel, items: matGroupItems }) => {
+                                    if (matGroupItems.length === 0) return null
+                                    const hasSel = matGroupItems.some((mat) =>
+                                      isPlatformMatSelected(mat, selMatIds, matSuggestions),
+                                    )
+                                    const isSearchResult = matGroupLabel === "Kết quả tìm kiếm"
                                     return (
-                                      <button
-                                        key={mat.id}
-                                        type="button"
-                                        onClick={() => togglePlatformMat(mat)}
-                                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                                          active
-                                            ? "border-[#8ea27a] bg-[#e9f0e2] text-[#415337]"
-                                            : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a] hover:bg-[#f2f6ee]"
-                                        }`}
+                                      <details
+                                        key={matGroupLabel}
+                                        className="rounded-lg border border-[#e3eadb] bg-[#fafcf8] px-2 py-1"
+                                        open
                                       >
-                                        {mat.name}
-                                        {active && <IconCheck className="size-3.5" />}
-                                      </button>
+                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 text-[11px] font-semibold text-[#44553a] [&::-webkit-details-marker]:hidden">
+                                          <span>{matGroupLabel}</span>
+                                          <span className="font-normal text-muted-foreground">{matGroupItems.length}</span>
+                                        </summary>
+                                        <div className="flex flex-wrap gap-2 pb-2 pt-0.5">
+                                          {matGroupItems.map((mat) => {
+                                            const active = isPlatformMatSelected(mat, selMatIds, matSuggestions)
+                                            return (
+                                              <button
+                                                key={mat.id}
+                                                type="button"
+                                                onClick={() => togglePlatformMat(mat)}
+                                                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                                                  active
+                                                    ? "border-[#8ea27a] bg-[#e9f0e2] text-[#415337]"
+                                                    : "border-[#cfd8c6] bg-white text-[#718267] hover:border-[#8ea27a] hover:bg-[#f2f6ee]"
+                                                }`}
+                                              >
+                                                {mat.name}
+                                                {active && <IconCheck className="size-3.5" />}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      </details>
                                     )
                                   })}
-                                  {filteredPlatformMaterials.length === 0 && !platformMatLoading && (
+                                  {platformMaterials.length === 0 && (
                                     <p className="w-full text-center text-sm italic text-muted-foreground py-4">Không tìm thấy chất liệu</p>
-                                  )}
-                                  {platformMatLoading && platformMaterials.length > 0 && (
-                                    <div className="w-full flex justify-center py-2">
-                                      <IconLoader2 className="size-4 animate-spin text-muted-foreground" />
-                                    </div>
-                                  )}
-                                  {!hasMoreMats && platformMaterials.length > 0 && (
-                                    <p className="w-full text-center text-xs text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
                                   )}
                                 </div>
                               )}
@@ -1376,8 +1588,7 @@ export default function CreateProductPage() {
                               </p>
                             </DialogContent>
                           </Dialog>
-                        </>
-                      )}
+                      </>
                     </div>
                   )}
                 </div>
@@ -1385,10 +1596,8 @@ export default function CreateProductPage() {
                 <div className="border-t border-[#dce3d5] pt-3">
                   <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
                   {!selCategory ? (
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="h-7 w-14 rounded-full bg-[#dfe8d6] opacity-60" />
-                      ))}
+                    <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fffdfb] p-3 text-[11px] text-[#7c8f72]">
+                      Chọn danh mục ở trên để thêm thẻ (gợi ý AI hoặc nút + chọn từ nền tảng).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1454,11 +1663,10 @@ export default function CreateProductPage() {
                       )}
 
                       {/* „+" badge mở Popover chọn từ nền tảng */}
-                      {hasAnalyzed && (
-                        <>
+                      <>
                           <button
                             type="button"
-                            onClick={() => { setTagDialogOpen(true); loadPlatformTags(1) }}
+                            onClick={() => setTagDialogOpen(true)}
                             className="inline-flex items-center justify-center size-7 rounded-md border-2 border-dashed border-[#e8b37f] bg-white text-[#c06f2a] hover:border-[#d49640] hover:bg-[#fdf5eb] transition-all"
                             title="Chọn thẻ từ nền tảng"
                           >
@@ -1466,9 +1674,12 @@ export default function CreateProductPage() {
                           </button>
 
                           <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
-                            <DialogContent className="sm:max-w-md">
+                            <DialogContent className="sm:max-w-lg">
                               <DialogHeader>
                                 <DialogTitle className="text-sm font-semibold text-[#8a3d05]">Chọn thẻ</DialogTitle>
+                                <p className="text-[11px] font-normal text-muted-foreground pt-0.5">
+                                  Đã nhóm theo loại (màu sắc, kiểu dáng, tính năng…). Dùng ô tìm để thu hẹp.
+                                </p>
                               </DialogHeader>
                               <div className="relative">
                                 <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -1480,48 +1691,49 @@ export default function CreateProductPage() {
                                   autoFocus
                                 />
                               </div>
-                              {platformTagLoading && platformTags.length === 0 ? (
+                              {platformTagLoading ? (
                                 <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                                   <IconLoader2 className="size-4 animate-spin" /> Đang tải...
                                 </div>
                               ) : (
-                                <div
-                                  className="flex flex-wrap gap-2 max-h-72 overflow-y-auto py-1 pr-1"
-                                  onScroll={(e) => {
-                                    const el = e.currentTarget
-                                    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && hasMoreTags && !platformTagLoading) {
-                                      loadPlatformTags(tagPage + 1)
-                                    }
-                                  }}
-                                >
-                                  {filteredPlatformTags.map((tag) => {
-                                    const active = selTagIds.includes(tag.id)
+                                <div className="max-h-[420px] overflow-y-auto py-1 pr-1 space-y-2">
+                                  {groupedPlatformTags.map(({ label: tagGroupLabel, items: tagGroupItems }) => {
+                                    if (tagGroupItems.length === 0) return null
                                     return (
-                                      <button
-                                        key={tag.id}
-                                        type="button"
-                                        onClick={() => togglePlatformTag(tag)}
-                                        className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all ${
-                                          active
-                                            ? "border-[#e8b37f] bg-[#fdf0e2] text-[#b06017]"
-                                            : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f] hover:bg-[#fdf5eb]"
-                                        }`}
+                                      <details
+                                        key={tagGroupLabel}
+                                        className="rounded-lg border border-[#f0e0d0] bg-[#fffdfb] px-2 py-1"
+                                        open
                                       >
-                                        #{tag.name}
-                                        {active && <IconCheck className="size-3.5" />}
-                                      </button>
+                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1.5 text-[11px] font-semibold text-[#8a3d05] [&::-webkit-details-marker]:hidden">
+                                          <span>{tagGroupLabel}</span>
+                                          <span className="font-normal text-muted-foreground">{tagGroupItems.length}</span>
+                                        </summary>
+                                        <div className="flex flex-wrap gap-2 pb-2 pt-0.5">
+                                          {tagGroupItems.map((tag) => {
+                                            const active = selTagIds.includes(tag.id)
+                                            return (
+                                              <button
+                                                key={tag.id}
+                                                type="button"
+                                                onClick={() => togglePlatformTag(tag)}
+                                                className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-all ${
+                                                  active
+                                                    ? "border-[#e8b37f] bg-[#fdf0e2] text-[#b06017]"
+                                                    : "border-[#efd4b7] bg-white text-[#c06f2a] hover:border-[#e8b37f] hover:bg-[#fdf5eb]"
+                                                }`}
+                                              >
+                                                #{tag.name}
+                                                {active && <IconCheck className="size-3.5" />}
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      </details>
                                     )
                                   })}
-                                  {filteredPlatformTags.length === 0 && !platformTagLoading && (
+                                  {platformTags.length === 0 && (
                                     <p className="w-full text-center text-sm italic text-muted-foreground py-4">Không tìm thấy thẻ</p>
-                                  )}
-                                  {platformTagLoading && platformTags.length > 0 && (
-                                    <div className="w-full flex justify-center py-2">
-                                      <IconLoader2 className="size-4 animate-spin text-muted-foreground" />
-                                    </div>
-                                  )}
-                                  {!hasMoreTags && platformTags.length > 0 && (
-                                    <p className="w-full text-center text-xs text-muted-foreground/60 py-1">— Đã hiển thị tất cả —</p>
                                   )}
                                 </div>
                               )}
@@ -1530,8 +1742,7 @@ export default function CreateProductPage() {
                               </p>
                             </DialogContent>
                           </Dialog>
-                        </>
-                      )}
+                      </>
                     </div>
                   )}
 
