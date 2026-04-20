@@ -168,6 +168,82 @@ function newVariantDraftRow(): VariantDraftRow {
   }
 }
 
+function parseAttributesStr(attrStr: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const leftoverSegments: string[] = [];
+  
+  if (attrStr.startsWith('{') || attrStr.startsWith('[')) {
+     try {
+       const parsed = JSON.parse(attrStr);
+       return typeof parsed === 'object' && parsed !== null ? parsed : { "Thuộc tính": attrStr };
+     } catch {
+       return { "Thuộc tính": attrStr };
+     }
+  }
+
+  const segments = attrStr.split(',');
+  for (const seg of segments) {
+     let text = seg.trim();
+     if (!text) continue;
+     
+     const firstColon = text.indexOf(':');
+     if (firstColon > 0) {
+        let k = text.substring(0, firstColon).trim();
+        let v = text.substring(firstColon + 1).trim();
+        
+        if (k.toLowerCase() === 'size') {
+           k = 'Size';
+           v = v.toUpperCase();
+        } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
+           k = 'Màu';
+           v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+        } else {
+           k = k.charAt(0).toUpperCase() + k.slice(1);
+        }
+
+        if (k) {
+           if (result[k]) result[k] += `, ${v}`;
+           else result[k] = v;
+        } else {
+           leftoverSegments.push(text);
+        }
+     } else {
+        const lower = text.toLowerCase();
+        if (lower.startsWith('size ') || lower.startsWith('size')) {
+           const val = text.substring(4).trim();
+           if (val) {
+             const finalVal = val.toUpperCase();
+             if (result['Size']) result['Size'] += `, ${finalVal}`;
+             else result['Size'] = finalVal;
+             continue;
+           }
+        } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
+           const idx = lower.startsWith('màu sắc') ? 7 : 3;
+           const val = text.substring(idx).trim();
+           if (val) {
+             const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+             if (result['Màu']) result['Màu'] += `, ${finalVal}`;
+             else result['Màu'] = finalVal;
+             continue;
+           }
+        }
+        
+        const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
+        leftoverSegments.push(capitalizedText);
+     }
+  }
+  
+  if (leftoverSegments.length > 0) {
+      if (Object.keys(result).length === 0) {
+         result["Phân loại"] = leftoverSegments.join(", ");
+      } else {
+         result["Khác"] = leftoverSegments.join(", ");
+      }
+  }
+  
+  return result;
+}
+
 /** Ảnh dán URL https — giữ nguyên; ảnh chọn từ máy (blob:) — upload lên bucket product-images. */
 async function resolveImageUrlForProduct(u: string): Promise<string> {
   const trimmed = u.trim()
@@ -522,6 +598,20 @@ export default function CreateProductPage() {
 
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
+    
+    if (!selCategory) {
+      toast.error("Vui lòng chọn Danh mục sản phẩm (Category)");
+      return;
+    }
+    if (selMatIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 Chất liệu (Material)");
+      return;
+    }
+    if (selTagIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 Thẻ (Tag)");
+      return;
+    }
+
     setUploadingImages(true)
     let persistedImageUrls: string[] | undefined
     try {
@@ -558,12 +648,19 @@ export default function CreateProductPage() {
             .map((r) => {
               const priceStr = r.price.replace(/[^0-9]/g, "")
               const rowPrice = priceStr ? Number(priceStr) : undefined
+
+              let finalAttributes: string | undefined = undefined;
+              const attrStr = r.attributes.trim();
+              if (attrStr) {
+                finalAttributes = JSON.stringify(parseAttributesStr(attrStr));
+              }
+
               return {
                 variantName: r.variantName.trim(),
                 sku: r.sku.trim() || undefined,
                 price: rowPrice !== undefined && Number.isFinite(rowPrice) && rowPrice > 0 ? rowPrice : undefined,
                 quantity: Math.max(0, Math.floor(Number(r.quantity) || 0)),
-                attributes: r.attributes.trim() || undefined,
+                attributes: finalAttributes,
               }
             }),
         })
@@ -836,8 +933,10 @@ export default function CreateProductPage() {
                               Xóa
                             </Button>
                           </div>
-                          <div className="sm:col-span-12 grid gap-1">
-                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Thuộc tính</span>
+                          <div className="sm:col-span-12 grid gap-1 mt-1">
+                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                              Thuộc tính <span className="text-muted-foreground/60 normal-case tracking-normal">(Tùy chọn)</span>
+                            </span>
                             <Input
                               value={row.attributes}
                               onChange={(e) =>
@@ -845,9 +944,23 @@ export default function CreateProductPage() {
                                   p.map((r) => (r.id === row.id ? { ...r, attributes: e.target.value } : r))
                                 )
                               }
-                              placeholder="Tùy chọn"
+                              placeholder="VD: Màu: Đỏ, Size: L"
                               className="h-8 text-xs"
                             />
+                            <p className="text-[10px] text-muted-foreground mt-0.5 mb-1.5">
+                              Hệ thống tự nhận diện các thuộc tính theo định dạng <strong className="font-semibold text-foreground/80">Khóa: Giá trị</strong>, phân tách bằng dấu phẩy.
+                            </p>
+                            {row.attributes.trim() && (
+                              <div className="rounded bg-emerald-50 text-emerald-700 px-2.5 py-1.5 text-[10px] mt-1 border border-emerald-100/50">
+                                <span className="font-semibold opacity-75 mr-1">Đã nhận diện:</span>
+                                {Object.entries(parseAttributesStr(row.attributes)).map(([k, v]) => (
+                                  <span key={k} className="inline-flex items-center gap-1 mr-2 px-1 rounded bg-white shadow-sm border border-emerald-100">
+                                    <span className="font-semibold opacity-80">{k}:</span>
+                                    <span>{v}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
