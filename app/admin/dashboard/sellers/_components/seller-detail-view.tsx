@@ -3,6 +3,7 @@ import Image from "next/image"
 import {
   IconCheck, IconX, IconPlayerPlay, IconPlayerPause, IconDoorExit,
   IconBuildingStore, IconFileText, IconExternalLink, IconArrowLeft,
+  IconId,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -42,6 +43,11 @@ function displayVal(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return "—"
   const s = String(v).trim()
   return s.length > 0 ? s : "—"
+}
+
+function identityHasText(identity: ShopVerification["identity"]): boolean {
+  if (!identity) return false
+  return Object.values(identity).some((v) => v != null && String(v).trim() !== "")
 }
 
 export function SellerDetailView({
@@ -335,15 +341,68 @@ export function SellerDetailView({
                 </div>
               </div>
 
-              {/* Documents */}
+              {/* CCCD: chỉ snapshot văn bản — không lưu ảnh */}
+              <div className="rounded-lg border p-4 space-y-3">
+                <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <IconId className="size-5 shrink-0" />
+                  Thông tin CCCD/CMND (lúc đăng ký)
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Hệ thống <strong>không lưu file ảnh</strong> mặt trước/sau thẻ; dưới đây là nội dung văn bản lấy từ OCR tại thời điểm gửi đơn (snapshot trong cơ sở dữ liệu).
+                </p>
+                {!identityHasText(shop.identity) ? (
+                  <p className="text-sm text-muted-foreground">
+                    Chưa có dữ liệu CCCD trên hồ sơ — thường gặp với đăng ký cũ trước khi hệ thống lưu snapshot, hoặc đơn chưa gửi kèm thông tin định danh.
+                  </p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                    {(
+                      [
+                        ["Họ và tên (thẻ)", shop.identity?.fullName],
+                        ["Số CCCD/CMND", shop.identity?.idNumber],
+                        ["Ngày sinh", shop.identity?.dateOfBirth],
+                        ["Giới tính", shop.identity?.sex],
+                        ["Quốc tịch", shop.identity?.nationality],
+                        ["Quê quán", shop.identity?.homeTown],
+                        ["Nơi thường trú", shop.identity?.permanentAddress],
+                        ["Tỉnh/TP (tách từ địa chỉ)", shop.identity?.addrProvince],
+                        ["Quận/Huyện", shop.identity?.addrDistrict],
+                        ["Phường/Xã", shop.identity?.addrWard],
+                        ["Số nhà, đường", shop.identity?.addrStreet],
+                        ["Ngày hết hạn", shop.identity?.dateOfExpiry],
+                        ["Loại thẻ", shop.identity?.cardType],
+                        ["Ngày cấp", shop.identity?.issueDate],
+                        ["Nơi cấp", shop.identity?.issuePlace],
+                        ["Tôn giáo", shop.identity?.religion],
+                        ["Dân tộc", shop.identity?.ethnicity],
+                      ] as const
+                    ).map(([label, val]) => (
+                      <div key={label} className="space-y-1">
+                        <span className="text-muted-foreground text-xs">{label}</span>
+                        <p className="font-medium break-words">{displayVal(val)}</p>
+                      </div>
+                    ))}
+                    <div className="space-y-1 sm:col-span-2 lg:col-span-3">
+                      <span className="text-muted-foreground text-xs">Đặc điểm nhận dạng (mặt sau)</span>
+                      <p className="font-medium break-words whitespace-pre-wrap text-sm">
+                        {displayVal(shop.identity?.features)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Documents — file GPKD, thuế (Supabase) */}
               <div className="rounded-lg border">
                 <div className="border-b p-4">
                   <h3 className="font-semibold flex items-center gap-2">
                     <IconFileText className="size-5" />
-                    Hồ sơ xác minh
+                    Hồ sơ &amp; giấy tờ có file
                     <Badge variant="outline" className="ml-1">{shop.documents?.length ?? 0} tài liệu</Badge>
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-1">Các giấy tờ seller đã nộp để xác minh danh tính và cửa hàng</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Các tệp upload (GPKD, mã số thuế…). Ảnh CCCD không nằm ở đây — xem khối &quot;Thông tin CCCD&quot; phía trên.
+                  </p>
                 </div>
                 {(!shop.documents || shop.documents.length === 0) ? (
                   <div className="p-8 text-center text-muted-foreground">

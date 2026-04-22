@@ -1,3 +1,5 @@
+import type { SellerIdentityInfo } from "./profile"
+
 export const VerificationStatus = {
   Pending: 0,
   Verified: 1,
@@ -92,6 +94,8 @@ export type ShopVerification = {
   verifiedByName: string | null
   createdAt: string
   documents: ShopDocument[]
+  /** Snapshot nội dung CCCD từ đăng ký (API admin) — không có URL ảnh thẻ */
+  identity?: SellerIdentityInfo | null
 }
 
 export type ShopListResponse = {

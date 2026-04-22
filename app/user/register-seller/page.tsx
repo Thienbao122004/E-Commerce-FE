@@ -4,17 +4,22 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { profileService } from "@/services/profile";
 import { vietnamProvincesService } from "@/services/vietnam-provinces";
+import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories";
+import { recognizeVietnamIdCard, type VnmIdOcrData } from "@/services/vnm-id-ocr";
 import type {
   RegisterSellerRequest,
+  SellerIdentityInfo,
   ShopDocumentInput,
   UserProfileResponse,
 } from "@/types/profile";
 import type { Province, District, Ward } from "@/types/vietnam-provinces";
 import { createClient } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +40,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -55,6 +73,8 @@ type SellerFormState = {
   bankName: string;
   bankAccountNumber: string;
   bankAccountName: string;
+  /** Danh mục gốc (cấp 1) — ràng buộc sản phẩm sau này */
+  primaryCategoryId: number;
 };
 
 type DocSlot = {
@@ -93,20 +113,21 @@ const INITIAL_FORM: SellerFormState = {
   bankName: "",
   bankAccountNumber: "",
   bankAccountName: "",
+  primaryCategoryId: 0,
 };
 
 const DOC_SLOTS_BASE: DocSlot[] = [
   {
     docType: "cccd_front",
-    label: "CCCD / CMND mặt trước",
+    label: "CCCD mặt trước",
     required: true,
-    hint: "Ảnh rõ ràng, không bị che khuất",
+    hint: "Bắt buộc — tối đa 5MB",
   },
   {
     docType: "cccd_back",
-    label: "CCCD / CMND mặt sau",
+    label: "CCCD mặt sau",
     required: true,
-    hint: "Ảnh rõ ràng, không bị che khuất",
+    hint: "Bắt buộc — tối đa 5MB",
   },
 ];
 
@@ -125,6 +146,115 @@ function getDocSlots(businessType: string): DocSlot[] {
   return slots;
 }
 
+type IdCardFormState = {
+  name: string;
+  idNumber: string;
+  dob: string;
+  sex: string;
+  nationality: string;
+  home: string;
+  address: string;
+  addrProvince: string;
+  addrDistrict: string;
+  addrWard: string;
+  addrStreet: string;
+  doe: string;
+  cardType: string;
+  issueDate: string;
+  issueLoc: string;
+  religion: string;
+  ethnicity: string;
+  features: string;
+};
+
+const INITIAL_ID_CARD: IdCardFormState = {
+  name: "",
+  idNumber: "",
+  dob: "",
+  sex: "",
+  nationality: "",
+  home: "",
+  address: "",
+  addrProvince: "",
+  addrDistrict: "",
+  addrWard: "",
+  addrStreet: "",
+  doe: "",
+  cardType: "",
+  issueDate: "",
+  issueLoc: "",
+  religion: "",
+  ethnicity: "",
+  features: "",
+};
+
+function cleanOcrValue(v: string | null | undefined): string {
+  if (v == null) return "";
+  const t = String(v).trim();
+  if (!t || t.toUpperCase() === "N/A") return "";
+  return t;
+}
+
+function clearFrontOcrPart(prev: IdCardFormState): IdCardFormState {
+  return {
+    ...prev,
+    name: "",
+    idNumber: "",
+    dob: "",
+    sex: "",
+    nationality: "",
+    home: "",
+    address: "",
+    addrProvince: "",
+    addrDistrict: "",
+    addrWard: "",
+    addrStreet: "",
+    doe: "",
+    cardType: "",
+  };
+}
+
+function clearBackOcrPart(prev: IdCardFormState): IdCardFormState {
+  return {
+    ...prev,
+    issueDate: "",
+    issueLoc: "",
+    religion: "",
+    ethnicity: "",
+    features: "",
+  };
+}
+
+function mergeOcrIntoIdForm(prev: IdCardFormState, d: VnmIdOcrData): IdCardFormState {
+  const n = { ...prev };
+  const set = (k: keyof IdCardFormState, v: string | null | undefined) => {
+    const t = cleanOcrValue(v);
+    if (t) (n as Record<string, string>)[k] = t;
+  };
+  set("name", d.name);
+  set("idNumber", d.id);
+  set("dob", d.dob);
+  set("sex", d.sex);
+  set("nationality", d.nationality);
+  set("home", d.home);
+  set("address", d.address);
+  if (d.addressEntities) {
+    set("addrProvince", d.addressEntities.province);
+    set("addrDistrict", d.addressEntities.district);
+    set("addrWard", d.addressEntities.ward);
+    set("addrStreet", d.addressEntities.street);
+  }
+  set("doe", d.doe);
+  const tParts = [cleanOcrValue(d.type), cleanOcrValue(d.typeNew)].filter(Boolean);
+  if (tParts.length) n.cardType = tParts.join(" · ");
+  set("issueDate", d.issueDate);
+  set("issueLoc", d.issueLoc);
+  set("religion", d.religion);
+  set("ethnicity", d.ethnicity);
+  set("features", d.features);
+  return n;
+}
+
 export default function RegisterSellerPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -140,6 +270,12 @@ export default function RegisterSellerPage() {
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [categoryRoots, setCategoryRoots] = useState<StorefrontCategory[]>([]);
+  const [primaryCategoryOpen, setPrimaryCategoryOpen] = useState(false);
+  const [ocrLoadingFront, setOcrLoadingFront] = useState(false);
+  const [ocrLoadingBack, setOcrLoadingBack] = useState(false);
+  const [ocrAnalyzing, setOcrAnalyzing] = useState(false);
+  const [idCardForm, setIdCardForm] = useState<IdCardFormState>(INITIAL_ID_CARD);
 
   // Document uploads state: map docType → DocFile
   const [docFiles, setDocFiles] = useState<Record<string, DocFile>>({});
@@ -155,10 +291,19 @@ export default function RegisterSellerPage() {
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([loadProfile(), loadProvinces()]);
+      await Promise.all([loadProfile(), loadProvinces(), loadCategoryRoots()]);
     };
     init();
   }, []);
+
+  const loadCategoryRoots = async () => {
+    try {
+      const res = await getCategoryTree();
+      if (res.success && res.tree?.length) setCategoryRoots(res.tree);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -253,6 +398,89 @@ export default function RegisterSellerPage() {
         fileUrl: "",
       },
     }));
+    if (docType === "cccd_front") {
+      setIdCardForm((p) => clearFrontOcrPart(p));
+    } else if (docType === "cccd_back") {
+      setIdCardForm((p) => clearBackOcrPart(p));
+    }
+  };
+
+  const analyzeIdCards = async () => {
+    const front = docFiles.cccd_front?.file;
+    const back = docFiles.cccd_back?.file;
+    if (!front && !back) {
+      toast.error("Vui lòng chọn ảnh mặt trước và/hoặc mặt sau, rồi bấm phân tích");
+      return;
+    }
+    setOcrAnalyzing(true);
+    try {
+      if (front) {
+        await runCccdOcr("front", front, { skipSuccessToast: true });
+      }
+      if (back) {
+        await runCccdOcr("back", back, { skipSuccessToast: true });
+      }
+      toast.success("Đã phân tích xong — vui lòng kiểm tra lại nội dung form");
+    } finally {
+      setOcrAnalyzing(false);
+    }
+  };
+
+  const runCccdOcr = async (
+    side: "front" | "back",
+    file: File,
+    opts?: { skipSuccessToast?: boolean },
+  ) => {
+    if (side === "front") {
+      setOcrLoadingFront(true);
+      setIdCardForm((p) => clearFrontOcrPart(p));
+    } else {
+      setOcrLoadingBack(true);
+      setIdCardForm((p) => clearBackOcrPart(p));
+    }
+    try {
+      const res = await recognizeVietnamIdCard(file);
+      if (!res.success || !res.data) {
+        toast.error(res.message ?? "Không đọc được thông tin từ ảnh");
+        return;
+      }
+      const d = res.data;
+      setIdCardForm((prev) => mergeOcrIntoIdForm(prev, d));
+      if (d.address && side === "front") {
+        setForm((prev) => ({
+          ...prev,
+          addressLine: prev.addressLine.trim() ? prev.addressLine : d.address!,
+        }));
+      }
+      if (!opts?.skipSuccessToast) {
+        toast.success(
+          side === "front"
+            ? "Đã điền thông tin từ mặt trước (kiểm tra lại nội dung)"
+            : "Đã điền thông tin từ mặt sau (kiểm tra lại nội dung)",
+        );
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Lỗi khi gọi dịch vụ đọc CCCD");
+    } finally {
+      if (side === "front") setOcrLoadingFront(false);
+      else setOcrLoadingBack(false);
+    }
+  };
+
+  const applyOcrNameToProfile = async () => {
+    const name = idCardForm.name.trim();
+    if (!name) return;
+    try {
+      const r = await profileService.updateProfile({ fullName: name });
+      if (r.success) {
+        setProfile((p) => (p ? { ...p, fullName: name } : p));
+        toast.success("Đã cập nhật họ tên tài khoản theo CCCD");
+      } else {
+        toast.error(r.message ?? "Cập nhật thất bại");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Cập nhật thất bại");
+    }
   };
 
   // ── Upload single doc to Supabase Storage ─────────────────────────────────
@@ -301,6 +529,10 @@ export default function RegisterSellerPage() {
         toast.error("Vui lòng chọn loại hình kinh doanh");
         return false;
       }
+      if (!form.primaryCategoryId || form.primaryCategoryId <= 0) {
+        toast.error("Vui lòng chọn ngành hàng bán (danh mục gốc trên sàn)");
+        return false;
+      }
     }
     if (targetStep === 2) {
       if (!form.addressLine.trim()) {
@@ -327,6 +559,10 @@ export default function RegisterSellerPage() {
           toast.error(`Vui lòng tải lên: ${slot.label}`);
           return false;
         }
+      }
+      if (!idCardForm.name.trim()) {
+        toast.error('Vui lòng phân tích mặt trước CCCD để có họ tên (bấm nút "Phân tích căn cước")');
+        return false;
       }
     }
     return true;
@@ -365,13 +601,35 @@ export default function RegisterSellerPage() {
     try {
       setSubmitting(true);
 
-      // Upload tất cả docs chưa upload
+      const fileDocTypes = new Set(["business_license", "tax_cert"]);
       const documents: ShopDocumentInput[] = [];
       for (const slot of docSlots) {
+        if (!fileDocTypes.has(slot.docType)) continue;
         if (!docFiles[slot.docType]) continue;
         const fileUrl = await uploadDoc(slot.docType, userId);
         documents.push({ docType: slot.docType, fileUrl });
       }
+
+      const identity: SellerIdentityInfo = {
+        fullName: idCardForm.name.trim(),
+        idNumber: idCardForm.idNumber.trim() || null,
+        dateOfBirth: idCardForm.dob.trim() || null,
+        sex: idCardForm.sex.trim() || null,
+        nationality: idCardForm.nationality.trim() || null,
+        homeTown: idCardForm.home.trim() || null,
+        permanentAddress: idCardForm.address.trim() || null,
+        addrProvince: idCardForm.addrProvince.trim() || null,
+        addrDistrict: idCardForm.addrDistrict.trim() || null,
+        addrWard: idCardForm.addrWard.trim() || null,
+        addrStreet: idCardForm.addrStreet.trim() || null,
+        dateOfExpiry: idCardForm.doe.trim() || null,
+        cardType: idCardForm.cardType.trim() || null,
+        issueDate: idCardForm.issueDate.trim() || null,
+        issuePlace: idCardForm.issueLoc.trim() || null,
+        religion: idCardForm.religion.trim() || null,
+        ethnicity: idCardForm.ethnicity.trim() || null,
+        features: idCardForm.features.trim() || null,
+      };
 
       const payload: RegisterSellerRequest = {
         shopName: form.shopName.trim(),
@@ -385,10 +643,12 @@ export default function RegisterSellerPage() {
         businessLicenseNumber: form.businessLicenseNumber.trim() || null,
         taxCode: form.taxCode.trim() || null,
         businessType: form.businessType,
+        primaryCategoryId: form.primaryCategoryId,
         bankName: form.bankName.trim() || null,
         bankAccountNumber: form.bankAccountNumber.trim() || null,
         bankAccountName: form.bankAccountName.trim() || null,
-        documents,
+        identity,
+        documents: documents.length ? documents : undefined,
       };
 
       const res = await profileService.registerSeller(payload);
@@ -415,6 +675,14 @@ export default function RegisterSellerPage() {
   const selectedWardName = useMemo(
     () => wards.find((w) => w.code === form.wardCode)?.name ?? "",
     [wards, form.wardCode],
+  );
+
+  const selectedPrimaryCategoryName = useMemo(
+    () =>
+      form.primaryCategoryId > 0
+        ? categoryRoots.find((c) => c.id === form.primaryCategoryId)?.name ?? null
+        : null,
+    [categoryRoots, form.primaryCategoryId],
   );
 
   // ── Loading / guard ────────────────────────────────────────────────────────
@@ -621,6 +889,81 @@ export default function RegisterSellerPage() {
                 </Select>
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="primary-category">Ngành hàng bán chính *</Label>
+              <Popover
+                open={primaryCategoryOpen}
+                onOpenChange={setPrimaryCategoryOpen}
+                modal={false}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    id="primary-category"
+                    type="button"
+                    role="combobox"
+                    variant="outline"
+                    aria-expanded={primaryCategoryOpen}
+                    disabled={categoryRoots.length === 0}
+                    className="w-full justify-between font-normal h-9 px-3"
+                  >
+                    <span
+                      className={cn(
+                        "truncate text-left",
+                        !selectedPrimaryCategoryName && "text-muted-foreground",
+                      )}
+                    >
+                      {categoryRoots.length === 0
+                        ? "Đang tải danh mục…"
+                        : selectedPrimaryCategoryName ?? "Chọn hoặc tìm ngành"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="p-0 w-[var(--radix-popover-trigger-width)] max-w-[min(100%,var(--radix-popover-content-available-width,100%))]"
+                  align="start"
+                  side="bottom"
+                  sideOffset={4}
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <Command>
+                    <CommandInput placeholder="Tìm ngành hàng…" className="h-9" />
+                    <CommandList className="max-h-[min(16rem,50vh)]">
+                      <CommandEmpty>Không tìm thấy danh mục phù hợp.</CommandEmpty>
+                      <CommandGroup>
+                        {categoryRoots.map((c) => (
+                          <CommandItem
+                            key={c.id}
+                            value={`${c.name} ${c.id}`}
+                            onSelect={() => {
+                              setForm((prev) => ({
+                                ...prev,
+                                primaryCategoryId: c.id,
+                              }));
+                              setPrimaryCategoryOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 size-4 shrink-0",
+                                form.primaryCategoryId === c.id ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            {c.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                Sau khi duyệt, bạn chỉ có thể đăng sản phẩm thuộc nhánh danh mục này (theo cây danh mục
+                sàn).
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="shop-description">Mô tả shop</Label>
               <Textarea
@@ -814,8 +1157,7 @@ export default function RegisterSellerPage() {
               <div style={{ color: "var(--color-text-main)" }}>
                 <p className="font-medium">Hồ sơ xác minh danh tính</p>
                 <p className="text-muted-foreground mt-0.5">
-                  Ảnh được lưu trữ bảo mật và chỉ dùng để xét duyệt. Yêu cầu
-                  ảnh rõ nét, đủ ánh sáng, không bị cắt xén.
+                  Chọn ảnh mặt trước/mặt sau, sau đó bấm <strong>Phân tích căn cước</strong>
                 </p>
               </div>
             </div>
@@ -839,6 +1181,12 @@ export default function RegisterSellerPage() {
                     onRemove={() => {
                       const prev = docFiles[slot.docType];
                       if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+                      if (slot.docType === "cccd_front") {
+                        setIdCardForm((p) => clearFrontOcrPart(p));
+                      }
+                      if (slot.docType === "cccd_back") {
+                        setIdCardForm((p) => clearBackOcrPart(p));
+                      }
                       setDocFiles((d) => {
                         const copy = { ...d };
                         delete copy[slot.docType];
@@ -848,6 +1196,196 @@ export default function RegisterSellerPage() {
                   />
                 );
               })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                onClick={analyzeIdCards}
+                disabled={
+                  ocrAnalyzing ||
+                  ocrLoadingFront ||
+                  ocrLoadingBack ||
+                  (!docFiles.cccd_front?.file && !docFiles.cccd_back?.file)
+                }
+                style={{ backgroundColor: "var(--color-primary)" }}
+              >
+                {ocrAnalyzing || ocrLoadingFront || ocrLoadingBack
+                  ? "Đang phân tích…"
+                  : "Phân tích căn cước"}
+              </Button>
+              <p className="text-xs text-muted-foreground max-w-md">
+                Gọi sau khi đã chọn ảnh. Có cả mặt trước và mặt sau sẽ đọc mặt trước, mặt sau.
+              </p>
+            </div>
+
+            {/* Form thông tin CCCD — chỉ đọc, điền từ phân tích AI */}
+            <div
+              className="rounded-lg border p-4 space-y-4"
+              style={{ borderColor: "#e5ded6", backgroundColor: "#fafafa" }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold" style={{ color: "var(--color-text-main)" }}>
+                  Thông tin trên CCCD/CMND (chỉ xem — không chỉnh sửa)
+                </p>
+                {idCardForm.name.trim().length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={applyOcrNameToProfile}
+                    disabled={ocrAnalyzing}
+                  >
+                    Ghi họ tên vào tài khoản
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Mặt trước
+                  {ocrLoadingFront && (
+                    <span className="ml-2 text-amber-600 normal-case">— Đang đọc ảnh…</span>
+                  )}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <IdField
+                    label="Họ và tên"
+                    value={idCardForm.name}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Số CCCD/CMND"
+                    value={idCardForm.idNumber}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Ngày sinh"
+                    value={idCardForm.dob}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Giới tính"
+                    value={idCardForm.sex}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Quốc tịch / ghi chú thẻ"
+                    value={idCardForm.nationality}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Quê quán"
+                    value={idCardForm.home}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <div className="sm:col-span-2 lg:col-span-3 space-y-1.5">
+                    <Label className="text-xs">Nơi thường trú / Địa chỉ (dòng trên thẻ)</Label>
+                    <Textarea
+                      value={idCardForm.address}
+                      readOnly
+                      rows={2}
+                      disabled={ocrLoadingFront || ocrAnalyzing}
+                      className={cn(
+                        "min-h-[64px] text-sm cursor-default resize-none",
+                        "bg-muted/50 border-muted-foreground/20",
+                      )}
+                    />
+                  </div>
+                  <IdField
+                    label="Tỉnh/TP (address_entities)"
+                    value={idCardForm.addrProvince}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Quận/Huyện"
+                    value={idCardForm.addrDistrict}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Phường/Xã"
+                    value={idCardForm.addrWard}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Số nhà, đường"
+                    value={idCardForm.addrStreet}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Ngày hết hạn (nếu có)"
+                    value={idCardForm.doe}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Loại thẻ (API trả về)"
+                    value={idCardForm.cardType}
+                    disabled={ocrLoadingFront || ocrAnalyzing}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Mặt sau
+                  {ocrLoadingBack && (
+                    <span className="ml-2 text-amber-600 normal-case">— Đang đọc ảnh…</span>
+                  )}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <IdField
+                    label="Ngày cấp"
+                    value={idCardForm.issueDate}
+                    disabled={ocrLoadingBack || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Nơi cấp"
+                    value={idCardForm.issueLoc}
+                    disabled={ocrLoadingBack || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Tôn giáo"
+                    value={idCardForm.religion}
+                    disabled={ocrLoadingBack || ocrAnalyzing}
+                    readOnly
+                  />
+                  <IdField
+                    label="Dân tộc"
+                    value={idCardForm.ethnicity}
+                    disabled={ocrLoadingBack || ocrAnalyzing}
+                    readOnly
+                  />
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label className="text-xs">Đặc điểm nhận dạng</Label>
+                    <Textarea
+                      value={idCardForm.features}
+                      readOnly
+                      rows={2}
+                      disabled={ocrLoadingBack || ocrAnalyzing}
+                      className={cn(
+                        "min-h-[56px] text-sm cursor-default resize-none",
+                        "bg-muted/50 border-muted-foreground/20",
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Summary */}
@@ -860,6 +1398,12 @@ export default function RegisterSellerPage() {
               </p>
               <p className="text-muted-foreground">Shop: {form.shopName || "—"}</p>
               <p className="text-muted-foreground">Loại hình: {form.businessType}</p>
+              <p className="text-muted-foreground">
+                Ngành hàng:{" "}
+                {form.primaryCategoryId > 0
+                  ? categoryRoots.find((c) => c.id === form.primaryCategoryId)?.name ?? "—"
+                  : "—"}
+              </p>
               <p className="text-muted-foreground">
                 Địa chỉ GHN: {form.addressLine || "—"}
                 {selectedWardName ? `, ${selectedWardName}` : ""}
@@ -908,6 +1452,33 @@ export default function RegisterSellerPage() {
         )}
       </CardFooter>
     </Card>
+  );
+}
+
+function IdField({
+  label,
+  value,
+  disabled,
+  readOnly,
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        value={value}
+        readOnly={readOnly}
+        disabled={disabled}
+        className={cn(
+          "text-sm h-9",
+          readOnly && "cursor-default bg-muted/50 border-muted-foreground/20",
+        )}
+      />
+    </div>
   );
 }
 
