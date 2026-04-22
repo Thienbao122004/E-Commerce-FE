@@ -49,6 +49,9 @@ import {
   aiCommitProductTagSession,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
+import { fetchMyShop } from "@/services/seller-dashboard"
+import type { SellerShopInfo } from "@/types/seller-dashboard"
+import { ShopPrimaryCategoryBanner } from "@/components/seller/shop-primary-category-banner"
 import { supabase } from "@/lib/supabase"
 import { groupMaterialsForPicker, groupTagsForPicker } from "@/lib/seller-picker-groups"
 import {
@@ -81,6 +84,21 @@ function flattenCategoryTree(nodes: StorefrontCategory[], prefix = ""): ManualCa
     }
   }
   return out
+}
+
+/** Tìm nút gốc theo id trong cây (để lọc danh mục theo ngành đăng ký seller) */
+function findCategorySubtree(
+  tree: StorefrontCategory[],
+  rootId: number,
+): StorefrontCategory[] | null {
+  for (const n of tree) {
+    if (n.id === rootId) return [n]
+    if (n.subcategories?.length) {
+      const sub = findCategorySubtree(n.subcategories, rootId)
+      if (sub) return sub
+    }
+  }
+  return null
 }
 
 function SectionLabel({
@@ -257,6 +275,7 @@ function parseAttributesStr(attrStr: string): Record<string, string> {
 
   const segments = attrStr.split(',');
   for (const seg of segments) {
+     // eslint-disable-next-line prefer-const
      let text = seg.trim();
      if (!text) continue;
      
@@ -370,6 +389,9 @@ export default function CreateProductPage() {
   const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
   const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
   const [manualCategoryRows, setManualCategoryRows] = React.useState<ManualCategoryRow[]>([])
+  const [allowedProductCategoryIds, setAllowedProductCategoryIds] = React.useState<Set<
+    number
+  > | null>(null)
   const [manualCatQuery, setManualCatQuery] = React.useState("")
   const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
@@ -393,6 +415,10 @@ export default function CreateProductPage() {
   const [selMatIds, setSelMatIds] = React.useState<string[]>([])
   const [nameTouched, setNameTouched] = React.useState(false)
   const [priceTouched, setPriceTouched] = React.useState(false)
+
+  /** Shop & ngành đăng ký — hiển thị banner "bán mặt hàng gì" */
+  const [myShop, setMyShop] = React.useState<SellerShopInfo | null>(null)
+  const [shopMetaLoading, setShopMetaLoading] = React.useState(true)
 
   const hasInput = name.trim().length > 0 || description.trim().length > 0
   const analysisReqRef = React.useRef(0)
@@ -460,12 +486,45 @@ export default function CreateProductPage() {
   React.useEffect(() => {
     let mounted = true
     ;(async () => {
+      setShopMetaLoading(true)
       try {
-        const res = await getCategoryTree()
-        if (!mounted || !res.success) return
-        setManualCategoryRows(flattenCategoryTree(res.tree ?? []))
+        const [treeRes, shopRes] = await Promise.all([getCategoryTree(), fetchMyShop()])
+        if (!mounted) return
+        if (shopRes.success && shopRes.data) {
+          setMyShop(shopRes.data)
+        } else {
+          setMyShop(null)
+        }
+        if (!treeRes.success) {
+          return
+        }
+        const fullTree = treeRes.tree ?? []
+        const rootId =
+          shopRes.success && shopRes.data?.primaryCategoryId != null
+            ? Number(shopRes.data.primaryCategoryId)
+            : null
+        if (rootId != null) {
+          const sub = findCategorySubtree(fullTree, rootId)
+          if (sub?.length) {
+            const rows = flattenCategoryTree(sub)
+            const allowed = new Set(rows.map((r) => r.id))
+            setManualCategoryRows(rows)
+            setAllowedProductCategoryIds(allowed)
+          } else {
+            setManualCategoryRows(flattenCategoryTree(fullTree))
+            setAllowedProductCategoryIds(null)
+            toast.error(
+              "Không tìm thấy danh mục ngành hàng đã đăng ký. Vui lòng liên hệ quản trị viên.",
+            )
+          }
+        } else {
+          setManualCategoryRows(flattenCategoryTree(fullTree))
+          setAllowedProductCategoryIds(null)
+        }
       } catch {
-        
+        if (mounted) setMyShop(null)
+      } finally {
+        if (mounted) setShopMetaLoading(false)
       }
     })()
     return () => {
@@ -541,35 +600,35 @@ export default function CreateProductPage() {
   }, [])
 
   const normalizeAiImageUrls = React.useCallback(async () => {
-    const normalized: string[] = []
-    for (const u of imageUrls.slice(0, 3)) {
+    const batch = imageUrls.slice(0, 3).map(async (u) => {
       if (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("data:image/")) {
-        normalized.push(u)
-        continue
+        return u
       }
       if (u.startsWith("blob:")) {
         try {
           const dataUrl = await blobUrlToDataUrl(u)
-          if (dataUrl.startsWith("data:image/")) normalized.push(dataUrl)
+          return dataUrl.startsWith("data:image/") ? dataUrl : null
         } catch {
+          return null
         }
       }
-    }
-    return normalized
+      return null
+    })
+    return (await Promise.all(batch)).filter((u): u is string => u != null && u.length > 0)
   }, [imageUrls, blobUrlToDataUrl])
 
-  /** Áp dụng kết quả phân tích AI (từ text hoặc image) vào state. */
+  /** Áp dụng kết quả phân tích AI (ECommerceAI đã thu hẹp danh mục theo primary_category_id shop — không cần lọc thêm ở FE). */
   const applyAnalysisResult = React.useCallback((
     categories: CategorySuggestion[],
     tags: TagSuggestion[],
     materials: MaterialSuggestion[],
   ) => {
     setCatSuggestions(categories ?? [])
-    setSelCategory((prev) =>
-      prev && (categories ?? []).some((c) => c.categoryId === prev.categoryId)
-        ? prev
-        : categories?.[0] ?? null
-    )
+    setSelCategory((prev) => {
+      const list = categories ?? []
+      if (prev && list.some((c) => c.categoryId === prev.categoryId)) return prev
+      return list[0] ?? null
+    })
     setTagSuggestions(tags ?? [])
     setSelTagIds(
       (tags ?? []).map((t) => parseTagIdFromSuggestion(t as TagSuggestion & { tag_id?: unknown }))
@@ -584,6 +643,10 @@ export default function CreateProductPage() {
   }, [])
 
   const runAiAnalysis = React.useCallback(async () => {
+    if (shopMetaLoading) {
+      toast.info("Đang tải thông tin ngành hàng shop, vui lòng chờ vài giây rồi phân tích lại.")
+      return
+    }
     const hasImages = imageUrls.length > 0
     if (!hasInput && !hasImages) {
       toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích")
@@ -607,7 +670,6 @@ export default function CreateProductPage() {
       if (reqId !== analysisReqRef.current) return
       const hasUsableImages = aiImageUrls.length > 0
       if (hasUsableImages && hasInput) {
-        // Có cả ảnh lẫn text → chạy SONG SONG, merge kết quả
         const [imageSettled, textSettled] = await Promise.allSettled([
           aiAnalyzeImage({
             imageUrls: aiImageUrls,
@@ -622,47 +684,60 @@ export default function CreateProductPage() {
         if (reqId !== analysisReqRef.current) return
 
         const imageRes = imageSettled.status === "fulfilled" && imageSettled.value.success
-          ? imageSettled.value : null
+          ? imageSettled.value
+          : null
         const textRes = textSettled.status === "fulfilled" && textSettled.value.success
-          ? textSettled.value : null
+          ? textSettled.value
+          : null
 
         setImageAnalyzeResult(imageRes)
 
-        if (!imageRes && !textRes) { setCatError(true); return }
+        if (!imageRes && !textRes) {
+          setCatError(true)
+          return
+        }
 
-        // Merge categories: dedup theo categoryId, confidence cao nhất thắng, top 3
         const catMap = new Map<number, CategorySuggestion>()
-        for (const cat of [...(imageRes?.suggestedCategories ?? []), ...(textRes?.categories ?? [])]) {
+        for (const cat of [
+          ...(imageRes?.suggestedCategories ?? []),
+          ...(textRes?.categories ?? []),
+        ]) {
           const existing = catMap.get(cat.categoryId)
-          if (!existing || cat.confidenceScore > existing.confidenceScore) catMap.set(cat.categoryId, cat)
+          if (!existing || cat.confidenceScore > existing.confidenceScore) {
+            catMap.set(cat.categoryId, cat)
+          }
         }
         const mergedCats = [...catMap.values()]
           .sort((a, b) => b.confidenceScore - a.confidenceScore)
           .slice(0, 3)
 
-        // Merge tags: dedup theo tagId, ưu tiên image kết quả trước, top 10
         const tagMap = new Map<number, TagSuggestion>()
         for (const tag of [...(imageRes?.suggestedTags ?? []), ...(textRes?.tags ?? [])]) {
           const tid = parseTagIdFromSuggestion(tag as TagSuggestion & { tag_id?: unknown })
-          if (tid != null && !tagMap.has(tid)) tagMap.set(tid, { ...tag, tagId: tid })
+          if (tid != null && !tagMap.has(tid)) {
+            tagMap.set(tid, { ...tag, tagId: tid })
+          }
         }
         const mergedTags = [...tagMap.values()].slice(0, 10)
 
-        // Merge materials: ưu tiên ảnh trước, dùng cả ID lẫn tên để dedup
-        // — key theo materialId nếu có, ngược lại theo __name__:lowercaseName
         const matKey = (m: MaterialSuggestion): string =>
           m.materialId ?? `__name__:${(m.materialName ?? "").trim().toLowerCase()}`
         const matMap = new Map<string, MaterialSuggestion>()
-        // Ảnh trước (độ tin cậy cao hơn về chất liệu vật lý)
-        for (const mat of (imageRes?.suggestedMaterials ?? [])) {
-          const k = matKey(mat); if (k && !matMap.has(k)) matMap.set(k, mat)
+        for (const mat of imageRes?.suggestedMaterials ?? []) {
+          const k = matKey(mat)
+          if (k && !matMap.has(k)) {
+            matMap.set(k, mat)
+          }
         }
-        // Text bổ sung: nếu chất liệu đó chưa có trong map (theo ID hoặc tên)
-        const imageNames = new Set([...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()))
-        for (const mat of (textRes?.materials ?? [])) {
+        const imageNames = new Set(
+          [...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()),
+        )
+        for (const mat of textRes?.materials ?? []) {
           const k = matKey(mat)
           const nameLow = (mat.materialName ?? "").trim().toLowerCase()
-          if (k && !matMap.has(k) && !imageNames.has(nameLow)) matMap.set(k, mat)
+          if (k && !matMap.has(k) && !imageNames.has(nameLow)) {
+            matMap.set(k, mat)
+          }
         }
         const mergedMats = [...matMap.values()].slice(0, 5)
 
@@ -705,9 +780,19 @@ export default function CreateProductPage() {
       setTagLoading(false)
       setImageAnalyzeLoading(false)
     }
-  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult])
+  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult, shopMetaLoading])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
+    if (
+      allowedProductCategoryIds != null &&
+      allowedProductCategoryIds.size > 0 &&
+      !allowedProductCategoryIds.has(cat.categoryId)
+    ) {
+      toast.error(
+        "Danh mục này không thuộc ngành hàng shop bạn đã đăng ký. Chỉ chọn danh mục trong danh sách bên dưới (cùng nhánh với ngành đã chọn).",
+      )
+      return
+    }
     setSelCategory((prev) => {
       if (prev?.categoryId !== cat.categoryId) {
         setSelTagIds([])
@@ -905,6 +990,8 @@ export default function CreateProductPage() {
           <IconChevronRight className="size-3" />
           <span className="text-foreground font-medium">Thêm mới</span>
         </div>
+
+        <ShopPrimaryCategoryBanner shop={myShop} loading={shopMetaLoading} />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:items-stretch">
 
@@ -1290,7 +1377,7 @@ export default function CreateProductPage() {
                       size="sm"
                       className="h-8 shrink-0 px-3 text-[11px]"
                       onClick={runAiAnalysis}
-                      disabled={catLoading || tagLoading || imageAnalyzeLoading}
+                      disabled={shopMetaLoading || catLoading || tagLoading || imageAnalyzeLoading}
                     >
                       {catLoading || tagLoading || imageAnalyzeLoading ? (
                         <>

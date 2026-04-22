@@ -6,6 +6,9 @@ export interface ShopInfo {
   shopLogo: string | null
   verificationStatus?: number   // 0=pending, 1=approved, 2=rejected
   rejectionReason?: string | null
+  /** Danh mục gốc khi đăng ký — giới hạn sản phẩm cùng nhánh */
+  primaryCategoryId?: number | null
+  primaryCategoryName?: string | null
 }
 
 export interface UserProfileResponse {
@@ -43,9 +46,31 @@ export interface UpdateProfileRequest {
 }
 
 export interface ShopDocumentInput {
-  /** cccd_front | cccd_back | business_license | tax_cert */
+  /** Chỉ business_license | tax_cert — ảnh CCCD không upload storage */
   docType: string
   fileUrl: string
+}
+
+/** Thông tin định danh từ CCCD (lưu JSON trên server) — không gửi file ảnh thẻ */
+export interface SellerIdentityInfo {
+  fullName: string
+  idNumber?: string | null
+  dateOfBirth?: string | null
+  sex?: string | null
+  nationality?: string | null
+  homeTown?: string | null
+  permanentAddress?: string | null
+  addrProvince?: string | null
+  addrDistrict?: string | null
+  addrWard?: string | null
+  addrStreet?: string | null
+  dateOfExpiry?: string | null
+  cardType?: string | null
+  issueDate?: string | null
+  issuePlace?: string | null
+  religion?: string | null
+  ethnicity?: string | null
+  features?: string | null
 }
 
 export interface RegisterSellerRequest {
@@ -60,9 +85,14 @@ export interface RegisterSellerRequest {
   businessLicenseNumber?: string | null
   taxCode?: string | null
   businessType: 'individual' | 'company' | 'household'
+  /** ID danh mục cấp 1 (gốc) trên sàn — shop chỉ được bán trong nhánh này */
+  primaryCategoryId: number
   bankName?: string | null
   bankAccountNumber?: string | null
   bankAccountName?: string | null
+  /** Bắt buộc — nội dung từ form CCCD, không lưu ảnh */
+  identity: SellerIdentityInfo
+  /** Chỉ file GPKD / giấy tờ tùy chọn, không gồm ảnh CCCD */
   documents?: ShopDocumentInput[]
 }
 

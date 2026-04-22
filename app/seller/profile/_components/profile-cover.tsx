@@ -41,7 +41,6 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
   const [logoPreview, setLogoPreview] = useState("")
   const [logoPreviewError, setLogoPreviewError] = useState(false)
 
-  // Cover image stored in localStorage (no backend field)
   const coverKey = shop ? `shop-cover-${shop.id}` : ""
   const [coverUrl, setCoverUrl] = useState(() => {
     if (typeof window !== "undefined" && coverKey) {

@@ -4,6 +4,7 @@ import { useSellerShop } from "@/hooks/use-seller-shop"
 import { ProfileCover } from "./_components/profile-cover"
 import { ProfileEditForm } from "./_components/profile-edit-form"
 import { ProfileInfoCards } from "./_components/profile-info-cards"
+import { ShopPrimaryCategoryBanner } from "@/components/seller/shop-primary-category-banner"
 
 export default function SellerProfilePage() {
   const { shop, loading, saving, save } = useSellerShop()
@@ -14,12 +15,16 @@ export default function SellerProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
-      <ProfileCover
-        shop={shop}
-        loading={loading}
-        saving={saving}
-        onUpdateLogo={handleUpdateLogo}
-      />
+      <div className="mb-0.5 space-y-1">
+        <h1 className="text-xl font-semibold md:text-2xl" style={{ color: "var(--color-text-main)" }}>
+          Hồ sơ cửa hàng
+        </h1>
+        <p className="text-sm text-muted-foreground">Thương hiệu và mặt hàng bạn bán trên sàn</p>
+      </div>
+
+      <ProfileCover shop={shop} loading={loading} saving={saving} onUpdateLogo={handleUpdateLogo} />
+
+      <ShopPrimaryCategoryBanner shop={shop} loading={loading} />
 
       {/* Form + Info Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
