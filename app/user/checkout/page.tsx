@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { cartService, type Cart, type CartItem } from '@/services/cart'
 import { profileService } from '@/services/profile'
-import { paymentsService } from '@/services/payments'
+import { paymentsService, type CreatePaymentResponse } from '@/services/payments'
 import type { AddressResponse } from '@/types/profile'
 import { formatPriceVND as formatPrice } from '@/lib/formatters'
 import {
@@ -321,17 +321,18 @@ export default function CheckoutPage() {
         }
 
         const gatewayLabel = paymentMethod === 'momo' ? 'MoMo' : 'VNPay'
-        if (orderIds.length > 1) {
-          toast.info(
-            `Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán ${gatewayLabel} cho đơn đầu tiên.`
-          )
-        }
 
-        const payFn =
-          paymentMethod === 'momo'
-            ? paymentsService.createMoMoPayment
-            : paymentsService.createVNPayPayment
-        const paymentRes = await payFn(orderIds[0])
+        let paymentRes: CreatePaymentResponse
+        if (paymentMethod === 'vnpay') {
+          // VNPay: gộp TẤT CẢ đơn hàng vào 1 giao dịch
+          paymentRes = await paymentsService.createVNPayBatchPayment(orderIds)
+        } else {
+          // MoMo: chưa hỗ trợ batch, thanh toán đơn đầu tiên
+          if (orderIds.length > 1) {
+            toast.info('Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán MoMo cho đơn đầu tiên.')
+          }
+          paymentRes = await paymentsService.createMoMoPayment(orderIds[0])
+        }
         if (!paymentRes.success || !paymentRes.paymentUrl) {
           toast.error(paymentRes.message || `Không thể tạo giao dịch ${gatewayLabel}`)
           router.push('/user/purchase?status=0&from=payment-create-failed')

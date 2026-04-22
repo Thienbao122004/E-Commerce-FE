@@ -7,6 +7,9 @@ export const paymentsService = {
   createVNPayPayment: (orderId: string) =>
     api.post<CreatePaymentResponse>('/api/payments/vnpay/create', { orderId }),
 
+  createVNPayBatchPayment: (orderIds: string[]) =>
+    api.post<CreatePaymentResponse>('/api/payments/vnpay/create-batch', { orderIds }),
+
   createMoMoPayment: (orderId: string) =>
     api.post<CreatePaymentResponse>('/api/payments/momo/create', { orderId }),
 }
