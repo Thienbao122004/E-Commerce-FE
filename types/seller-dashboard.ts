@@ -11,6 +11,9 @@ export type SellerShopInfo = {
   logoUrl: string | null
   status: number
   verificationStatus: number
+  /** Ràng buộc danh mục sản phẩm (cùng nhánh) — null = dữ liệu cũ */
+  primaryCategoryId?: number | null
+  primaryCategoryName?: string | null
   createdAt: string
 }
 
