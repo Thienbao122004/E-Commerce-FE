@@ -107,6 +107,7 @@ export type SellerOrder = {
   customerEmail?: string | null
   customerAvatarUrl?: string | null
   customerPhone: string | null
+  shipPhone?: string | null
   totalAmount: number
   status: number
   cancelReason?: string | null

@@ -132,8 +132,10 @@ export function OrderTable({
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm">{order.customerName ?? "Chưa rõ"}</p>
-                        {order.customerPhone && (
-                          <p className="text-xs text-muted-foreground tabular-nums">{formatPhoneVn(order.customerPhone)}</p>
+                        {(order.shipPhone ?? order.customerPhone) && (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {formatPhoneVn(order.shipPhone ?? order.customerPhone)}
+                          </p>
                         )}
                       </div>
                     </TableCell>

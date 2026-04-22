@@ -63,7 +63,13 @@ import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import type { OrderStatusStep } from "@/types/customer-order"
 import type { SellerOrderDetail } from "@/types/seller-dashboard"
 import { validTransitions } from "./order-status-dialog"
-import { formatDateTimeVN as fmtDate, formatPhoneVn, formatPriceVND as currency, normalizeVietnamPhone } from "@/lib/formatters"
+import {
+  formatDateTimeVN as fmtDate,
+  formatPhoneVn,
+  formatPriceVND as currency,
+  isVietnamPhoneLocal,
+  normalizeVietnamPhone,
+} from "@/lib/formatters"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 // ── Status config ──
@@ -330,13 +336,23 @@ export function OrderDetailView({ orderId }: Props) {
     setUpdating(true)
     try {
       let trackingCodeToSave: string | undefined = undefined
+      const deliveryPhone = order.shipPhone ?? order.customerPhone
 
-      // Xử lý tạo đơn GHN trước khi update backend
       if (selectedStatus === OrderStatus.Processing) {
         if (!order.shippingAddress) {
            toast.error( "Đơn hàng này thiếu thông tin địa chỉ để báo sang GHN");
            setUpdating(false);
            return;
+        }
+
+        const toPhone = normalizeVietnamPhone(deliveryPhone)
+        if (!isVietnamPhoneLocal(toPhone)) {
+          toast.error(
+            "Thiếu số điện thoại người nhận hợp lệ. GHN bắt buộc có SĐT (kiểm tra SĐT giao hàng trên đơn).",
+            { id: "ghn-toast" },
+          )
+          setUpdating(false)
+          return
         }
 
         toast.loading("Đang đẩy vận đơn sang phần mềm GHN...", { id: "ghn-toast" })
@@ -345,8 +361,7 @@ export function OrderDetailView({ orderId }: Props) {
         
         try {
           const { districtId, wardCode } = await parseAddressToGHNIds(order.shippingAddress)
-          const fallbackWeight = (order.items?.length || 1) * 500;
-
+          const fallbackWeight = order.items?.length ? order.items.length * 500 : 500;
           const ghnRes = await ghnService.createOrder({
             payment_type_id: 2,
             required_note: 'CHOXEMHANGKHONGTHU',
@@ -355,7 +370,7 @@ export function OrderDetailView({ orderId }: Props) {
             width: 10,
             height: 10,
             to_name: order.customerName || "Khách Hàng",
-            to_phone: normalizeVietnamPhone(order.customerPhone) || "0987654321",
+            to_phone: toPhone,
             to_address: order.shippingAddress,
             to_ward_code: wardCode,
             to_district_id: districtId,
@@ -395,6 +410,9 @@ export function OrderDetailView({ orderId }: Props) {
       setUpdating(false)
     }
   }
+
+  const deliveryDisplayPhone = order
+    ? formatPhoneVn(order.shipPhone, "—") : "—"
 
   const cfg = order ? statusConfig[order.status] : null
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
@@ -574,8 +592,8 @@ export function OrderDetailView({ orderId }: Props) {
                       <IconPhone className="size-3.5" />
                     </div>
                     <div>
-                      <p className="text-[11px] text-muted-foreground">Số điện thoại  </p>
-                      <p className="text-sm font-medium tabular-nums">{formatPhoneVn(order.customerPhone, "—")}</p>
+                      <p className="text-[11px] text-muted-foreground">Số điện thoại người nhận</p>
+                      <p className="text-sm font-medium tabular-nums">{deliveryDisplayPhone}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
