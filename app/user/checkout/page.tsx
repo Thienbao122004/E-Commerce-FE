@@ -8,7 +8,7 @@ import { cartService, type Cart, type CartItem } from '@/services/cart'
 import { profileService } from '@/services/profile'
 import { paymentsService, type CreatePaymentResponse } from '@/services/payments'
 import type { AddressResponse } from '@/types/profile'
-import { formatPriceVND as formatPrice } from '@/lib/formatters'
+import { formatPhoneVn, formatPriceVND as formatPrice } from '@/lib/formatters'
 import {
   writePendingPaymentSession,
   type PendingPaymentMethod,
@@ -223,7 +223,7 @@ export default function CheckoutPage() {
     [groupedByShop],
   )
 
-  const { shopFees, totalShippingFee, isCalculating, fallbackFee } = useGHNShippingFee(
+  const { shopFees, totalShippingFee, isCalculating, hasBlockingError } = useGHNShippingFee(
     shopInputs,
     selectedAddress,
   )
@@ -270,13 +270,35 @@ export default function CheckoutPage() {
       return
     }
 
+    if (isCalculating) {
+      toast.error('Vui lòng đợi tính phí vận chuyển (GHN) xong')
+      return
+    }
+
+    if (hasBlockingError) {
+      toast.error('Chưa tính được phí giao hàng. Kiểm tra địa chỉ, dịch vụ GHN, rồi thử lại.')
+      return
+    }
+
+    for (const group of groupedByShop) {
+      if (!group.shopId) continue
+      const sf = shopFees.get(group.key)
+      if (!sf || sf.fee == null) {
+        toast.error('Thiếu phí vận chuyển cho đơn hàng. Thử tải lại trang hoặc đổi địa chỉ.')
+        return
+      }
+    }
+
     setPlacingOrder(true)
     try {
       const shippingOptions = groupedByShop
         .filter((group) => !!group.shopId)
         .map((group) => {
           const sf = shopFees.get(group.key)
-          const fee = sf?.fee ?? fallbackFee
+          const fee = sf?.fee
+          if (fee == null) {
+            return null
+          }
           const estimatedDeliveryDate = sf?.leadTime
             ? new Date(sf.leadTime * 1000).toISOString()
             : null
@@ -284,12 +306,12 @@ export default function CheckoutPage() {
           return {
             shopId: group.shopId!,
             shippingProvider: 'GHN',
-            shippingServiceId: '53320',
-            providerShippingFee: fee,
+            shippingServiceId: sf?.ghnServiceId ?? '53320',
             shippingFee: fee,
             estimatedDeliveryDate,
           }
         })
+        .filter((x): x is NonNullable<typeof x> => x != null)
 
       const checkoutRes = await cartService.checkout({
         cartId: cart.id,
@@ -426,7 +448,8 @@ export default function CheckoutPage() {
             {selectedAddress ? (
               <div className="grid gap-2 text-sm">
                 <p className="font-semibold" style={{ color: 'var(--color-text-main)' }}>
-                  {getAddressDisplayName(selectedAddress)} {selectedAddress.phone ? `| ${selectedAddress.phone}` : ''}
+                  {getAddressDisplayName(selectedAddress)}{' '}
+                  {selectedAddress.phone ? `| ${formatPhoneVn(selectedAddress.phone)}` : ''}
                 </p>
                 <p className="text-muted-foreground">{formatAddress(selectedAddress)}</p>
               </div>
@@ -476,9 +499,6 @@ export default function CheckoutPage() {
                   <StoreIcon size={13} />
                   <span>Xem chi tiết shop</span>
                 </button>
-                <div className="rounded-full bg-[rgba(236,127,19,0.1)] px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-primary)' }}>
-                  Tách đơn theo shop
-                </div>
               </div>
             </div>
 
@@ -530,33 +550,32 @@ export default function CheckoutPage() {
             </div>
 
             <div className="grid gap-3 border-t px-5 py-4" style={{ borderColor: '#efe8de' }}>
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Truck size={15} />
-                  <span>Phí vận chuyển</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-0">
+                  <Truck size={15} className="shrink-0" />
+                  <span>Phí vận chuyển (GHN)</span>
                 </div>
                 {(() => {
                   const sf = shopFees.get(group.key)
                   if (!sf || sf.loading) {
                     return (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground sm:ml-auto">
                         <Loader2 size={12} className="animate-spin" />
-                        Đang tính...
+                        Đang tính phí…
                       </span>
                     )
                   }
                   if (sf.error) {
                     return (
-                      <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-primary)' }}>
-                        <AlertCircle size={12} />
-                        {formatPrice(sf.fee ?? fallbackFee)}
-                        <span className="text-muted-foreground">(dự phòng)</span>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-200 sm:ml-auto">
+                        <AlertCircle size={12} className="shrink-0" />
+                        <span className="text-right">Không tính được phí</span>
                       </span>
                     )
                   }
                   return (
-                    <span className="font-medium" style={{ color: 'var(--color-text-main)' }}>
-                      {formatPrice(sf.fee ?? fallbackFee)}
+                    <span className="font-medium sm:ml-auto" style={{ color: 'var(--color-text-main)' }}>
+                      {formatPrice(sf.fee ?? 0)}
                     </span>
                   )
                 })()}
@@ -647,6 +666,8 @@ export default function CheckoutPage() {
                     <Loader2 size={11} className="animate-spin" />
                     Đang tính...
                   </span>
+                ) : hasBlockingError ? (
+                  <span className="text-xs text-amber-800 dark:text-amber-200">Không tính được</span>
                 ) : (
                   <span style={{ color: 'var(--color-text-main)' }}>{formatPrice(shippingAmount)}</span>
                 )}
@@ -663,6 +684,8 @@ export default function CheckoutPage() {
                     <Loader2 size={16} className="animate-spin" />
                     <span className="text-xl font-bold">Đang tính...</span>
                   </span>
+                ) : hasBlockingError ? (
+                  <span className="text-right text-sm font-semibold text-amber-800 dark:text-amber-200">—</span>
                 ) : (
                   <span className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
                     {formatPrice(grandTotal)}
@@ -684,7 +707,7 @@ export default function CheckoutPage() {
 
           <button
             onClick={handlePlaceOrder}
-            disabled={placingOrder || !selectedAddress}
+            disabled={placingOrder || !selectedAddress || isCalculating || hasBlockingError}
             className="w-full rounded-lg px-6 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: 'var(--color-primary)' }}
           >

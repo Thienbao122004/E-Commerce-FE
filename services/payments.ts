@@ -3,6 +3,17 @@ import type { CreatePaymentResponse } from '@/types/payment'
 
 export type { CreatePaymentResponse } from '@/types/payment'
 
+/** Base API (có hoặc không có /api) — dùng để gửi MoMo redirect/ipn trỏ về đúng BE khi dev. */
+function momoCallbackUrlOverrides() {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')
+  if (!raw) return {}
+  const withApi = raw.endsWith('/api') ? raw : `${raw}/api`
+  return {
+    moMoReturnUrlOverride: `${withApi}/payments/momo/return`,
+    moMoNotifyUrlOverride: `${withApi}/payments/momo/ipn`,
+  }
+}
+
 export const paymentsService = {
   createVNPayPayment: (orderId: string) =>
     api.post<CreatePaymentResponse>('/api/payments/vnpay/create', { orderId }),
@@ -11,5 +22,8 @@ export const paymentsService = {
     api.post<CreatePaymentResponse>('/api/payments/vnpay/create-batch', { orderIds }),
 
   createMoMoPayment: (orderId: string) =>
-    api.post<CreatePaymentResponse>('/api/payments/momo/create', { orderId }),
+    api.post<CreatePaymentResponse>('/api/payments/momo/create', {
+      orderId,
+      ...momoCallbackUrlOverrides(),
+    }),
 }

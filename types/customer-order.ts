@@ -1,3 +1,12 @@
+/** Bước trên timeline trạng thái (API: statusTimeline, camelCase) */
+export type OrderStatusStep = {
+  code: string
+  displayName: string
+  value: number
+  state: string
+  reachedAt?: string | null
+}
+
 export interface OrderItem {
   id: string
   productId: string
@@ -16,7 +25,6 @@ export interface OrderSummary {
   orderCode?: string
   paymentProvider?: string | null
   cancelReason?: string | null
-  providerShippingFee?: number | null
   shippingFee?: number | null
   shopId: string
   shopSlug?: string
@@ -41,6 +49,7 @@ export interface OrderDetail extends OrderSummary {
   shipFullName?: string
   shipPhone?: string
   shipAddress?: string
+  statusTimeline?: OrderStatusStep[] | null
 }
 
 export interface OrderDetailResponse {

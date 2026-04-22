@@ -1,3 +1,4 @@
+import type { OrderStatusStep } from "@/types/customer-order"
 import type { MaterialDto } from "@/types/material"
 import type { Tag } from "@/types/tag"
 
@@ -110,13 +111,15 @@ export type SellerOrder = {
   status: number
   cancelReason?: string | null
   shippingAddress: string | null
-  providerShippingFee: number
+  shippingFee: number
   shippingProvider: string | null
   shippingServiceId: string | null
   trackingCode: string | null
   estimatedDeliveryDate: string | null
   actualDeliveryDate: string | null
   createdAt: string
+  updatedAt?: string
+  statusTimeline?: OrderStatusStep[] | null
   items: SellerOrderItem[] | null
   shopGhnShopId?: number | null
   shopFromDistrictId?: number | null
@@ -141,6 +144,7 @@ export type SellerDashboardStats = {
 
 export const OrderStatus = {
   PendingPayment: 0,
+  PendingConfirmation: 1,
   Confirmed: 2,
   Processing: 3,
   Shipping: 4,
@@ -152,6 +156,7 @@ export const OrderStatus = {
 
 export const OrderStatusLabels: Record<number, string> = {
   [OrderStatus.PendingPayment]: "Chờ thanh toán",
+  [OrderStatus.PendingConfirmation]: "Chờ xác nhận",
   [OrderStatus.Confirmed]: "Đã xác nhận",
   [OrderStatus.Processing]: "Đang chuẩn bị",
   [OrderStatus.Shipping]: "Đang giao hàng",

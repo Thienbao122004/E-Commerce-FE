@@ -22,9 +22,9 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
+import { formatDateTimeVN, formatDateVN as formatDate, formatPhoneVn, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
-import { ordersService, type OrderDetail } from '@/services/orders'
+import { ordersService, type OrderDetail, type OrderStatusStep } from '@/services/orders'
 import { createDispute } from '@/services/disputes'
 import { DisputeType } from '@/types/dispute'
 import { EvidenceUploader } from '@/components/common/evidence-uploader'
@@ -53,7 +53,7 @@ const STATUS_LABELS: Record<number, string> = {
   8: 'Đã hoàn tiền',
 }
 
-const STATUS_STEPS = [0, 2, 3, 4, 5, 6] as const
+const STATUS_STEPS = [0, 1, 2, 3, 4, 5, 6] as const
 
 const CANCELLABLE_STATUSES = new Set([0, 1, 2, 3])
 // Có thể khiếu nại: Đã giao (5) hoặc Hoàn thành (6), trong vòng 7 ngày
@@ -70,20 +70,88 @@ const DISPUTE_TYPE_OPTIONS = [
   { value: String(DisputeType.Other), label: 'Khác' },
 ]
 
-function StatusTimeline({ currentStatus }: { currentStatus: number }) {
+function StatusTimeline({
+  currentStatus,
+  statusTimeline,
+}: {
+  currentStatus: number
+  statusTimeline?: OrderStatusStep[] | null
+}) {
   const isCancelled = currentStatus === 7
   const isRefunded = currentStatus === 8
+  const terminalAt = statusTimeline?.find((s) => s.value === currentStatus)?.reachedAt
 
   if (isCancelled || isRefunded) {
     const statusColor = STATUS_COLORS[currentStatus] || '#6b7280'
     return (
       <div
-        className="flex items-center gap-2.5 rounded-xl border px-4 py-3"
+        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:flex-wrap gap-x-2.5 gap-y-1 rounded-xl border px-4 py-3"
         style={{ borderColor: `${statusColor}55`, backgroundColor: `${statusColor}14`, color: statusColor }}
       >
-        <div className="size-2 rounded-full" style={{ backgroundColor: statusColor }} />
-        <span className="text-sm font-semibold">{STATUS_LABELS[currentStatus] ?? 'Đơn hàng đã kết thúc'}</span>
-        <span className="text-xs opacity-80 ml-1">- Đơn hàng đã kết thúc</span>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
+          <span className="text-sm font-semibold">{STATUS_LABELS[currentStatus] ?? 'Đơn hàng đã kết thúc'}</span>
+          <span className="text-xs opacity-80">· Đơn hàng đã kết thúc</span>
+        </div>
+        {terminalAt && (
+          <span className="text-xs tabular-nums opacity-90 sm:ml-1">
+            {formatDateTimeVN(terminalAt)}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  const mainFromApi = statusTimeline?.filter((s) => s.value >= 0 && s.value <= 6) ?? []
+  if (mainFromApi.length > 0) {
+    return (
+      <div className="overflow-x-auto">
+        <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
+          {mainFromApi.map((step, idx) => {
+            const isLast = idx === mainFromApi.length - 1
+            const isDone = step.state === 'completed'
+            const isCurrent = step.state === 'current'
+            const showTime = (isDone || isCurrent) && step.reachedAt
+            return (
+              <div key={step.value} className="contents">
+                <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-[72px] max-w-[100px]">
+                  <div
+                    className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                      isDone
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : isCurrent
+                          ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
+                          : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
+                    }`}
+                  >
+                    {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold text-center leading-tight ${
+                      isDone
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : isCurrent
+                          ? 'text-primary'
+                          : 'text-muted-foreground/50'
+                    }`}
+                  >
+                    {step.displayName || (STATUS_LABELS[step.value] ?? `Bước ${idx + 1}`)}
+                  </span>
+                  {showTime ? (
+                    <span className="text-[9px] text-center leading-tight text-muted-foreground tabular-nums max-w-full">
+                      {formatDateTimeVN(step.reachedAt!)}
+                    </span>
+                  ) : null}
+                </div>
+                {!isLast && (
+                  <div
+                    className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     )
   }
@@ -173,8 +241,12 @@ export default function PurchaseOrderDetailPage() {
         return
       }
       setOrder((prev) => {
-        // Chỉ update nếu trạng thái thực sự thay đổi (tránh re-render thừa)
-        if (prev && prev.status === res.order!.status && prev.updatedAt === res.order!.updatedAt) {
+        if (!prev) return res.order!
+        if (
+          prev.status === res.order!.status &&
+          prev.updatedAt === res.order!.updatedAt &&
+          JSON.stringify(prev.statusTimeline ?? null) === JSON.stringify(res.order!.statusTimeline ?? null)
+        ) {
           return prev
         }
         return res.order!
@@ -229,7 +301,7 @@ export default function PurchaseOrderDetailPage() {
   const shippingFee = useMemo(() => {
     if (!order) return 0
 
-    const raw = order.providerShippingFee ?? order.shippingFee
+    const raw = order.shippingFee
     if (typeof raw === 'number' && Number.isFinite(raw)) {
       return Math.max(0, raw)
     }
@@ -546,10 +618,10 @@ export default function PurchaseOrderDetailPage() {
       </div>
 
       {isEndedOrder ? (
-        <StatusTimeline currentStatus={order.status} />
+        <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
       ) : (
         <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
-          <StatusTimeline currentStatus={order.status} />
+          <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
         </div>
       )}
 
@@ -561,7 +633,9 @@ export default function PurchaseOrderDetailPage() {
           <p className="text-sm" style={{ color: 'var(--color-text-main)' }}>
             {order.shipFullName || 'Không có thông tin người nhận'}
           </p>
-          <p className="text-sm text-muted-foreground">{order.shipPhone || 'Chưa có số điện thoại'}</p>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {order.shipPhone ? formatPhoneVn(order.shipPhone) : 'Chưa có số điện thoại'}
+          </p>
           <p className="text-sm text-muted-foreground">{order.shipAddress || 'Chưa có địa chỉ giao hàng'}</p>
         </div>
 

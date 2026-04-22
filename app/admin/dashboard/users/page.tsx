@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
-import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
+import { formatDateTimeVN as fmtDate, formatPhoneVn } from "@/lib/formatters"
 import { fetchUsers, suspendUser, unsuspendUser } from "@/services/users"
 import {
   UserStatus,
@@ -171,7 +171,7 @@ export default function UsersPage() {
                         {u.email && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm truncate">{u.phone ?? "—"}</TableCell>
+                    <TableCell className="text-sm truncate tabular-nums">{u.phone ? formatPhoneVn(u.phone) : "—"}</TableCell>
                     <TableCell><Badge variant="outline" className="text-xs capitalize">{u.role}</Badge></TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={`text-xs ${userStatusBadgeClass(u)}`}>

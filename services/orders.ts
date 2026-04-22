@@ -8,6 +8,7 @@ import type {
 
 export type {
   OrderItem,
+  OrderStatusStep,
   OrderSummary,
   OrderListResponse,
   OrderDetail,

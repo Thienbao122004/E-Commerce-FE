@@ -20,6 +20,7 @@ const PAGE_SIZE = 10
 
 const orderStatusColors: Record<number, string> = {
   [OrderStatus.PendingPayment]: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  [OrderStatus.PendingConfirmation]: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
   [OrderStatus.Confirmed]: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   [OrderStatus.Processing]: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   [OrderStatus.Shipping]: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
@@ -213,6 +214,7 @@ function OrdersTab({ orders, loading }: { orders: SellerOrder[]; loading: boolea
       options: [
         { value: "all", label: "Tất cả trạng thái" },
         { value: String(OrderStatus.PendingPayment), label: "Chờ thanh toán" },
+        { value: String(OrderStatus.PendingConfirmation), label: "Chờ xác nhận" },
         { value: String(OrderStatus.Confirmed), label: "Đã xác nhận" },
         { value: String(OrderStatus.Processing), label: "Đang chuẩn bị" },
         { value: String(OrderStatus.Shipping), label: "Đang giao hàng" },
@@ -295,6 +297,7 @@ function OverviewTab({ orders, loading }: { orders: SellerOrder[]; loading: bool
   const rows = useMemo(() => [
     { label: "Tổng đơn hàng", value: orders.length, color: "bg-primary/10 text-primary" },
     { label: "Chờ thanh toán", value: orders.filter((o) => o.status === OrderStatus.PendingPayment).length, color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+    { label: "Chờ xác nhận", value: orders.filter((o) => o.status === OrderStatus.PendingConfirmation).length, color: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300" },
     { label: "Đang xử lý", value: orders.filter((o) => o.status === OrderStatus.Confirmed || o.status === OrderStatus.Processing || o.status === OrderStatus.Shipping).length, color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
     { label: "Đã giao thành công", value: orders.filter((o) => o.status === OrderStatus.Delivered || o.status === OrderStatus.Completed).length, color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
     { label: "Đã hủy", value: orders.filter((o) => o.status === OrderStatus.Cancelled).length, color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },

@@ -200,3 +200,5 @@ export function formatJoinTime(dateStr?: string | null, options: JoinTimeOptions
 
   return justJoinedLabel
 }
+
+export { formatPhoneVn, isVietnamPhoneLocal, normalizeVietnamPhone } from './phone-vn'

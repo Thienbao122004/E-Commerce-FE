@@ -18,9 +18,12 @@ type Props = {
 }
 
 export function OrderStats({ orders, totalCount, loading }: Props) {
-  const pendingCount = orders.filter((o) => o.status === OrderStatus.Confirmed).length
+  const pendingCount = orders.filter((o) => o.status === OrderStatus.PendingConfirmation).length
   const processingCount = orders.filter(
-    (o) => o.status === OrderStatus.Confirmed || o.status === OrderStatus.Processing || o.status === OrderStatus.Shipping
+    (o) =>
+      o.status === OrderStatus.Confirmed ||
+      o.status === OrderStatus.Processing ||
+      o.status === OrderStatus.Shipping
   ).length
   const totalRevenue = orders
     .filter((o) => o.status === OrderStatus.Completed)

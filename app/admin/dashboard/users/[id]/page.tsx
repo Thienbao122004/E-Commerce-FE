@@ -52,7 +52,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
+import { formatDateTimeVN as fmtDate, formatPhoneVn, formatPriceVND as currency } from "@/lib/formatters"
 import { fetchAdminOrders } from "@/services/admin-orders"
 import { fetchDisputes } from "@/services/disputes"
 import {
@@ -379,7 +379,7 @@ export default function UserDetailPage() {
                         <div className="flex items-start gap-3">
                           <IconPhone className="text-muted-foreground mt-0.5 size-4" />
                           <div>
-                            <p className="text-sm">{user.phone}</p>
+                            <p className="text-sm tabular-nums">{formatPhoneVn(user.phone)}</p>
                             <p className="text-muted-foreground text-xs">Số điện thoại</p>
                           </div>
                         </div>
@@ -413,7 +413,10 @@ export default function UserDetailPage() {
                                   </Badge>
                                 )}
                               </div>
-                              <p>{a.fullName ?? "—"} · {a.phone ?? "—"}</p>
+                              <p>
+                                {a.fullName ?? "—"} ·{" "}
+                                <span className="tabular-nums">{a.phone ? formatPhoneVn(a.phone) : "—"}</span>
+                              </p>
                               <p className="text-muted-foreground">
                                 {[a.addressLine1, a.ward, a.district, a.city, a.country]
                                   .filter(Boolean)
@@ -817,7 +820,7 @@ export default function UserDetailPage() {
                             label="Tên hiển thị"
                             value={user.supabase.authDisplayName}
                           />
-                          <RowKV label="SĐT" value={user.supabase.authPhone} />
+                          <RowKV label="SĐT" value={user.supabase.authPhone ? formatPhoneVn(user.supabase.authPhone) : "—"} />
                           <RowKV
                             label="Tạo tài khoản"
                             value={

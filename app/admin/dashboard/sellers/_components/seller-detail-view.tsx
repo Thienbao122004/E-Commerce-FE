@@ -16,7 +16,7 @@ import {
   ShopStatus, ShopStatusLabels, ShopStatusColors,
 } from "@/types/seller"
 import type { ShopVerification } from "@/types/seller"
-import { formatDateTimeVN } from "@/lib/formatters"
+import { formatDateTimeVN, formatPhoneVn } from "@/lib/formatters"
 import { DocumentCard } from "./document-card"
 
 type DialogType = "approve" | "reject" | "suspend" | "close" | null
@@ -283,7 +283,7 @@ export function SellerDetailView({
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                   <div className="space-y-1">
                     <span className="text-muted-foreground text-xs">Số điện thoại shop</span>
-                    <p className="font-medium break-all">{displayVal(shop.phone)}</p>
+                    <p className="font-medium tabular-nums">{formatPhoneVn(shop.phone, "—")}</p>
                   </div>
                   <div className="space-y-1 sm:col-span-2 lg:col-span-2">
                     <span className="text-muted-foreground text-xs">Địa chỉ (số nhà, đường)</span>

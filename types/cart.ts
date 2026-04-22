@@ -40,7 +40,6 @@ export interface ShopShippingOption {
   shopId: string
   shippingProvider?: string
   shippingServiceId?: string
-  providerShippingFee: number
   shippingFee: number
   estimatedDeliveryDate?: string | null
 }

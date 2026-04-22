@@ -19,6 +19,7 @@ import type {
 } from "@/types/profile";
 import type { Province, District, Ward } from "@/types/vietnam-provinces";
 import { createClient } from "@/lib/supabase";
+import { isVietnamPhoneLocal, normalizeVietnamPhone } from "@/lib/phone-vn";
 import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
@@ -313,7 +314,7 @@ export default function RegisterSellerPage() {
         setProfile(res.data);
         setForm((prev) => ({
           ...prev,
-          phone: prev.phone || res.data.phone || "",
+          phone: prev.phone || normalizeVietnamPhone(res.data.phone) || "",
         }));
       }
     } catch {
@@ -525,6 +526,10 @@ export default function RegisterSellerPage() {
         toast.error("Vui lòng nhập số điện thoại shop");
         return false;
       }
+      if (!isVietnamPhoneLocal(normalizeVietnamPhone(form.phone))) {
+        toast.error("Số điện thoại shop không hợp lệ (dùng đầu 0, 10–11 số)");
+        return false;
+      }
       if (!form.businessType) {
         toast.error("Vui lòng chọn loại hình kinh doanh");
         return false;
@@ -634,7 +639,7 @@ export default function RegisterSellerPage() {
       const payload: RegisterSellerRequest = {
         shopName: form.shopName.trim(),
         shopDescription: form.shopDescription.trim() || null,
-        phone: form.phone.trim(),
+        phone: normalizeVietnamPhone(form.phone),
         addressLine: form.addressLine.trim(),
         wardCode: form.wardCode,
         districtId,
