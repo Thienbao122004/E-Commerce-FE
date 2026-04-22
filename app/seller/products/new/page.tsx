@@ -1221,7 +1221,7 @@ export default function CreateProductPage() {
                       <p className="text-sm italic text-muted-foreground">Nhấn để nhập mô tả sản phẩm...</p>
                     )}
                     <span className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
-                      <IconAlignLeft className="size-3" /> Nhấn để chỉnh sậa
+                      <IconAlignLeft className="size-3" /> Nhấn để chỉnh sửa
                     </span>
                   </button>
                 </div>
