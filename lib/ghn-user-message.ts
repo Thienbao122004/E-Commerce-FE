@@ -15,6 +15,10 @@ export function userFacingGhnMessage(technical: string | undefined | null): stri
     return 'Dịch vụ vận chuyển (GHN) chưa được cấu hình đúng. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.'
   }
 
+  if (t.includes('route not found') || t.includes('not found service')) {
+    return 'GHN chưa có tuyến giao tương ứng với dịch vụ/điểm lấy — gửi hàng. Kiểm tra mã kho (quận/xã) của shop, địa chỉ nhận khớp dữ liệu GHN, hoặc thử đổi gói dịch vụ.'
+  }
+
   if (t.includes('ward') && (t.includes('not') || t.includes('invalid') || t.includes('mismatch'))) {
     return 'Mã xã / phường không nằm trong vùng GHN giao được. Hãy chọn lại xã tương ứng trên ứng dụng/dữ liệu GHN.'
   }

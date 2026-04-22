@@ -7,13 +7,6 @@ import { ghnService } from '@/services/ghn'
 import type { AddressResponse } from '@/types/profile'
 import type { GHNService } from '@/types/ghn'
 
-/**
- * Fallback khi chưa có shop_id / tuyến hoặc API available-services lỗi.
- * 53320 = "Chuẩn" (service_type_id 2) theo tài liệu GHN.
- */
-const GHN_DEFAULT_SERVICE_ID = 53_320
-const GHN_DEFAULT_SERVICE_TYPE_ID = 2
-
 /** Chọn dịch vụ từ `available-services` (ưu tiên Chuẩn, rồi Nhanh, rồi Tiết kiệm). */
 function pickPreferredGhnService(services: GHNService[]): GHNService | null {
   if (!services?.length) return null
@@ -28,31 +21,13 @@ function pickPreferredGhnService(services: GHNService[]): GHNService | null {
   )
 }
 
-/**
- * Tự động chọn tuyến từ `available-services` (Chuẩn → Nhanh → …). Không ép `service_type_id` 0 → 2.
- */
-function pickGhnServiceFromList(list: GHNService[]): {
-  service: GHNService
-  service_id: number
-  service_type_id: number
-} {
+/** Thứ tự thử: ưu tiên Chuẩn → còn lại, để tính phí/lead time khớp tuyến thực tế. */
+function orderGhnServicesToTry(list: GHNService[]): GHNService[] {
+  if (!list.length) return []
   const preferred = pickPreferredGhnService(list)
-  if (preferred) {
-    return {
-      service: preferred,
-      service_id: preferred.service_id,
-      service_type_id: preferred.service_type_id,
-    }
-  }
-  return {
-    service: {
-      service_id: GHN_DEFAULT_SERVICE_ID,
-      short_name: 'Chuẩn',
-      service_type_id: GHN_DEFAULT_SERVICE_TYPE_ID,
-    },
-    service_id: GHN_DEFAULT_SERVICE_ID,
-    service_type_id: GHN_DEFAULT_SERVICE_TYPE_ID,
-  }
+  if (!preferred) return [...list]
+  const rest = list.filter((s) => s.service_id !== preferred.service_id)
+  return [preferred, ...rest]
 }
 
 /** GHN: `service_type_id` = 0 thường là tuyến đặc biệt — gửi kèm 0 dễ bị 400; chỉ gửi nếu 1/2/3. */
@@ -221,47 +196,75 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
         shops.map(async (shop) => {
           const ghnShopId = shop.ghnShopId ?? undefined
           let list: GHNService[] = []
-          if (ghnShopId != null && shop.fromDistrictId != null) {
+          if (ghnShopId == null || shop.fromDistrictId == null) {
+            throw new Error(
+              'Shop chưa cấu hình đủ GHN (mã cửa hàng GHN và quận/huyện kho lấy hàng). Seller cần cập nhật trong cài đặt shop.',
+            )
+          }
+
+          try {
+            const raw = await ghnService.getAvailableServices(
+              {
+                shop_id: ghnShopId,
+                from_district: shop.fromDistrictId,
+                to_district: matchedDistrict.DistrictID,
+              },
+              ghnShopId,
+            )
+            list = raw
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[GHN getAvailableServices]', e)
+            }
+            throw e instanceof Error ? e : new Error(String(e))
+          }
+
+          if (list.length === 0) {
+            throw new Error(
+              'GHN không có dịch vụ nào cho tuyến từ kho shop tới địa chỉ nhận này. Kiểm tra phường/xã — quận/huyện khớp dữ liệu GHN, hoặc đổi địa chỉ giao.',
+            )
+          }
+
+          const candidates = orderGhnServicesToTry(list)
+          const weightGrams = Math.max(shop.totalWeightGrams || 0, DEFAULT_WEIGHT)
+
+          let feeData: { total: number } | null = null
+          let usedServiceId: number | null = null
+          let lastFeeError: unknown = null
+
+          for (const svc of candidates) {
+            const feeTypeForBody = serviceTypeIdForGhnFeeBody(svc.service_type_id)
             try {
-              const raw = await ghnService.getAvailableServices(
+              feeData = await ghnService.calculateFee(
                 {
-                  shop_id: ghnShopId,
-                  from_district: shop.fromDistrictId,
-                  to_district: matchedDistrict.DistrictID,
+                  service_id: svc.service_id,
+                  from_district_id: shop.fromDistrictId ?? undefined,
+                  from_ward_code: shop.fromWardCode ?? undefined,
+                  to_district_id: matchedDistrict.DistrictID,
+                  to_ward_code: matchedWard.WardCode,
+                  weight: weightGrams,
+                  insurance_value: Math.min(shop.totalValue, 5_000_000),
+                  ...(feeTypeForBody != null ? { service_type_id: feeTypeForBody } : {}),
                 },
                 ghnShopId,
               )
-              list = raw
+              usedServiceId = svc.service_id
+              break
             } catch (e) {
+              lastFeeError = e
               if (process.env.NODE_ENV === 'development') {
-                console.warn('[GHN getAvailableServices]', e)
+                console.warn('[GHN calculateFee] thử service_id', svc.service_id, e)
               }
             }
           }
 
-          const { service_id, service_type_id } =
-            list.length > 0
-              ? (() => {
-                  const picked = pickGhnServiceFromList(list)
-                  return { service_id: picked.service_id, service_type_id: picked.service_type_id }
-                })()
-              : { service_id: GHN_DEFAULT_SERVICE_ID, service_type_id: GHN_DEFAULT_SERVICE_TYPE_ID }
-
-          const weightGrams = Math.max(shop.totalWeightGrams || 0, DEFAULT_WEIGHT)
-          const feeTypeForBody = serviceTypeIdForGhnFeeBody(service_type_id)
-          const feeData = await ghnService.calculateFee(
-            {
-              service_id,
-              from_district_id: shop.fromDistrictId ?? undefined,
-              from_ward_code: shop.fromWardCode ?? undefined,
-              to_district_id: matchedDistrict.DistrictID,
-              to_ward_code: matchedWard.WardCode,
-              weight: weightGrams,
-              insurance_value: Math.min(shop.totalValue, 5_000_000),
-              ...(feeTypeForBody != null ? { service_type_id: feeTypeForBody } : {}),
-            },
-            ghnShopId,
-          )
+          if (feeData == null || usedServiceId == null) {
+            const msg =
+              lastFeeError instanceof Error
+                ? lastFeeError.message
+                : 'GHN không tính được phí với mọi dịch vụ trên tuyến này.'
+            throw new Error(msg)
+          }
 
           let leadTime: number | undefined
           try {
@@ -271,7 +274,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
                 from_ward_code: shop.fromWardCode ?? undefined,
                 to_district_id: matchedDistrict.DistrictID,
                 to_ward_code: matchedWard.WardCode,
-                service_id,
+                service_id: usedServiceId,
               },
               ghnShopId,
             )
@@ -284,7 +287,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
             key: shop.key,
             total: feeData.total,
             leadTime,
-            ghnServiceId: String(service_id),
+            ghnServiceId: String(usedServiceId),
           }
         }),
       )

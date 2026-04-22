@@ -346,10 +346,8 @@ export default function CheckoutPage() {
 
         let paymentRes: CreatePaymentResponse
         if (paymentMethod === 'vnpay') {
-          // VNPay: gộp TẤT CẢ đơn hàng vào 1 giao dịch
           paymentRes = await paymentsService.createVNPayBatchPayment(orderIds)
         } else {
-          // MoMo: chưa hỗ trợ batch, thanh toán đơn đầu tiên
           if (orderIds.length > 1) {
             toast.info('Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán MoMo cho đơn đầu tiên.')
           }
