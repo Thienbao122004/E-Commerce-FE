@@ -63,11 +63,11 @@ const NOT_RECEIVED_MIN_DAYS_PROCESSING = 7
 const NOT_RECEIVED_MIN_DAYS_SHIPPING = 5
 const DISPUTE_ALLOWED_STATUSES = new Set([5, 6])
 
+// "Không nhận được hàng" tách riêng thành nút "Báo không nhận được hàng" — không nằm trong dropdown chung
 const DISPUTE_TYPE_OPTIONS = [
   { value: String(DisputeType.Refund), label: 'Hoàn tiền' },
   { value: String(DisputeType.Return), label: 'Trả hàng' },
   { value: String(DisputeType.Damaged), label: 'Hàng hư hỏng' },
-  { value: String(DisputeType.NotReceived), label: 'Không nhận được hàng' },
   { value: String(DisputeType.WrongItem), label: 'Giao sai hàng' },
   { value: String(DisputeType.QualityIssue), label: 'Chất lượng không đảm bảo' },
   { value: String(DisputeType.Other), label: 'Khác' },
@@ -301,8 +301,9 @@ export default function PurchaseOrderDetailPage() {
     return (Date.now() - disputeAnchorDate.getTime()) / 86400000 <= DISPUTE_WINDOW_DAYS
   }, [order, disputeAnchorDate])
 
-  // Có thể khiếu nại "Không nhận được hàng" khi đơn đang Processing(3) hoặc Shipping(4)
-  // Đồng bộ ValidateNotReceivedCreateRules trong BE
+  // Có thể khiếu nại "Không nhận được hàng" — đồng bộ ValidateNotReceivedCreateRules trong BE:
+  //   Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày, Delivered(5) trong 7 ngày kể từ anchor
+  //   Completed(6) KHÔNG cho — khách đã xác nhận nhận hàng rồi
   const canDisputeNotReceived = useMemo(() => {
     if (!order) return false
     if (order.status === 3) { // Processing — cần ≥7 ngày kể từ khi vào trạng thái này
@@ -319,8 +320,11 @@ export default function PurchaseOrderDetailPage() {
         : new Date(order.updatedAt ?? order.createdAt).getTime()
       return (Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_SHIPPING
     }
+    if (order.status === 5 && disputeAnchorDate) { // Delivered — trong 7 ngày (courier đánh dấu giao nhưng khách chưa nhận)
+      return (Date.now() - disputeAnchorDate.getTime()) / 86400000 <= DISPUTE_WINDOW_DAYS
+    }
     return false
-  }, [order])
+  }, [order, disputeAnchorDate])
 
   const disputeDeadline = useMemo(() => {
     if (!order || !disputeAnchorDate) return null
