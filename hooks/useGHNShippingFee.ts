@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { userFacingGhnMessage } from '@/lib/ghn-user-message'
 import { ghnService } from '@/services/ghn'
@@ -115,12 +115,62 @@ function buildAddressError(what: string, value: string) {
   return `Không tìm thấy "${value}" trên GHN (${what}). Sửa tỉnh / quận / xã trùng cách gọi mà GHN dùng.`
 }
 
+/** Khóa theo nội dung — tránh gọi lại GHN khi parent chỉ cấp lại cùng địa chỉ / giỏ nhưng tham chiếu object/mảng mới. */
+function stableGhnShopsKey(shops: ShopInput[]): string {
+  if (shops.length === 0) return ''
+  return JSON.stringify(
+    [...shops]
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map((s) => ({
+        key: s.key,
+        totalWeightGrams: s.totalWeightGrams,
+        totalValue: s.totalValue,
+        ghnShopId: s.ghnShopId,
+        fromDistrictId: s.fromDistrictId,
+        fromWardCode: s.fromWardCode,
+      })),
+  )
+}
+
+function stableGhnAddressKey(address: AddressResponse | undefined): string {
+  if (!address) return ''
+  return [address.id, address.province, address.city, address.district, address.ward, address.addressLine1]
+    .map((x) => (x == null ? '' : String(x)))
+    .join('\x1e')
+}
+
 export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse | undefined): UseGHNShippingFeeResult {
   const [shopFees, setShopFees] = useState<Map<string, ShopShippingFee>>(new Map())
   const abortRef = useRef<AbortController | null>(null)
+  const addressRef = useRef(address)
+  const shopsRef = useRef(shops)
+  addressRef.current = address
+  shopsRef.current = shops
+
+  const ghnInputKey = useMemo(() => {
+    if (!address) return ''
+    if (shops.length === 0) return ''
+    return `${stableGhnAddressKey(address)}\x1f${stableGhnShopsKey(shops)}`
+  }, [
+    // Tham chiếu `address` thay đổi mỗi lần API set state — chỉ theo dõi nội dung chính lý thuyết tính phí
+    address?.id,
+    address?.province,
+    address?.city,
+    address?.district,
+    address?.ward,
+    address?.addressLine1,
+    JSON.stringify(
+      shops
+        .map((s) => [s.key, s.totalWeightGrams, s.totalValue, s.ghnShopId ?? 0, s.fromDistrictId ?? 0, s.fromWardCode ?? ''].join(':'))
+        .sort((a, b) => a.localeCompare(b)),
+    ),
+  ])
 
   const calculate = useCallback(async () => {
-    if (!address || shops.length === 0) {
+    const currentAddress = addressRef.current
+    const currentShops = shopsRef.current
+
+    if (!currentAddress || currentShops.length === 0) {
       setShopFees(new Map())
       return
     }
@@ -131,7 +181,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
 
     setShopFees(
       new Map(
-        shops.map((s) => [
+        currentShops.map((s) => [
           s.key,
           { fee: undefined, leadTime: undefined, ghnServiceId: undefined, loading: true, error: null },
         ]),
@@ -141,7 +191,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
     const applyAddressFailure = (errorMsg: string) => {
       notifyShippingToasts([formatToastFromAddress(errorMsg)], [errorMsg])
       setShopFees(
-        new Map(shops.map((s) => [s.key, { fee: undefined, loading: false, error: errorMsg }])),
+        new Map(currentShops.map((s) => [s.key, { fee: undefined, loading: false, error: errorMsg }])),
       )
     }
 
@@ -149,7 +199,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
       const provinces = await ghnService.getProvinces()
       if (controller.signal.aborted) return
 
-      const provinceQuery = address.province || address.city
+      const provinceQuery = currentAddress.province || currentAddress.city
       const matchedProvince = provinces.find(
         (p) =>
           fuzzyMatch(p.ProvinceName, provinceQuery) ||
@@ -165,7 +215,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
       const districts = await ghnService.getDistricts(matchedProvince.ProvinceID)
       if (controller.signal.aborted) return
 
-      const districtQuery = address.district || ''
+      const districtQuery = currentAddress.district || ''
       const matchedDistrict = districts.find(
         (d) =>
           fuzzyMatch(d.DistrictName, districtQuery) || (d.NameExtension ?? []).some((ext) => fuzzyMatch(ext, districtQuery)),
@@ -180,7 +230,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
       const wards = await ghnService.getWards(matchedDistrict.DistrictID)
       if (controller.signal.aborted) return
 
-      const wardQuery = address.ward || ''
+      const wardQuery = currentAddress.ward || ''
       const matchedWard = wards.find(
         (w) =>
           fuzzyMatch(w.WardName, wardQuery) || (w.NameExtension ?? []).some((ext) => fuzzyMatch(ext, wardQuery)),
@@ -193,7 +243,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
       }
 
       const results = await Promise.allSettled(
-        shops.map(async (shop) => {
+        currentShops.map(async (shop) => {
           const ghnShopId = shop.ghnShopId ?? undefined
           let list: GHNService[] = []
           if (ghnShopId == null || shop.fromDistrictId == null) {
@@ -299,7 +349,7 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
       const rawForDev: string[] = []
 
       results.forEach((result, idx) => {
-        const key = shops[idx].key
+        const key = currentShops[idx].key
         if (result.status === 'fulfilled') {
           const v = result.value
           updatedMap.set(key, {
@@ -337,10 +387,10 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
         console.warn('[GHN shipping fee]', errMsg)
       }
       const friendly = userFacingGhnMessage(errMsg)
-      setShopFees(new Map(shops.map((s) => [s.key, { fee: undefined, loading: false, error: friendly }]))),
+      setShopFees(new Map(currentShops.map((s) => [s.key, { fee: undefined, loading: false, error: friendly }]))),
       notifyShippingToasts([friendly], [errMsg])
     }
-  }, [address, shops])
+  }, [ghnInputKey])
 
   useEffect(() => {
     void calculate()

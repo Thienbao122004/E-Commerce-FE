@@ -660,9 +660,8 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Phí vận chuyển</span>
                 {isCalculating ? (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Loader2 size={11} className="animate-spin" />
-                    Đang tính...
+                  <span className="text-xs text-muted-foreground" aria-live="polite">
+                    Đang tính…
                   </span>
                 ) : hasBlockingError ? (
                   <span className="text-xs text-amber-800 dark:text-amber-200">Không tính được</span>
@@ -678,9 +677,8 @@ export default function CheckoutPage() {
                   Tổng thanh toán
                 </span>
                 {isCalculating ? (
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span className="text-xl font-bold">Đang tính...</span>
+                  <span className="text-xl font-bold text-muted-foreground" aria-hidden>
+                    —
                   </span>
                 ) : hasBlockingError ? (
                   <span className="text-right text-sm font-semibold text-amber-800 dark:text-amber-200">—</span>
