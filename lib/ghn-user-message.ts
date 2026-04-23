@@ -19,6 +19,17 @@ export function userFacingGhnMessage(technical: string | undefined | null): stri
     return 'GHN chưa có tuyến giao tương ứng với dịch vụ/điểm lấy — gửi hàng. Kiểm tra mã kho (quận/xã) của shop, địa chỉ nhận khớp dữ liệu GHN, hoặc thử đổi gói dịch vụ.'
   }
 
+  /** Câu từ app (throw trong useGHNShippingFee) — giữ nguyên để toast khớp vì thường > 100 ký tự, không cắt thành GENERIC. */
+  if (t.includes('không có dịch vụ nào cho tuyến') && t.includes('kho shop')) {
+    return technical.trim()
+  }
+  if (t.includes('shop chưa cấu hình đủ ghn') || t.includes('cập nhật trong cài đặt shop')) {
+    return technical.trim()
+  }
+  if (t.includes('không tính được phí với mọi dịch vụ trên tuyến') || t.includes('kiểm tra cấu hình kho')) {
+    return technical.trim()
+  }
+
   if (t.includes('ward') && (t.includes('not') || t.includes('invalid') || t.includes('mismatch'))) {
     return 'Mã xã / phường không nằm trong vùng GHN giao được. Hãy chọn lại xã tương ứng trên ứng dụng/dữ liệu GHN.'
   }

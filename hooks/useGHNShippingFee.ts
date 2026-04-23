@@ -49,15 +49,20 @@ function notifyShippingToasts(
   if (unique.length === 0) return
 
   if (process.env.NODE_ENV === 'development' && rawTechForDev.some(Boolean)) {
-    // eslint-disable-next-line no-console
     console.warn('[GHN shipping]', rawTechForDev.filter(Boolean))
   }
 
   if (unique.length === 1) {
-    toast.error(unique[0])
+    const msg = unique[0]
+    const long = msg.length > 120
+    toast.error(msg, {
+      id: 'ghn-shipping-fee',
+      duration: long ? 12_000 : 6_000,
+    })
   } else {
     toast.error(
       unique[0] + ` (và ${unique.length - 1} tuyến/shop chưa tính được phí)`,
+      { id: 'ghn-shipping-fee', duration: 12_000 },
     )
   }
 }
@@ -364,10 +369,6 @@ export function useGHNShippingFee(shops: ShopInput[], address: AddressResponse |
             result.reason instanceof Error
               ? result.reason.message
               : 'GHN không tính được phí (kiểm tra cấu hình kho, địa chỉ gửi, hoặc tuyến giao hàng).'
-          if (process.env.NODE_ENV === 'development') {
-            // eslint-disable-next-line no-console
-            console.warn('[GHN calculateFee]', raw)
-          }
           const friendly = userFacingGhnMessage(raw)
           errMsgs.push(friendly)
           rawForDev.push(raw)
