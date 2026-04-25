@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, MessageCircle, Package, Store, StoreIcon } from 'lucide-react'
+import { ArrowLeft, Check, MessageCircle, Package, Store, StoreIcon, Truck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +25,7 @@ import {
 import { formatDateTimeVN, formatDateVN as formatDate, formatPhoneVn, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { ordersService, type OrderDetail, type OrderStatusStep } from '@/services/orders'
+import type { CancelOrderResponse } from '@/types/customer-order'
 import { createDispute } from '@/services/disputes'
 import { DisputeType } from '@/types/dispute'
 import { EvidenceUploader } from '@/components/common/evidence-uploader'
@@ -55,7 +56,8 @@ const STATUS_LABELS: Record<number, string> = {
 
 const STATUS_STEPS = [0, 1, 2, 3, 4, 5, 6] as const
 
-const CANCELLABLE_STATUSES = new Set([0, 1, 2, 3])
+// Status 0/1/2: hủy tự động ngay. Status 3 (Processing): xem thêm logic canCancelProcessing bên dưới.
+const CANCELLABLE_STATUSES = new Set([0, 1, 2])
 // Có thể khiếu nại: Đã giao (5) hoặc Hoàn thành (6), trong vòng 7 ngày
 const DISPUTE_WINDOW_DAYS = 7
 // NotReceived: Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày — đồng bộ BE CustomerDisputeService
@@ -278,6 +280,17 @@ export default function PurchaseOrderDetailPage() {
   const canCancel = useMemo(() => {
     if (!order) return false
     return CANCELLABLE_STATUSES.has(order.status)
+  }, [order])
+
+  // Trạng thái "Đang chuẩn bị" (3): có thể gửi yêu cầu hủy nếu chưa có yêu cầu đang chờ
+  const canRequestCancelProcessing = useMemo(() => {
+    if (!order) return false
+    return order.status === 3 && !order.cancelRequestedAt
+  }, [order])
+
+  const hasPendingCancelRequest = useMemo(() => {
+    if (!order) return false
+    return order.status === 3 && !!order.cancelRequestedAt
   }, [order])
 
   // Mốc anchor cho cửa sổ 7 ngày — đồng bộ GetReceiptAnchorUtc trong BE
@@ -508,7 +521,7 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const openCancelDialog = () => {
-    if (!canCancel || canceling || confirming) return
+    if ((!canCancel && !canRequestCancelProcessing) || canceling || confirming) return
     setCancelReason('')
     setCancelDialogOpen(true)
   }
@@ -519,12 +532,17 @@ export default function PurchaseOrderDetailPage() {
     const reason = cancelReason.trim()
     setCanceling(true)
     try {
-      const res = await ordersService.cancelOrder(order.id, reason ? { reason } : undefined)
+      const res = await ordersService.cancelOrder(order.id, reason ? { reason } : undefined) as CancelOrderResponse
       if (!res.success) {
         toast.error(res.message || 'Không thể hủy đơn hàng')
         return
       }
-      toast.success(res.message || 'Đơn hàng đã được hủy')
+      if (res.cancelledImmediately === false) {
+        // Yêu cầu hủy đã gửi, chờ shop duyệt
+        toast.info(res.message || 'Yêu cầu hủy đã được gửi đến shop')
+      } else {
+        toast.success(res.message || 'Đơn hàng đã được hủy')
+      }
       setCancelDialogOpen(false)
       setCancelReason('')
       await loadOrder()
@@ -637,6 +655,24 @@ export default function PurchaseOrderDetailPage() {
               {canceling ? 'Đang hủy...' : 'Hủy đơn hàng'}
             </Button>
           )}
+          {canRequestCancelProcessing && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={openCancelDialog}
+              disabled={canceling || confirming}
+              className="cursor-pointer border-red-300 text-red-600 hover:bg-red-50"
+            >
+              {canceling ? 'Đang gửi...' : 'Yêu cầu hủy đơn'}
+            </Button>
+          )}
+          {hasPendingCancelRequest && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+              <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Đang chờ shop xác nhận hủy
+            </span>
+          )}
           {canConfirm && (
             <Button
               type="button"
@@ -699,6 +735,41 @@ export default function PurchaseOrderDetailPage() {
             {order.shipPhone ? formatPhoneVn(order.shipPhone) : 'Chưa có số điện thoại'}
           </p>
           <p className="text-sm text-muted-foreground">{order.shipAddress || 'Chưa có địa chỉ giao hàng'}</p>
+
+          {/* Ngày giao dự kiến / thực tế */}
+          {(order.estimatedDeliveryDate || order.actualDeliveryDate || order.trackingCode) && (
+            <div className="mt-3 rounded-lg border px-3 py-2.5 space-y-1.5 bg-blue-50/60 border-blue-100">
+              {order.actualDeliveryDate ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700">
+                  <Truck className="size-4 shrink-0" />
+                  <span>
+                    Đã giao lúc{' '}
+                    <span className="font-semibold tabular-nums">{formatDateTimeVN(order.actualDeliveryDate)}</span>
+                  </span>
+                </div>
+              ) : order.estimatedDeliveryDate ? (
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <Truck className="size-4 shrink-0" />
+                  <span>
+                    Dự kiến giao{' '}
+                    <span className="font-semibold tabular-nums">{formatDate(order.estimatedDeliveryDate)}</span>
+                  </span>
+                </div>
+              ) : null}
+              {order.trackingCode && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Package className="size-3.5 shrink-0" />
+                  <span>
+                    Mã vận đơn:{' '}
+                    <span className="font-mono font-medium text-foreground">{order.trackingCode}</span>
+                    {order.shippingProvider && (
+                      <span className="ml-1 text-muted-foreground">({order.shippingProvider})</span>
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {order.cancelReason && (order.status === 7 || order.status === 8) && (
@@ -951,14 +1022,16 @@ export default function PurchaseOrderDetailPage() {
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hủy đơn hàng</DialogTitle>
+            <DialogTitle>{canRequestCancelProcessing ? 'Gửi yêu cầu hủy đơn' : 'Hủy đơn hàng'}</DialogTitle>
             <DialogDescription>
-              Bạn có thể nhập lý do hủy để shop xử lý nhanh hơn.
+              {canRequestCancelProcessing
+                ? 'Đơn hàng đang được chuẩn bị — yêu cầu sẽ gửi đến shop để xem xét. Bạn sẽ nhận thông báo khi shop phản hồi.'
+                : 'Bạn có thể nhập lý do hủy để shop xử lý nhanh hơn.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <label htmlFor="cancel-reason" className="text-sm font-medium" style={{ color: 'var(--color-text-main)' }}>
-              Lý do hủy (không bắt buộc)
+              Lý do hủy
             </label>
             <Textarea
               id="cancel-reason"
@@ -983,12 +1056,14 @@ export default function PurchaseOrderDetailPage() {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant={canRequestCancelProcessing ? 'outline' : 'destructive'}
               onClick={() => void submitCancelOrder()}
               disabled={canceling}
-              className="cursor-pointer"
+              className={`cursor-pointer ${canRequestCancelProcessing ? 'border-red-300 text-red-600 hover:bg-red-50' : ''}`}
             >
-              {canceling ? 'Đang hủy...' : 'Xác nhận hủy'}
+              {canceling
+                ? (canRequestCancelProcessing ? 'Đang gửi...' : 'Đang hủy...')
+                : (canRequestCancelProcessing ? 'Gửi yêu cầu hủy' : 'Xác nhận hủy')}
             </Button>
           </DialogFooter>
         </DialogContent>

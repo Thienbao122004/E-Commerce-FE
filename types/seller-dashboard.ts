@@ -122,6 +122,8 @@ export type SellerOrder = {
   shopGhnShopId?: number | null
   shopFromDistrictId?: number | null
   shopFromWardCode?: string | null
+  /** Null = không có yêu cầu hủy đang chờ. Có giá trị = khách đang yêu cầu hủy, chờ shop duyệt. */
+  cancelRequestedAt?: string | null
 }
 
 export type SellerOrdersResponse = {

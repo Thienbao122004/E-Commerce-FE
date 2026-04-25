@@ -137,6 +137,20 @@ export function updateMyOrderStatus(orderId: string, dto: UpdateSellerOrderStatu
   )
 }
 
+export function approveCancelRequest(orderId: string) {
+  return api.post<{ success: boolean; message?: string }>(
+    `/api/seller/orders/${orderId}/approve-cancel`,
+    {}
+  )
+}
+
+export function rejectCancelRequest(orderId: string, note?: string) {
+  return api.post<{ success: boolean; message?: string }>(
+    `/api/seller/orders/${orderId}/reject-cancel`,
+    { note }
+  )
+}
+
 // ====== Reviews (product reviews của khách) ======
 
 export function fetchMyProductReviews(

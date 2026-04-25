@@ -50,6 +50,20 @@ export interface OrderDetail extends OrderSummary {
   shipPhone?: string
   shipAddress?: string
   statusTimeline?: OrderStatusStep[] | null
+  estimatedDeliveryDate?: string | null
+  actualDeliveryDate?: string | null
+  trackingCode?: string | null
+  shippingProvider?: string | null
+  /** Null = không có yêu cầu hủy đang chờ. Có giá trị = đơn đang chờ shop duyệt hủy. */
+  cancelRequestedAt?: string | null
+}
+
+export interface CancelOrderResponse {
+  success: boolean
+  message: string
+  /** true = hủy ngay; false = yêu cầu đã gửi đến shop, chờ duyệt */
+  cancelledImmediately?: boolean
+  cancelRequestedAt?: string | null
 }
 
 export interface OrderDetailResponse {
