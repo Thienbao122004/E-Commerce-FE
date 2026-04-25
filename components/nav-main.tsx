@@ -23,6 +23,7 @@ import {
 
 export function NavMain({
   items,
+  pendingApprovalCount = 0,
 }: {
   items: {
     title: string
@@ -35,6 +36,7 @@ export function NavMain({
       icon?: Icon
     }[]
   }[]
+  pendingApprovalCount?: number
 }) {
   const pathname = usePathname()
 
@@ -63,8 +65,15 @@ export function NavMain({
                       isActive={isGroupActive(item)}
                     >
                       {item.icon && <item.icon />}
-                      <span>{item.title}</span>
-                      <IconChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
+                      {pendingApprovalCount > 0 && item.items?.some((s) => s.url.includes("pending-approval")) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: "var(--color-primary)" }}
+                          title={`${pendingApprovalCount} sản phẩm cần duyệt`}
+                        />
+                      ) : null}
+                      <IconChevronRight className="shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -72,9 +81,23 @@ export function NavMain({
                       {item.items.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild isActive={isActive(subItem.url, subItem.url === item.url)}>
-                            <Link href={subItem.url}>
-                              {subItem.icon && <subItem.icon className="size-4" />}
-                              <span>{subItem.title}</span>
+                            <Link
+                              href={subItem.url}
+                              className="!flex min-w-0 w-full max-w-full items-center gap-2"
+                              title={pendingApprovalCount > 0 && subItem.url.includes("pending-approval")
+                                ? `${pendingApprovalCount} sản phẩm cần duyệt`
+                                : undefined}
+                            >
+                              {subItem.icon && <subItem.icon className="size-4 shrink-0" />}
+                              <span className="min-w-0 flex-1 truncate">{subItem.title}</span>
+                              {pendingApprovalCount > 0 && subItem.url.includes("pending-approval") ? (
+                                <span
+                                  className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums"
+                                  style={{ backgroundColor: "var(--color-primary)" }}
+                                >
+                                  {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
+                                </span>
+                              ) : null}
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

@@ -12,9 +12,6 @@ export type SellerShopInfo = {
   logoUrl: string | null
   status: number
   verificationStatus: number
-  /** Ràng buộc danh mục sản phẩm (cùng nhánh) — null = dữ liệu cũ */
-  primaryCategoryId?: number | null
-  primaryCategoryName?: string | null
   createdAt: string
 }
 
@@ -168,11 +165,14 @@ export const OrderStatusLabels: Record<number, string> = {
 }
 
 // ====== Product Status ======
+/** Khớp `ProductStatus` backend (ECommerceAPI.Domain.Enums.ProductStatus) */
 export const ProductStatus = {
   Draft: 0,
   Active: 1,
   Hidden: 2,
-  Deleted: 3,
+  OutOfStock: 3,
+  Removed: 4,
+  PendingApproval: 5,
 } as const
 
 // ====== Product Variant ======

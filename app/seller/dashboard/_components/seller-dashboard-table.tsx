@@ -85,6 +85,9 @@ function ProductsTab({ products, loading }: { products: SellerProduct[]; loading
         { value: String(ProductStatus.Active), label: "Đang bán" },
         { value: String(ProductStatus.Draft), label: "Nháp" },
         { value: String(ProductStatus.Hidden), label: "Đã ẩn" },
+        { value: String(ProductStatus.PendingApproval), label: "Chờ duyệt" },
+        { value: String(ProductStatus.OutOfStock), label: "Hết hàng" },
+        { value: String(ProductStatus.Removed), label: "Đã gỡ" },
       ],
     },
   ]
@@ -151,8 +154,33 @@ function ProductsTab({ products, loading }: { products: SellerProduct[]; loading
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className={`text-[10px] ${p.status === ProductStatus.Active ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}`}>
-                      {p.status === ProductStatus.Active ? "Đang bán" : p.status === ProductStatus.Draft ? "Nháp" : "Đã ẩn"}
+                    <Badge
+                      variant="secondary"
+                      className={`text-[10px] ${
+                        p.status === ProductStatus.Active
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : p.status === ProductStatus.PendingApproval
+                            ? "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200"
+                            : p.status === ProductStatus.OutOfStock
+                              ? "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200"
+                              : p.status === ProductStatus.Removed
+                                ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200"
+                                : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {p.status === ProductStatus.Active
+                        ? "Đang bán"
+                        : p.status === ProductStatus.Draft
+                          ? "Nháp"
+                          : p.status === ProductStatus.PendingApproval
+                            ? "Chờ duyệt"
+                            : p.status === ProductStatus.Hidden
+                              ? "Đã ẩn"
+                              : p.status === ProductStatus.OutOfStock
+                                ? "Hết hàng"
+                                : p.status === ProductStatus.Removed
+                                  ? "Đã gỡ"
+                                  : "—"}
                     </Badge>
                   </TableCell>
                 </TableRow>

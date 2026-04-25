@@ -44,7 +44,7 @@ function SearchPageContent() {
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [sortBy, setSortBy] = useState<"newest" | "price_asc" | "price_desc" | "rating">("newest")
+  const [sortBy, setSortBy] = useState<"relevance" | "newest" | "price_asc" | "price_desc" | "rating">("relevance")
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined)
   const [initialCategorySet, setInitialCategorySet] = useState(false)
   const [showMoreCategories, setShowMoreCategories] = useState(false)
@@ -272,6 +272,7 @@ function SearchPageContent() {
   const RATING_FILTER_OPTIONS = [5, 4, 3, 2, 1]
 
   const SORT_OPTIONS: { value: typeof sortBy; label: string }[] = [
+    { value: "relevance", label: "Phù hợp nhất" },
     { value: "newest", label: "Mới nhất" },
     { value: "rating", label: "Đánh giá cao" },
     { value: "price_asc", label: "Giá tăng dần" },
@@ -579,6 +580,18 @@ function SearchPageContent() {
                           <h3 className="text-sm truncate flex-1" style={{ color: "var(--color-text-main)" }}>
                             {product.name}
                           </h3>
+                          {(product.reviewCount ?? 0) > 0 && (
+                            <p className="text-[11px] mt-0.5 flex items-center gap-0.5" style={{ color: "var(--color-text-secondary)" }}>
+                              <span
+                                className="material-symbols-outlined text-[15px] text-amber-500"
+                                style={{ fontVariationSettings: "'FILL' 1" }}
+                              >
+                                star
+                              </span>
+                              <span className="font-semibold tabular-nums">{(product.averageRating ?? 0).toFixed(1)}</span>
+                              <span className="text-gray-400">({product.reviewCount})</span>
+                            </p>
+                          )}
                           <div className="mt-2 flex items-end justify-between gap-1">
                             <span className="font-bold text-sm" style={{ color: "var(--color-text-secondary)" }}>
                               {formatPrice(product.basePrice)}

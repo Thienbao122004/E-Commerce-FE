@@ -72,17 +72,13 @@ import {
   updateMyVariant,
   fetchSellerMaterials,
   fetchSellerTags,
-  fetchMyShop,
 } from "@/services/seller-dashboard"
 import { ProductStatus } from "@/types/seller-dashboard"
 import type {
   SellerProductDetail,
   SellerProductVariant,
   SellerProductVariantPayload,
-  SellerShopResponse,
-  SellerShopInfo,
 } from "@/types/seller-dashboard"
-import { ShopPrimaryCategoryBanner } from "@/components/seller/shop-primary-category-banner"
 import {
   getCategoryTree,
   type StorefrontCategory,
@@ -92,20 +88,6 @@ import type { MaterialDto } from "@/types/material"
 import type { Tag } from "@/types/tag"
 import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency, formatNumberVN } from "@/lib/formatters"
-
-function findCategorySubtree(
-  tree: StorefrontCategory[],
-  rootId: number,
-): StorefrontCategory[] | null {
-  for (const n of tree) {
-    if (n.id === rootId) return [n]
-    if (n.subcategories?.length) {
-      const sub = findCategorySubtree(n.subcategories, rootId)
-      if (sub) return sub
-    }
-  }
-  return null
-}
 
 const statusMap: Record<number, { label: string; cls: string; dotCls: string }> = {
   [ProductStatus.Draft]: {
@@ -123,10 +105,20 @@ const statusMap: Record<number, { label: string; cls: string; dotCls: string }> 
     cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800",
     dotCls: "bg-amber-500",
   },
-  [ProductStatus.Deleted]: {
-    label: "Đã xóa",
+  [ProductStatus.OutOfStock]: {
+    label: "Hết hàng",
+    cls: "bg-orange-50 text-orange-800 dark:bg-orange-950 dark:text-orange-200 border-orange-200 dark:border-orange-800",
+    dotCls: "bg-orange-500",
+  },
+  [ProductStatus.Removed]: {
+    label: "Đã gỡ",
     cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 border-red-200 dark:border-red-800",
     dotCls: "bg-red-500",
+  },
+  [ProductStatus.PendingApproval]: {
+    label: "Chờ duyệt",
+    cls: "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-200 border-sky-200 dark:border-sky-800",
+    dotCls: "bg-sky-500",
   },
 }
 
@@ -263,8 +255,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [editMaterialIds, setEditMaterialIds] = React.useState<string[]>([])
   const [dirty, setDirty] = React.useState(false)
 
-  const [myShop, setMyShop] = React.useState<SellerShopInfo | null>(null)
-
   const [fileList, setFileList] = React.useState<NativeImageFile[]>([])
   const [previewOpen, setPreviewOpen] = React.useState(false)
   const [previewUrl, setPreviewUrl] = React.useState("")
@@ -302,21 +292,14 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const [res, catTreeRes, shopRes, tagsRes, matsRes] = await Promise.all([
+      const [res, catTreeRes, tagsRes, matsRes] = await Promise.all([
         fetchMyProductById(productId),
         getCategoryTree().catch(
           (): StorefrontCategoryTreeResponse => ({ success: false, tree: [] })
         ),
-        fetchMyShop().catch((): SellerShopResponse => ({ success: false })),
         fetchSellerTags(1, 100).catch(()=>({ success: false, tags: [], totalCount: 0, page: 1, pageSize: 100 })),
         fetchSellerMaterials(1, 50).catch(()=>({ success: false, materials: [], totalCount: 0, page: 1, pageSize: 50 }))
       ])
-
-      if (shopRes.success && shopRes.data) {
-        setMyShop(shopRes.data)
-      } else {
-        setMyShop(null)
-      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const flatten = (arr: any[], level = 1): (StorefrontCategory & { level: number; pathLabel: string })[] => {
@@ -328,24 +311,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
           }, [])
       }
       if (catTreeRes.success && catTreeRes.tree?.length) {
-        const fullTree = catTreeRes.tree
-        const rootId =
-          shopRes.success && shopRes.data?.primaryCategoryId != null
-            ? Number(shopRes.data.primaryCategoryId)
-            : null
-        if (rootId != null) {
-          const sub = findCategorySubtree(fullTree, rootId)
-          if (sub?.length) {
-            setCategoriesList(flatten(sub))
-          } else {
-            setCategoriesList(flatten(fullTree))
-            toast.error(
-              "Không tìm thấy danh mục ngành hàng đã đăng ký. Vui lòng liên hệ quản trị viên.",
-            )
-          }
-        } else {
-          setCategoriesList(flatten(fullTree))
-        }
+        setCategoriesList(flatten(catTreeRes.tree))
       }
       if (tagsRes.success && tagsRes.tags) setPlatformTags(tagsRes.tags)
       if (matsRes.success && matsRes.materials) setPlatformMaterials(matsRes.materials)
@@ -356,7 +322,11 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         setEditName(p.name)
         setEditDesc(p.description ?? "")
         setEditPrice(String(p.basePrice))
-        setEditStatus(String(p.status))
+        setEditStatus(
+          p.status === ProductStatus.PendingApproval
+            ? String(ProductStatus.Active)
+            : String(p.status)
+        )
         setEditCategoryId(p.categoryId ?? null)
         setEditTagIds(p.tagIds ?? [])
         setEditMaterialIds(p.materialIds ?? [])
@@ -373,7 +343,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         onBack()
       }
     } catch (err) {
-      setMyShop(null)
       toast.error(err instanceof Error ? err.message : "Lỗi tải sản phẩm")
       onBack()
     } finally {
@@ -550,18 +519,24 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     if (!product) return
     setSaving(true)
     try {
+      const statusToSend =
+        editStatus.trim() === "" && product
+          ? product.status === ProductStatus.PendingApproval
+            ? ProductStatus.Active
+            : product.status
+          : Number(editStatus)
       const res = await updateMyProduct(product.id, {
         name: editName.trim(),
         description: editDesc.trim() || undefined,
         basePrice: Number(editPrice),
-        status: Number(editStatus),
+        status: statusToSend,
         imageUrls: fileList.map((f) => f.url).filter(Boolean),
         categoryId: editCategoryId ?? undefined,
         tagIds: editTagIds,
         materialIds: editMaterialIds,
       })
       if (res.success) {
-        toast.success("Cập nhật thành công")
+        toast.success(res.message ?? "Cập nhật thành công")
         await load()
       } else toast.error(res.message ?? "Lỗi cập nhật")
     } catch (err) {
@@ -680,8 +655,6 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-
-        <ShopPrimaryCategoryBanner shop={myShop} loading={loading} />
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-3">
@@ -1014,20 +987,40 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="ed-status" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Label
+                        htmlFor="ed-status"
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"
+                      >
                         Trạng thái
                       </Label>
+                      {product?.status === ProductStatus.PendingApproval ? (
+                        <div
+                          className={`mb-1.5 h-9 flex items-center gap-1.5 rounded-xl border px-2.5 text-xs font-medium ${statusMap[ProductStatus.PendingApproval].cls}`}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${statusMap[ProductStatus.PendingApproval].dotCls}`}
+                          />
+                          Chờ admin duyệt
+                        </div>
+                      ) : null}
                       <Select
                         value={editStatus}
-                        onValueChange={(v) => { setEditStatus(v); mark() }}
+                        onValueChange={(v) => {
+                          setEditStatus(v)
+                          mark()
+                        }}
                       >
-                        <SelectTrigger id="ed-status" className="h-10 text-sm rounded-xl bg-muted/20 border-muted focus-visible:bg-background">
-                          <SelectValue />
+                        <SelectTrigger
+                          id="ed-status"
+                          className="h-10 text-sm rounded-xl bg-muted/20 border-muted focus-visible:bg-background"
+                        >
+                          <SelectValue placeholder="Chọn" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
-                          <SelectItem value={String(ProductStatus.Active)}>Đang bán</SelectItem>
                           <SelectItem value={String(ProductStatus.Draft)}>Lưu nháp</SelectItem>
+                          <SelectItem value={String(ProductStatus.Active)}>Đang bán (gửi duyệt)</SelectItem>
                           <SelectItem value={String(ProductStatus.Hidden)}>Đã ẩn</SelectItem>
+                          <SelectItem value={String(ProductStatus.OutOfStock)}>Hết hàng</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

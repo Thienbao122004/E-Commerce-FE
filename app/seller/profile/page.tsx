@@ -4,8 +4,6 @@ import { useSellerShop } from "@/hooks/use-seller-shop"
 import { ProfileCover } from "./_components/profile-cover"
 import { ProfileEditForm } from "./_components/profile-edit-form"
 import { ProfileInfoCards } from "./_components/profile-info-cards"
-import { ShopPrimaryCategoryBanner } from "@/components/seller/shop-primary-category-banner"
-
 export default function SellerProfilePage() {
   const { shop, loading, saving, save } = useSellerShop()
 
@@ -23,8 +21,6 @@ export default function SellerProfilePage() {
       </div>
 
       <ProfileCover shop={shop} loading={loading} saving={saving} onUpdateLogo={handleUpdateLogo} />
-
-      <ShopPrimaryCategoryBanner shop={shop} loading={loading} />
 
       {/* Form + Info Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

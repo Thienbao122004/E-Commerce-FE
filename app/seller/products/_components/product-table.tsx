@@ -17,14 +17,18 @@ const statusLabels: Record<number, string> = {
   [ProductStatus.Draft]: "Nháp",
   [ProductStatus.Active]: "Đang bán",
   [ProductStatus.Hidden]: "Đã ẩn",
-  [ProductStatus.Deleted]: "Đã xóa",
+  [ProductStatus.OutOfStock]: "Hết hàng",
+  [ProductStatus.Removed]: "Đã gỡ",
+  [ProductStatus.PendingApproval]: "Chờ duyệt",
 }
 
 const statusColors: Record<number, string> = {
   [ProductStatus.Draft]: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   [ProductStatus.Active]: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   [ProductStatus.Hidden]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  [ProductStatus.Deleted]: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  [ProductStatus.OutOfStock]: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  [ProductStatus.Removed]: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  [ProductStatus.PendingApproval]: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200",
 }
 
 function TableSkeleton() {

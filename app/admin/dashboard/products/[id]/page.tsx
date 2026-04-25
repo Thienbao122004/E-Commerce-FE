@@ -13,6 +13,8 @@ import {
   IconTag,
   IconBuildingStore,
   IconCurrencyDollar,
+  IconCircleCheck,
+  IconBan,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -31,7 +33,14 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
-import { fetchProductById, hideProduct, unhideProduct, removeProduct } from "@/services/products"
+import {
+  fetchProductById,
+  hideProduct,
+  unhideProduct,
+  removeProduct,
+  approveProduct,
+  rejectProduct,
+} from "@/services/products"
 import {
   ProductStatus,
   ProductStatusLabels,
@@ -47,7 +56,7 @@ export default function ProductDetailPage() {
   const [actionLoading, setActionLoading] = React.useState(false)
   const [selectedImage, setSelectedImage] = React.useState(0)
   const [dialogState, setDialogState] = React.useState<{
-    type: "hide" | "remove" | "unhide" | null
+    type: "hide" | "remove" | "unhide" | "reject" | null
   }>({ type: null })
   const [reason, setReason] = React.useState("")
 
@@ -81,6 +90,8 @@ export default function ProductDetailPage() {
         res = await hideProduct(product.id, reason)
       } else if (dialogState.type === "unhide") {
         res = await unhideProduct(product.id)
+      } else if (dialogState.type === "reject") {
+        res = await rejectProduct(product.id, reason)
       } else {
         res = await removeProduct(product.id, reason)
       }
@@ -99,7 +110,32 @@ export default function ProductDetailPage() {
     }
   }
 
-  const needsReason = dialogState.type === "hide" || dialogState.type === "remove"
+  const needsReason =
+    dialogState.type === "hide" ||
+    dialogState.type === "remove" ||
+    dialogState.type === "reject"
+
+  const handleApprove = async () => {
+    if (!product) return
+    setActionLoading(true)
+    try {
+      const res = await approveProduct(product.id)
+      if (res.success) {
+        toast.success(res.message ?? "Đã duyệt sản phẩm")
+        if (res.product) {
+          setProduct(res.product)
+        } else {
+          await load()
+        }
+      } else {
+        toast.error(res.message ?? "Duyệt thất bại")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra")
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   return (
     <>
@@ -205,6 +241,27 @@ export default function ProductDetailPage() {
                       Quản lý trạng thái hiển thị sản phẩm trên hệ thống
                     </CardDescription>
                     <div className="flex flex-col gap-2 pt-2">
+                      {product.status === ProductStatus.PendingApproval && (
+                        <Button
+                          className="w-full justify-start bg-[var(--color-primary)] text-white shadow-sm hover:bg-[var(--color-primary-hover)]"
+                          onClick={handleApprove}
+                          disabled={actionLoading}
+                        >
+                          <IconCircleCheck className="mr-2 size-4" />
+                          Duyệt và mở bán
+                        </Button>
+                      )}
+                      {product.status === ProductStatus.PendingApproval && (
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => { setReason(""); setDialogState({ type: "reject" }) }}
+                          disabled={actionLoading}
+                        >
+                          <IconBan className="mr-2 size-4" />
+                          Từ chối (về nháp)
+                        </Button>
+                      )}
                       {product.status === ProductStatus.Hidden ? (
                         <Button
                           variant="outline"
@@ -258,14 +315,18 @@ export default function ProductDetailPage() {
                 ? "Ẩn sản phẩm"
                 : dialogState.type === "remove"
                   ? "Gỡ sản phẩm vĩnh viễn"
-                  : "Hiển thị lại sản phẩm"}
+                  : dialogState.type === "reject"
+                    ? "Từ chối duyệt"
+                    : "Hiển thị lại sản phẩm"}
             </DialogTitle>
             <DialogDescription>
               {dialogState.type === "hide"
                 ? `Bạn có chắc muốn ẩn "${product?.name}"? Sản phẩm sẽ không còn hiển thị cho người mua.`
                 : dialogState.type === "remove"
                   ? `Thao tác này sẽ gỡ "${product?.name}" khỏi hệ thống. Không thể hoàn tác.`
-                  : `Bạn có chắc muốn hiển thị lại "${product?.name}"?`}
+                  : dialogState.type === "reject"
+                    ? "Sản phẩm về nháp, nhập lý do gửi tới shop."
+                    : `Bạn có chắc muốn hiển thị lại "${product?.name}"?`}
             </DialogDescription>
           </DialogHeader>
           {needsReason && (

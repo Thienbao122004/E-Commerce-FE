@@ -40,7 +40,7 @@ export function SearchBox({ initialValue = '' }: SearchBoxProps) {
     debounceRef.current = setTimeout(async () => {
       setLoadingSuggestions(true)
       try {
-        const res = await getProducts({ search: value.trim(), pageSize: 8 })
+        const res = await getProducts({ search: value.trim(), pageSize: 8, sortBy: "relevance" })
         if (res.success) {
           const dedupedByName = new Map<string, { id: string; name: string; shopName: string; imageUrl?: string }>()
           const uniqueShops = new Map<string, { slug: string; name: string; logoUrl?: string | null }>()

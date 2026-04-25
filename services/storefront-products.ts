@@ -33,7 +33,7 @@ export function getProducts(params: {
   minPrice?: number
   maxPrice?: number
   minRating?: number
-  sortBy?: "newest" | "price_asc" | "price_desc" | "rating" | "best_seller"
+  sortBy?: "relevance" | "newest" | "price_asc" | "price_desc" | "rating" | "best_seller"
 } = {}): Promise<StorefrontProductsResponse> {
   const qs = new URLSearchParams()
   if (params.page) qs.set("page", String(params.page))
