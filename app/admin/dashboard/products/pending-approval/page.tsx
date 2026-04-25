@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  IconEye, IconEyeOff, IconTrash, IconRefresh, IconPackage,
+  IconEye, IconEyeOff, IconTrash, IconRefresh, IconCircleCheck,
 } from "@tabler/icons-react"
 import Image from "next/image"
 import dynamic from "next/dynamic"
@@ -16,13 +16,19 @@ import { useProducts } from "@/hooks/use-products"
 import { fetchProductById } from "@/services/products"
 import { ProductStatus, ProductStatusLabels, ProductStatusColors } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
-const ProductDetailView = dynamic(() => import("./_components/product-detail-view").then(m => m.ProductDetailView), {
-  loading: () => <div className="flex items-center justify-center h-64"><div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full" /></div>,
-})
-const ActionDialog = dynamic(() => import("./_components/action-dialog").then(m => m.ActionDialog))
+const ProductDetailView = dynamic(
+  () => import("../_components/product-detail-view").then((m) => m.ProductDetailView),
+  {
+    loading: () => (
+      <div className="flex h-64 items-center justify-center">
+        <div className="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    ),
+  }
+)
+const ActionDialog = dynamic(() => import("../_components/action-dialog").then((m) => m.ActionDialog))
 
 import FilterBar from "@/components/common/filter-bar"
-import type { FilterConfig } from "@/components/common/filter-bar"
 import TablePagination from "@/components/common/table-pagination"
 import { SortableTableHead, getNextSort } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
@@ -31,15 +37,17 @@ import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
-export default function ProductsPage() {
+const PENDING_PATH = "/admin/dashboard/products/pending-approval"
+
+export default function ProductsPendingApprovalPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const productIdFromUrl = searchParams.get("id")
 
   const {
     products, totalCount, loading, actionLoading, params, totalPages,
-    setPage, setStatus, setSearch, hideProduct, unhideProduct, removeProduct, approveProduct, rejectProduct, reload,
-  } = useProducts()
+    setPage, setSearch, hideProduct, unhideProduct, removeProduct, approveProduct, rejectProduct, reload,
+  } = useProducts({ status: ProductStatus.PendingApproval, pageSize: 10 })
 
   const [searchInput, setSearchInput] = React.useState("")
   const debouncedSearch = useDebounce(searchInput)
@@ -73,13 +81,13 @@ export default function ProductsPage() {
 
   const viewDetail = (product: ProductModeration) => {
     setSelectedProduct(product)
-    router.push(`/admin/dashboard/products?id=${product.id}`, { scroll: false })
+    router.push(`${PENDING_PATH}?id=${product.id}`, { scroll: false })
     loadProductById(product.id)
   }
 
   const goBack = () => {
     setSelectedProduct(null)
-    router.push("/admin/dashboard/products", { scroll: false })
+    router.push(PENDING_PATH, { scroll: false })
   }
 
   const handleListAction = async (reason: string) => {
@@ -110,24 +118,21 @@ export default function ProductsPage() {
 
   const handleSort = (key: string) => setSort(getNextSort(sort, key))
 
-  const filters: FilterConfig[] = React.useMemo(() => [
-    {
-      key: "status",
-      label: "Trạng thái",
-      value: params.status === null ? "all" : String(params.status),
-      onChange: (v: string) => setStatus(v === "all" ? null : Number(v)),
-      width: "w-[160px]",
-      options: [
-        { value: "all", label: "Tất cả trạng thái" },
-        { value: String(ProductStatus.Active), label: "Đang bán" },
-        { value: String(ProductStatus.Draft), label: "Nháp" },
-        { value: String(ProductStatus.Hidden), label: "Đã ẩn" },
-        { value: String(ProductStatus.OutOfStock), label: "Hết hàng" },
-        { value: String(ProductStatus.Removed), label: "Đã gỡ" },
-        { value: String(ProductStatus.PendingApproval), label: "Chờ duyệt" },
-      ],
+  const handleProductUpdatedAfterAction = React.useCallback(
+    (p: ProductModeration | null) => {
+      if (p == null) {
+        setSelectedProduct(null)
+        return
+      }
+      if (p.status !== ProductStatus.PendingApproval) {
+        setSelectedProduct(null)
+        router.push(PENDING_PATH, { scroll: false })
+        return
+      }
+      setSelectedProduct(p)
     },
-  ], [params.status, setStatus])
+    [router]
+  )
 
   if (selectedProduct) {
     return (
@@ -141,7 +146,7 @@ export default function ProductsPage() {
         onRemove={removeProduct}
         onApprove={approveProduct}
         onReject={rejectProduct}
-        onProductUpdated={setSelectedProduct}
+        onProductUpdated={handleProductUpdatedAfterAction}
       />
     )
   }
@@ -157,11 +162,11 @@ export default function ProductsPage() {
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
           <FilterBar
-            searchPlaceholder="Tìm kiếm sản phẩm..."
+            searchPlaceholder="Tìm kiếm sản phẩm hoặc cửa hàng…"
             searchValue={searchInput}
             onSearchChange={setSearchInput}
             onSearch={reload}
-            filters={filters}
+            filters={[]}
           />
 
           <div className="overflow-x-auto rounded-lg border">
@@ -183,7 +188,7 @@ export default function ProductsPage() {
                   <SortableTableHead sortKey="basePrice" currentSort={sort} onSort={handleSort}>Giá</SortableTableHead>
                   <SortableTableHead sortKey="status" currentSort={sort} onSort={handleSort}>Trạng thái</SortableTableHead>
                   <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={handleSort}>Ngày tạo</SortableTableHead>
-                  <TableHead className="text-right"></TableHead>
+                  <TableHead className="text-right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -198,21 +203,27 @@ export default function ProductsPage() {
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-32" /></TableCell>
                     </TableRow>
                   ))
                 ) : sorted.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">Không tìm thấy sản phẩm nào.</TableCell>
+                    <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                      Hiện không có sản phẩm nào cần duyệt.
+                    </TableCell>
                   </TableRow>
                 ) : sorted.map((product, idx) => (
-                  <TableRow key={product.id} className="cursor-pointer hover:bg-muted/50" onClick={() => viewDetail(product)}>
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => viewDetail(product)}
+                  >
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">{(params.page - 1) * 10 + idx + 1}</TableCell>
                     <TableCell>
                       {product.imageUrls[0] ? (
                         <Image src={product.imageUrls[0]} alt={product.name} width={40} height={40} className="size-10 rounded border object-cover" />
                       ) : (
-                        <div className="bg-muted flex size-10 items-center justify-center rounded border text-xs text-muted-foreground">N/A</div>
+                        <div className="flex size-10 items-center justify-center rounded border bg-muted text-xs text-muted-foreground">N/A</div>
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-medium">{product.productCode}</TableCell>
@@ -223,7 +234,7 @@ export default function ProductsPage() {
                         </p>
                         {product.categoryName && (
                           <p
-                            className="text-muted-foreground line-clamp-1 truncate text-xs"
+                            className="line-clamp-1 truncate text-xs text-muted-foreground"
                             title={product.categoryName}
                           >
                             {product.categoryName}
@@ -236,23 +247,35 @@ export default function ProductsPage() {
                     <TableCell>
                       <Badge variant="secondary" className={ProductStatusColors[product.status] ?? ""}>{ProductStatusLabels[product.status] ?? product.statusName}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm tabular-nums">{formatDateTimeVN(product.createdAt)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground tabular-nums">{formatDateTimeVN(product.createdAt)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="size-8" onClick={() => viewDetail(product)}>
+                        {product.status === ProductStatus.PendingApproval && (
+                          <Button
+                            size="icon"
+                            className="size-8 text-white shadow-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+                            onClick={() => approveProduct(product.id)}
+                            disabled={actionLoading}
+                            title="Duyệt nhanh"
+                            type="button"
+                          >
+                            <IconCircleCheck className="size-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="size-8" onClick={() => viewDetail(product)} type="button" title="Xem chi tiết">
                           <IconEye className="size-4" />
                         </Button>
                         {product.status === ProductStatus.Hidden ? (
-                          <Button variant="ghost" size="icon" className="size-8 text-green-600 hover:text-green-700" onClick={() => setDialogState({ type: "unhide", product })} disabled={actionLoading} title="Hiển thị lại">
+                          <Button variant="ghost" size="icon" className="size-8 text-green-600 hover:text-green-700" onClick={() => setDialogState({ type: "unhide", product })} disabled={actionLoading} title="Hiển thị lại" type="button">
                             <IconEye className="size-4" />
                           </Button>
                         ) : product.status !== ProductStatus.Removed ? (
-                          <Button variant="ghost" size="icon" className="size-8 text-yellow-600 hover:text-yellow-700" onClick={() => setDialogState({ type: "hide", product })} disabled={actionLoading} title="Ẩn sản phẩm">
+                          <Button variant="ghost" size="icon" className="size-8 text-yellow-600 hover:text-yellow-700" onClick={() => setDialogState({ type: "hide", product })} disabled={actionLoading} title="Ẩn sản phẩm" type="button">
                             <IconEyeOff className="size-4" />
                           </Button>
                         ) : null}
                         {product.status !== ProductStatus.Removed && product.status !== ProductStatus.Draft && (
-                          <Button variant="ghost" size="icon" className="size-8 text-red-600 hover:text-red-700" onClick={() => setDialogState({ type: "remove", product })} disabled={actionLoading} title="Gỡ sản phẩm">
+                          <Button variant="ghost" size="icon" className="size-8 text-red-600 hover:text-red-700" onClick={() => setDialogState({ type: "remove", product })} disabled={actionLoading} title="Gỡ sản phẩm" type="button">
                             <IconTrash className="size-4" />
                           </Button>
                         )}

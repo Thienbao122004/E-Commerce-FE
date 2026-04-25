@@ -40,6 +40,11 @@ export function getNotificationUrl(item: NotificationItem, pathname: string): st
     if (isSeller) return '/seller/wallet'
     return '/user/profile/wallet'
   }
+  if (type === 'product') {
+    if (isSeller) return `/seller/products/${referenceId}`
+    if (isAdmin) return '/admin/dashboard/products'
+    return null
+  }
   return null
 }
 

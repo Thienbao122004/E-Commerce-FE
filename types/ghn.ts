@@ -96,7 +96,7 @@ export interface GHNFeeItem {
 }
 
 export interface GHNCalculateFeeRequest {
-  /** Required: filled from ShopId header */
+  /** Bắt buộc với API v2 (vd. 53320 — dịch vụ chuẩn, trùng lead time & checkout) */
   service_id?: number
   service_type_id?: number
   insurance_value?: number

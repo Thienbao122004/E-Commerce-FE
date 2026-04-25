@@ -60,9 +60,16 @@ import {
   updateMyOrderStatus,
 } from "@/services/seller-dashboard"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
+import type { OrderStatusStep } from "@/types/customer-order"
 import type { SellerOrderDetail } from "@/types/seller-dashboard"
 import { validTransitions } from "./order-status-dialog"
-import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
+import {
+  formatDateTimeVN as fmtDate,
+  formatPhoneVn,
+  formatPriceVND as currency,
+  isVietnamPhoneLocal,
+  normalizeVietnamPhone,
+} from "@/lib/formatters"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 // ── Status config ──
@@ -78,6 +85,12 @@ const statusConfig: Record<number, StatusCfg> = {
     label: "Chờ thanh toán",
     dotCls: "bg-amber-500",
     badgeCls: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+    icon: <IconClock className="size-4" />,
+  },
+  [OrderStatus.PendingConfirmation]: {
+    label: "Chờ xác nhận",
+    dotCls: "bg-sky-500",
+    badgeCls: "bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
     icon: <IconClock className="size-4" />,
   },
   [OrderStatus.Confirmed]: {
@@ -125,6 +138,7 @@ const statusConfig: Record<number, StatusCfg> = {
 }
 
 const STATUS_STEPS = [
+  OrderStatus.PendingConfirmation,
   OrderStatus.Confirmed,
   OrderStatus.Processing,
   OrderStatus.Shipping,
@@ -132,23 +146,89 @@ const STATUS_STEPS = [
   OrderStatus.Completed,
 ]
 
-function StatusTimeline({ currentStatus, cancelReason }: { currentStatus: number; cancelReason?: string | null }) {
+function StatusTimeline({
+  currentStatus,
+  cancelReason,
+  statusTimeline,
+}: {
+  currentStatus: number
+  cancelReason?: string | null
+  statusTimeline?: OrderStatusStep[] | null
+}) {
   const isCancelled = currentStatus === OrderStatus.Cancelled
   const isRefunded = currentStatus === OrderStatus.Refunded
+  const terminalAt = statusTimeline?.find((s) => s.value === currentStatus)?.reachedAt
 
   if (isCancelled || isRefunded) {
     const cfg = statusConfig[currentStatus]
     const normalizedCancelReason = cancelReason?.trim()
     return (
-      <div className={`flex items-center flex-wrap gap-2.5 px-4 py-3 rounded-xl border ${cfg.badgeCls}`}>
-        <div className={`size-2 rounded-full ${cfg.dotCls}`} />
-        <span className="text-sm font-semibold">{cfg.label}</span>
-        <span className="text-xs opacity-70 ml-1">— Đơn hàng đã kết thúc</span>
-        {isCancelled && (
-          <span className="text-xs opacity-80 ml-1 break-words">
-            — Lý do: {normalizedCancelReason || "Không có lý do hủy được cung cấp."}
-          </span>
-        )}
+      <div className={`flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:flex-wrap gap-x-2.5 px-4 py-3 rounded-xl border ${cfg.badgeCls}`}>
+        <div className="flex items-center flex-wrap gap-2.5 min-w-0">
+          <div className={`size-2 shrink-0 rounded-full ${cfg.dotCls}`} />
+          <span className="text-sm font-semibold">{cfg.label}</span>
+          <span className="text-xs opacity-70">— Đơn hàng đã kết thúc</span>
+          {terminalAt && <span className="text-xs tabular-nums opacity-90">{fmtDate(terminalAt)}</span>}
+          {isCancelled && (
+            <span className="text-xs opacity-80 break-words w-full sm:w-auto">
+              — Lý do: {normalizedCancelReason || "Không có lý do hủy được cung cấp."}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const mainFromApi = statusTimeline?.filter((s) => s.value >= 0 && s.value <= 6) ?? []
+  if (mainFromApi.length > 0) {
+    return (
+      <div className="flex items-center gap-0 overflow-x-auto min-w-0">
+        {mainFromApi.map((step, idx) => {
+          const cfg = statusConfig[step.value] ?? {
+            label: step.displayName,
+            dotCls: "bg-zinc-500",
+            badgeCls: "",
+            icon: <IconPackage className="size-4" />,
+          }
+          const isLast = idx === mainFromApi.length - 1
+          const isDone = step.state === "completed"
+          const isCurrent = step.state === "current"
+          const showTime = (isDone || isCurrent) && step.reachedAt
+          return (
+            <React.Fragment key={step.value}>
+              <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-[72px] max-w-[100px]">
+                <div
+                  className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                    isDone
+                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      : isCurrent
+                        ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30"
+                        : "bg-muted/50 border-muted-foreground/20 text-muted-foreground/40"
+                  }`}
+                >
+                  {isDone ? <IconCheck className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                </div>
+                <span
+                  className={`text-[10px] font-semibold text-center leading-tight ${
+                    isDone ? "text-emerald-600 dark:text-emerald-400" : isCurrent ? "text-primary" : "text-muted-foreground/50"
+                  }`}
+                >
+                  {step.displayName || cfg.label}
+                </span>
+                {showTime ? (
+                  <span className="text-[9px] text-center leading-tight text-muted-foreground tabular-nums max-w-full">
+                    {fmtDate(step.reachedAt!)}
+                  </span>
+                ) : null}
+              </div>
+              {!isLast && (
+                <div
+                  className={`flex-1 h-0.5 mb-5 mx-1 rounded-full min-w-[8px] ${isDone ? "bg-emerald-400" : "bg-muted-foreground/15"}`}
+                />
+              )}
+            </React.Fragment>
+          )
+        })}
       </div>
     )
   }
@@ -256,13 +336,23 @@ export function OrderDetailView({ orderId }: Props) {
     setUpdating(true)
     try {
       let trackingCodeToSave: string | undefined = undefined
+      const deliveryPhone = order.shipPhone ?? order.customerPhone
 
-      // Xử lý tạo đơn GHN trước khi update backend
       if (selectedStatus === OrderStatus.Processing) {
         if (!order.shippingAddress) {
            toast.error( "Đơn hàng này thiếu thông tin địa chỉ để báo sang GHN");
            setUpdating(false);
            return;
+        }
+
+        const toPhone = normalizeVietnamPhone(deliveryPhone)
+        if (!isVietnamPhoneLocal(toPhone)) {
+          toast.error(
+            "Thiếu số điện thoại người nhận hợp lệ. GHN bắt buộc có SĐT (kiểm tra SĐT giao hàng trên đơn).",
+            { id: "ghn-toast" },
+          )
+          setUpdating(false)
+          return
         }
 
         toast.loading("Đang đẩy vận đơn sang phần mềm GHN...", { id: "ghn-toast" })
@@ -271,8 +361,7 @@ export function OrderDetailView({ orderId }: Props) {
         
         try {
           const { districtId, wardCode } = await parseAddressToGHNIds(order.shippingAddress)
-          const fallbackWeight = (order.items?.length || 1) * 500;
-
+          const fallbackWeight = order.items?.length ? order.items.length * 500 : 500;
           const ghnRes = await ghnService.createOrder({
             payment_type_id: 2,
             required_note: 'CHOXEMHANGKHONGTHU',
@@ -281,7 +370,7 @@ export function OrderDetailView({ orderId }: Props) {
             width: 10,
             height: 10,
             to_name: order.customerName || "Khách Hàng",
-            to_phone: order.customerPhone || "0987654321",
+            to_phone: toPhone,
             to_address: order.shippingAddress,
             to_ward_code: wardCode,
             to_district_id: districtId,
@@ -321,6 +410,9 @@ export function OrderDetailView({ orderId }: Props) {
       setUpdating(false)
     }
   }
+
+  const deliveryDisplayPhone = order
+    ? formatPhoneVn(order.shipPhone, "—") : "—"
 
   const cfg = order ? statusConfig[order.status] : null
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
@@ -374,11 +466,19 @@ export function OrderDetailView({ orderId }: Props) {
         ) : order ? (
           <>
             {isEndedOrder ? (
-              <StatusTimeline currentStatus={order.status} cancelReason={order.cancelReason} />
+              <StatusTimeline
+                currentStatus={order.status}
+                cancelReason={order.cancelReason}
+                statusTimeline={order.statusTimeline}
+              />
             ) : (
               <Card className="rounded shadow-sm overflow-hidden">
                 <CardContent className="p-4 sm:p-5">
-                  <StatusTimeline currentStatus={order.status} cancelReason={order.cancelReason} />
+                  <StatusTimeline
+                    currentStatus={order.status}
+                    cancelReason={order.cancelReason}
+                    statusTimeline={order.statusTimeline}
+                  />
                 </CardContent>
               </Card>
             )}
@@ -398,7 +498,7 @@ export function OrderDetailView({ orderId }: Props) {
                 </div>
                 <div>
                   <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Trạng thái thanh toán</p>
-                  <p className="mt-1 text-sm font-semibold">{paid ? "Đã xử lý" : "Chưa thanh toán"}</p>
+                  <p className="mt-1 text-sm font-semibold">{paid ? "Đã thanh toán" : "Chưa thanh toán"}</p>
                 </div>
                 <div>
                   <p className="text-[11px] tracking-wide font-semibold text-muted-foreground">Dự kiến giao hàng</p>
@@ -492,8 +592,8 @@ export function OrderDetailView({ orderId }: Props) {
                       <IconPhone className="size-3.5" />
                     </div>
                     <div>
-                      <p className="text-[11px] text-muted-foreground">Số điện thoại  </p>
-                      <p className="text-sm font-medium tabular-nums">{order.customerPhone ?? "—"}</p>
+                      <p className="text-[11px] text-muted-foreground">Số điện thoại người nhận</p>
+                      <p className="text-sm font-medium tabular-nums">{deliveryDisplayPhone}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
@@ -538,7 +638,7 @@ export function OrderDetailView({ orderId }: Props) {
                   </div>
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>Phí vận chuyển</span>
-                    <span className="font-medium tabular-nums">{currency(order.providerShippingFee)}</span>
+                    <span className="font-medium tabular-nums">{currency(order.shippingFee)}</span>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">

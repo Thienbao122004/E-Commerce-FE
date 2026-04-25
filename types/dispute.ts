@@ -74,13 +74,20 @@ export type DisputeAffectedItem = {
   lineTotal: number
 }
 
-/** Trần hoàn tiền khi admin duyệt: min(yêu cầu, tổng đơn) — nếu không có orderTotal thì chỉ so với yêu cầu. */
+/** Trần hoàn tiền khi admin duyệt — đồng bộ ApproveRefundInternalAsync trong BE:
+ *  1. base = requestedAmount > 0 ? requestedAmount : orderTotal
+ *  2. Nếu lineSum (tổng dòng hàng khiếu nại) > 0 thì ceiling = min(base, lineSum) */
 export function disputeRefundCeiling(d: {
   requestedAmount: number
   orderTotal?: number
+  affectedItems?: DisputeAffectedItem[]
 }): number {
-  if (d.requestedAmount > 0) return d.requestedAmount
-  return d.orderTotal ?? 0
+  const base = d.requestedAmount > 0 ? d.requestedAmount : (d.orderTotal ?? 0)
+  const lineSum =
+    d.affectedItems && d.affectedItems.length > 0
+      ? d.affectedItems.reduce((s, i) => s + i.lineTotal, 0)
+      : 0
+  return lineSum > 0 ? Math.min(base, lineSum) : base
 }
 
 export type AdminDispute = {

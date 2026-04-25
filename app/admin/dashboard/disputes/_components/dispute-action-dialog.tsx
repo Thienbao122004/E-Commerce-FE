@@ -34,6 +34,12 @@ export function DisputeActionDialog({
     }
   }, [dispute, dialogType])
 
+  const ceiling = dispute ? disputeRefundCeiling(dispute) : 0
+  const lineSum =
+    dispute?.affectedItems && dispute.affectedItems.length > 0
+      ? dispute.affectedItems.reduce((s, i) => s + i.lineTotal, 0)
+      : 0
+
   const handleConfirm = () => {
     if (dialogType === "approve") {
       const trimmed = approvedAmount.trim()
@@ -65,21 +71,33 @@ export function DisputeActionDialog({
                 value={approvedAmount}
                 onChange={(e) => setApprovedAmount(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Yêu cầu: {dispute ? formatPriceVND(dispute.requestedAmount) : ""}
+              <p className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                <span className="block">Yêu cầu: {dispute ? formatPriceVND(dispute.requestedAmount) : ""}</span>
                 {dispute && dispute.requestedAmount <= 0 && dispute.orderTotal != null && (
-                  <span className="block mt-0.5">
+                  <span className="block">
                     Tối đa theo đơn: {formatPriceVND(dispute.orderTotal)}
+                  </span>
+                )}
+                {lineSum > 0 && (
+                  <span className="block text-amber-600">
+                    Trần theo dòng hàng khiếu nại: {formatPriceVND(lineSum)}
+                    {lineSum < (dispute?.requestedAmount ?? Infinity) && " (thấp hơn yêu cầu — BE sẽ dùng giá trị này)"}
                   </span>
                 )}
               </p>
               {dispute &&
                 approvedAmount.trim() !== "" &&
                 !Number.isNaN(Number(approvedAmount)) &&
-                Number(approvedAmount) > disputeRefundCeiling(dispute) && (
+                Number(approvedAmount) > ceiling && (
                 <p className="text-xs text-red-500 mt-1">
                   Số tiền duyệt không được vượt quá{" "}
-                  {dispute.requestedAmount > 0 ? "số tiền yêu cầu" : "tổng đơn hàng"}
+                  {dispute.requestedAmount > 0
+                    ? lineSum > 0 && lineSum < dispute.requestedAmount
+                      ? "tổng giá trị dòng hàng khiếu nại"
+                      : "số tiền yêu cầu"
+                    : lineSum > 0
+                      ? "tổng giá trị dòng hàng khiếu nại"
+                      : "tổng đơn hàng"}
                 </p>
               )}
             </div>

@@ -76,9 +76,12 @@ function SellerProductsContent({ onReady }: { onReady?: (reload: () => void, loa
       width: "w-[160px]",
       options: [
         { value: "all", label: "Tất cả trạng thái" },
+        { value: String(ProductStatus.PendingApproval), label: "Chờ duyệt" },
         { value: String(ProductStatus.Active), label: "Đang bán" },
         { value: String(ProductStatus.Draft), label: "Nháp" },
         { value: String(ProductStatus.Hidden), label: "Đã ẩn" },
+        { value: String(ProductStatus.OutOfStock), label: "Hết hàng" },
+        { value: String(ProductStatus.Removed), label: "Đã gỡ" },
       ],
     },
   ]

@@ -12,11 +12,12 @@ import type { SellerOrder } from "@/types/seller-dashboard"
 import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
-import { formatDateVN as formatDate, formatPriceVND as currency } from "@/lib/formatters"
+import { formatDateVN as formatDate, formatPhoneVn, formatPriceVND as currency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
 const statusColors: Record<number, string> = {
   [OrderStatus.PendingPayment]: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  [OrderStatus.PendingConfirmation]: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
   [OrderStatus.Confirmed]: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   [OrderStatus.Processing]: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   [OrderStatus.Shipping]: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
@@ -131,8 +132,10 @@ export function OrderTable({
                     <TableCell>
                       <div>
                         <p className="font-medium text-sm">{order.customerName ?? "Chưa rõ"}</p>
-                        {order.customerPhone && (
-                          <p className="text-xs text-muted-foreground">{order.customerPhone}</p>
+                        {(order.shipPhone ?? order.customerPhone) && (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {formatPhoneVn(order.shipPhone ?? order.customerPhone)}
+                          </p>
                         )}
                       </div>
                     </TableCell>

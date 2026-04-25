@@ -6,9 +6,6 @@ export interface ShopInfo {
   shopLogo: string | null
   verificationStatus?: number   // 0=pending, 1=approved, 2=rejected
   rejectionReason?: string | null
-  /** Danh mục gốc khi đăng ký — giới hạn sản phẩm cùng nhánh */
-  primaryCategoryId?: number | null
-  primaryCategoryName?: string | null
 }
 
 export interface UserProfileResponse {
@@ -84,9 +81,7 @@ export interface RegisterSellerRequest {
   city: string
   businessLicenseNumber?: string | null
   taxCode?: string | null
-  businessType: 'individual' | 'company' | 'household'
-  /** ID danh mục cấp 1 (gốc) trên sàn — shop chỉ được bán trong nhánh này */
-  primaryCategoryId: number
+  businessType?: 'individual' | 'company' | 'household' | null
   bankName?: string | null
   bankAccountNumber?: string | null
   bankAccountName?: string | null

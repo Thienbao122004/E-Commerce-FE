@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
-import { formatDateTimeVN as fmtDate } from "@/lib/formatters"
+import { formatDateTimeVN as fmtDate, formatPhoneVn } from "@/lib/formatters"
 import { fetchUserById, suspendUser, unsuspendUser, fetchUserAuditLogs } from "@/services/users"
 import {
   UserStatus,
@@ -115,7 +115,7 @@ export default function UserDetailPage() {
                     {user.phone && (
                       <div className="flex items-start gap-3">
                         <IconPhone className="size-4 mt-0.5 text-muted-foreground" />
-                        <div><p className="text-sm">{user.phone}</p><p className="text-xs text-muted-foreground">SĐT</p></div>
+                        <div><p className="text-sm tabular-nums">{formatPhoneVn(user.phone)}</p><p className="text-xs text-muted-foreground">SĐT</p></div>
                       </div>
                     )}
                     <Separator />

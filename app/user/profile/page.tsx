@@ -23,6 +23,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp'
 import { toast } from 'sonner'
+import { isVietnamPhoneLocal, normalizeVietnamPhone } from '@/lib/phone-vn'
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split('@')
@@ -88,7 +89,7 @@ export default function ProfilePage() {
       if (res.success && res.data) {
         setProfile(res.data)
         setFullName(res.data.fullName ?? '')
-        setPhone(res.data.phone ?? '')
+        setPhone(normalizeVietnamPhone(res.data.phone) || '')
       }
     } catch {
       toast.error('Không thể tải thông tin hồ sơ')
@@ -118,9 +119,15 @@ export default function ProfilePage() {
         setAvatarFile(null)
       }
 
+      const phoneNorm = normalizeVietnamPhone(phone)
+      if (phone.trim() && !isVietnamPhoneLocal(phoneNorm)) {
+        toast.error('Số điện thoại không hợp lệ (dùng đầu 0, 10–11 số)')
+        return
+      }
+
       const res = await profileService.updateProfile({
         fullName: fullName || null,
-        phone: phone || null,
+        phone: phoneNorm || null,
       })
       if (res.success) {
         await refreshProfile()
@@ -400,7 +407,7 @@ export default function ProfilePage() {
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Nhập số điện thoại"
+                  placeholder="0901 234 567"
                   className="flex-1"
                 />
               </div>

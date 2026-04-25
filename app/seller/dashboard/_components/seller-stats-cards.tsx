@@ -32,6 +32,9 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
     (o) =>
       o.status === OrderStatus.Processing
   ).length
+  const pendingConfirmOrders = orders.filter(
+    (o) => o.status === OrderStatus.PendingConfirmation
+  ).length
   const confirmedOrders = orders.filter(
     (o) => o.status === OrderStatus.Confirmed).length
   const processingOrders = orders.filter(
@@ -109,6 +112,10 @@ export function SellerStatsCards({ stats, wallet, orders, loading }: Props) {
         iconColor="text-blue-500"
         footer={
           <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400 font-medium">
+              <IconClock className="size-3.5" />
+              Chờ xác nhận: {fmt(pendingConfirmOrders)} đơn
+            </div>
             <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium">
               <IconCircleCheck className="size-3.5" />
               Đã xác nhận: {fmt(confirmedOrders)} đơn

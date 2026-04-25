@@ -1,3 +1,27 @@
+/** JSON (camelCase) từ API — bản lưu tại thời điểm duyệt trước. */
+export type ProductApprovedSnapshot = {
+  capturedAtUtc?: string
+  name: string
+  description?: string | null
+  basePrice: number
+  categoryId?: number | null
+  categoryName?: string | null
+  imageUrls: string[]
+  tagIds?: number[]
+  tagNames: string[]
+  materialIds?: string[]
+  materialNames: string[]
+  baseInventoryQuantity?: number | null
+  variants: ProductModerationVariantRow[]
+}
+
+export type ProductModerationVariantRow = {
+  variantName: string
+  sku?: string | null
+  price?: number | null
+  stock: number
+  attributes?: string | null
+}
 
 export type ProductModeration = {
   id: string
@@ -13,6 +37,13 @@ export type ProductModeration = {
   createdAt: string
   updatedAt: string
   imageUrls: string[]
+  description?: string | null
+  /** Bản cũ (lần duyệt trước), để so sánh với bản mới. */
+  lastApprovedSnapshotJson?: string | null
+  tagNames?: string[]
+  materialNames?: string[]
+  baseInventoryQuantity?: number | null
+  variants?: ProductModerationVariantRow[]
 }
 
 export type ProductListResponse = {
@@ -42,6 +73,8 @@ export const ProductStatus = {
   Hidden: 2,
   OutOfStock: 3,
   Removed: 4,
+  /** Chờ admin duyệt (sau khi seller tạo/cập nhật) */
+  PendingApproval: 5,
 } as const
 
 export const ProductStatusLabels: Record<number, string> = {
@@ -50,6 +83,7 @@ export const ProductStatusLabels: Record<number, string> = {
   [ProductStatus.Hidden]: "Đã ẩn",
   [ProductStatus.OutOfStock]: "Hết hàng",
   [ProductStatus.Removed]: "Đã gỡ",
+  [ProductStatus.PendingApproval]: "Chờ duyệt",
 }
 
 export const ProductStatusColors: Record<number, string> = {
@@ -58,4 +92,5 @@ export const ProductStatusColors: Record<number, string> = {
   [ProductStatus.Hidden]: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
   [ProductStatus.OutOfStock]: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
   [ProductStatus.Removed]: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  [ProductStatus.PendingApproval]: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200",
 }

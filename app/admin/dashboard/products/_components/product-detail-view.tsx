@@ -10,6 +10,8 @@ import {
   IconCurrencyDollar,
   IconCalendar,
   IconPackage,
+  IconCircleCheck,
+  IconBan,
 } from "@tabler/icons-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +24,12 @@ import {
 } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ActionDialog } from "./action-dialog"
+import {
+  ProductModerationDiff,
+  tryParseProductSnapshotJson,
+} from "./product-moderation-diff"
 
 type Props = {
   product: ProductModeration
@@ -32,6 +39,15 @@ type Props = {
   onHide: (id: string, reason: string) => Promise<boolean>
   onUnhide: (id: string) => Promise<boolean>
   onRemove: (id: string, reason: string) => Promise<boolean>
+  /** Duyệt sản phẩm chờ duyệt (PendingApproval → Active) */
+  onApprove?: (
+    id: string
+  ) => Promise<{ success: boolean; product?: ProductModeration | null }>
+  /** Từ chối duyệt (PendingApproval → Draft, có lý do) */
+  onReject?: (
+    id: string,
+    reason: string
+  ) => Promise<{ success: boolean; product?: ProductModeration | null }>
   onProductUpdated: (product: ProductModeration | null) => void
 }
 
@@ -43,12 +59,19 @@ export function ProductDetailView({
   onHide,
   onUnhide,
   onRemove,
+  onApprove,
+  onReject,
   onProductUpdated,
 }: Props) {
   const [selectedImage, setSelectedImage] = React.useState(0)
   const [dialogState, setDialogState] = React.useState<{
-    type: "hide" | "remove" | "unhide" | null
+    type: "hide" | "remove" | "unhide" | "reject" | null
   }>({ type: null })
+
+  const lastApprovedSnapshot = React.useMemo(
+    () => tryParseProductSnapshotJson(product.lastApprovedSnapshotJson),
+    [product.lastApprovedSnapshotJson]
+  )
 
   React.useEffect(() => { setSelectedImage(0) }, [product.id])
 
@@ -61,12 +84,49 @@ export function ProductDetailView({
       ok = await onUnhide(product.id)
     } else if (dialogState.type === "remove") {
       ok = await onRemove(product.id, reason)
+    } else if (dialogState.type === "reject" && onReject) {
+      const res = await onReject(product.id, reason)
+      if (res.success) {
+        if (res.product) onProductUpdated(res.product)
+        ok = true
+      }
     }
     if (ok) setDialogState({ type: null })
   }
 
+  const handleApprove = async () => {
+    if (!onApprove) return
+    const res = await onApprove(product.id)
+    if (res.success) {
+      if (res.product) onProductUpdated(res.product)
+    }
+  }
+
   const renderActions = () => (
     <div className="flex items-center gap-1 flex-wrap">
+      {product.status === ProductStatus.PendingApproval && onApprove ? (
+        <Button
+          size="sm"
+          className="h-8 text-xs bg-[var(--color-primary)] text-white shadow-sm hover:bg-[var(--color-primary-hover)]"
+          onClick={handleApprove}
+          disabled={actionLoading}
+        >
+          <IconCircleCheck className="mr-1 size-3.5" />
+          Duyệt
+        </Button>
+      ) : null}
+      {product.status === ProductStatus.PendingApproval && onReject ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          onClick={() => setDialogState({ type: "reject" })}
+          disabled={actionLoading}
+        >
+          <IconBan className="mr-1 size-3.5" />
+          Từ chối
+        </Button>
+      ) : null}
       {product.status === ProductStatus.Hidden ? (
         <Button
           variant="outline" size="sm"
@@ -187,6 +247,14 @@ export function ProductDetailView({
                     </span>
                   </div>
                   <p className="font-semibold text-lg leading-tight">{product.name}</p>
+                  {product.description ? (
+                    <div className="pt-0.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Mô tả</p>
+                      <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-1 max-h-48 overflow-y-auto">
+                        {product.description}
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <IconCurrencyDollar className="size-4 text-green-600" />
@@ -217,6 +285,27 @@ export function ProductDetailView({
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thao tác kiểm duyệt</h3>
                   <p className="text-sm text-muted-foreground">Quản lý trạng thái hiển thị sản phẩm trên hệ thống</p>
                   <div className="flex flex-col gap-2 pt-1">
+                    {product.status === ProductStatus.PendingApproval && onApprove ? (
+                      <Button
+                        className="w-full justify-start bg-[var(--color-primary)] text-white shadow-sm hover:bg-[var(--color-primary-hover)]"
+                        onClick={handleApprove}
+                        disabled={actionLoading}
+                      >
+                        <IconCircleCheck className="mr-2 size-4" />
+                        Duyệt và mở bán
+                      </Button>
+                    ) : null}
+                    {product.status === ProductStatus.PendingApproval && onReject ? (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setDialogState({ type: "reject" })}
+                        disabled={actionLoading}
+                      >
+                        <IconBan className="mr-2 size-4" />
+                        Từ chối (về nháp)
+                      </Button>
+                    ) : null}
                     {product.status === ProductStatus.Hidden ? (
                       <Button
                         variant="outline"
@@ -251,6 +340,24 @@ export function ProductDetailView({
               </div>
             </div>
           )}
+
+          {!detailLoading && product.status === ProductStatus.PendingApproval ? (
+            lastApprovedSnapshot ? (
+              <ProductModerationDiff
+                product={product}
+                snapshot={lastApprovedSnapshot}
+              />
+            ) : (
+              <Alert className="border-amber-500/40 bg-amber-500/5">
+                <AlertTitle>Chưa có bản đã duyệt để so sánh</AlertTitle>
+                <AlertDescription>
+                  Hệ thống chưa lưu “ảnh chụp” lần duyệt trước (lần đăng/chỉnh sửa đầu hoặc dữ liệu
+                  từ phiên bản cũ). Bạn vẫn thấy đủ nội dung hiện tại ở trên; sau lần duyệt tiếp
+                  theo, phần so sánh cũ ↔ mới sẽ hoạt động.
+                </AlertDescription>
+              </Alert>
+            )
+          ) : null}
         </div>
       </div>
 
@@ -277,6 +384,15 @@ export function ProductDetailView({
         onOpenChange={(v) => !v && setDialogState({ type: null })}
         title="Gỡ sản phẩm vĩnh viễn"
         description={`Thao tác này sẽ gỡ "${product.name}" (shop: ${product.shopName}) khỏi nền tảng. Hành động này không thể hoàn tác.`}
+        loading={actionLoading}
+        onConfirm={handleAction}
+        requireReason
+      />
+      <ActionDialog
+        open={dialogState.type === "reject"}
+        onOpenChange={(v) => !v && setDialogState({ type: null })}
+        title="Từ chối duyệt"
+        description="Sản phẩm sẽ về nháp. Nhập lý do (gửi tới shop)."
         loading={actionLoading}
         onConfirm={handleAction}
         requireReason

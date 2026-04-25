@@ -12,6 +12,8 @@ export interface CartItem {
   stockAvailable: number
   shopId?: string | null
   shopName?: string | null
+  /** Slug storefront; ưu tiên dùng cho URL /shop/{slug}, không dùng guid. */
+  shopSlug?: string | null
   ghnShopId?: number | null
   fromDistrictId?: number | null
   fromWardCode?: string | null
@@ -40,7 +42,6 @@ export interface ShopShippingOption {
   shopId: string
   shippingProvider?: string
   shippingServiceId?: string
-  providerShippingFee: number
   shippingFee: number
   estimatedDeliveryDate?: string | null
 }

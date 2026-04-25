@@ -85,10 +85,17 @@ export default function DisputesPage() {
       }
       if (amt <= 0) { toast.error("Số tiền duyệt phải lớn hơn 0"); return }
       if (amt > ceiling) {
+        const lineSum = d.affectedItems && d.affectedItems.length > 0
+          ? d.affectedItems.reduce((s, i) => s + i.lineTotal, 0)
+          : 0
         toast.error(
           d.requestedAmount > 0
-            ? "Số tiền duyệt không được vượt quá số tiền yêu cầu"
-            : "Số tiền duyệt không được vượt quá tổng đơn hàng"
+            ? lineSum > 0 && lineSum < d.requestedAmount
+              ? "Số tiền duyệt không được vượt quá tổng giá trị dòng hàng khiếu nại"
+              : "Số tiền duyệt không được vượt quá số tiền yêu cầu"
+            : lineSum > 0
+              ? "Số tiền duyệt không được vượt quá tổng giá trị dòng hàng khiếu nại"
+              : "Số tiền duyệt không được vượt quá tổng đơn hàng"
         )
         return
       }

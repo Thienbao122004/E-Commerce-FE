@@ -23,6 +23,8 @@ export interface StorefrontProduct {
   imageUrls: string[]
   createdAt: string
   soldCount: number
+  averageRating?: number
+  reviewCount?: number
 }
 
 export interface StorefrontProductDetail extends StorefrontProduct {

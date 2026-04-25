@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { vietnamProvincesService } from '@/services/vietnam-provinces'
 import type { Province, District, Ward } from '@/types/vietnam-provinces'
 import { Loader2 } from 'lucide-react'
+import { formatPhoneVn, isVietnamPhoneLocal, normalizeVietnamPhone } from '@/lib/phone-vn'
 
 interface AddressFormData {
   label: string
@@ -95,8 +96,8 @@ export function CheckoutAddressModal({
       setPhoneError('')
       return
     }
-    const phoneRegex = /^(0|\+84)[0-9]{9,10}$/
-    if (!phoneRegex.test(value.trim())) {
+    const n = normalizeVietnamPhone(value)
+    if (!isVietnamPhoneLocal(n)) {
       setPhoneError('Số điện thoại không hợp lệ')
     } else {
       setPhoneError('')
@@ -231,7 +232,7 @@ export function CheckoutAddressModal({
     setForm({
       label: addr.label ?? '',
       fullName: addr.fullName ?? '',
-      phone: addr.phone ?? '',
+      phone: normalizeVietnamPhone(addr.phone) || (addr.phone ?? ''),
       addressLine1: addr.addressLine1,
       ward: addr.ward ?? '',
       district: addr.district ?? '',
@@ -289,8 +290,8 @@ export function CheckoutAddressModal({
       toast.error('Vui lòng nhập số điện thoại')
       return
     }
-    const phoneRegex = /^(0|\+84)[0-9]{9,10}$/
-    if (!phoneRegex.test(form.phone.trim())) {
+    const phoneNorm = normalizeVietnamPhone(form.phone)
+    if (!isVietnamPhoneLocal(phoneNorm)) {
       setPhoneError('Số điện thoại không hợp lệ')
       return
     }
@@ -317,7 +318,7 @@ export function CheckoutAddressModal({
         const data: UpdateAddressRequest = {
           label: form.label || null,
           fullName: form.fullName,
-          phone: form.phone,
+          phone: phoneNorm,
           addressLine1: form.addressLine1,
           ward: form.ward || null,
           district: form.district || null,
@@ -337,7 +338,7 @@ export function CheckoutAddressModal({
         const data: AddAddressRequest = {
           label: form.label || undefined,
           fullName: form.fullName,
-          phone: form.phone,
+          phone: phoneNorm,
           addressLine1: form.addressLine1,
           ward: form.ward || undefined,
           district: form.district || undefined,
@@ -416,7 +417,7 @@ export function CheckoutAddressModal({
                           {addr.fullName}
                         </span>
                         <Separator orientation="vertical" className="h-3" />
-                        <span className="text-sm text-muted-foreground">{addr.phone}</span>
+                        <span className="text-sm text-muted-foreground tabular-nums">{formatPhoneVn(addr.phone)}</span>
                         {addr.label && (
                           <Badge variant="secondary" className="text-xs">
                             {addr.label}
@@ -488,7 +489,7 @@ export function CheckoutAddressModal({
                       if (phoneError) validatePhone(e.target.value)
                     }}
                     onBlur={(e) => validatePhone(e.target.value)}
-                    placeholder="(+84) 901 234 567"
+                    placeholder="0901 234 567"
                     className={phoneError ? 'border-destructive focus-visible:ring-destructive' : ''}
                   />
                   {phoneError && (

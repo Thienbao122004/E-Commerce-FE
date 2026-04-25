@@ -49,9 +49,6 @@ import {
   aiCommitProductTagSession,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
-import { fetchMyShop } from "@/services/seller-dashboard"
-import type { SellerShopInfo } from "@/types/seller-dashboard"
-import { ShopPrimaryCategoryBanner } from "@/components/seller/shop-primary-category-banner"
 import { supabase } from "@/lib/supabase"
 import { groupMaterialsForPicker, groupTagsForPicker } from "@/lib/seller-picker-groups"
 import {
@@ -84,21 +81,6 @@ function flattenCategoryTree(nodes: StorefrontCategory[], prefix = ""): ManualCa
     }
   }
   return out
-}
-
-/** Tìm nút gốc theo id trong cây (để lọc danh mục theo ngành đăng ký seller) */
-function findCategorySubtree(
-  tree: StorefrontCategory[],
-  rootId: number,
-): StorefrontCategory[] | null {
-  for (const n of tree) {
-    if (n.id === rootId) return [n]
-    if (n.subcategories?.length) {
-      const sub = findCategorySubtree(n.subcategories, rootId)
-      if (sub) return sub
-    }
-  }
-  return null
 }
 
 function SectionLabel({
@@ -389,9 +371,6 @@ export default function CreateProductPage() {
   const [tagSuggestions, setTagSuggestions] = React.useState<TagSuggestion[]>([])
   const [matSuggestions, setMatSuggestions] = React.useState<MaterialSuggestion[]>([])
   const [manualCategoryRows, setManualCategoryRows] = React.useState<ManualCategoryRow[]>([])
-  const [allowedProductCategoryIds, setAllowedProductCategoryIds] = React.useState<Set<
-    number
-  > | null>(null)
   const [manualCatQuery, setManualCatQuery] = React.useState("")
   const [debouncedManualCatQuery, setDebouncedManualCatQuery] = React.useState("")
 
@@ -415,10 +394,6 @@ export default function CreateProductPage() {
   const [selMatIds, setSelMatIds] = React.useState<string[]>([])
   const [nameTouched, setNameTouched] = React.useState(false)
   const [priceTouched, setPriceTouched] = React.useState(false)
-
-  /** Shop & ngành đăng ký — hiển thị banner "bán mặt hàng gì" */
-  const [myShop, setMyShop] = React.useState<SellerShopInfo | null>(null)
-  const [shopMetaLoading, setShopMetaLoading] = React.useState(true)
 
   const hasInput = name.trim().length > 0 || description.trim().length > 0
   const analysisReqRef = React.useRef(0)
@@ -486,46 +461,15 @@ export default function CreateProductPage() {
   React.useEffect(() => {
     let mounted = true
     ;(async () => {
-      setShopMetaLoading(true)
       try {
-        const [treeRes, shopRes] = await Promise.all([getCategoryTree(), fetchMyShop()])
+        const treeRes = await getCategoryTree()
         if (!mounted) return
-        if (shopRes.success && shopRes.data) {
-          setMyShop(shopRes.data)
-        } else {
-          setMyShop(null)
-        }
         if (!treeRes.success) {
           return
         }
         const fullTree = treeRes.tree ?? []
-        const rootId =
-          shopRes.success && shopRes.data?.primaryCategoryId != null
-            ? Number(shopRes.data.primaryCategoryId)
-            : null
-        if (rootId != null) {
-          const sub = findCategorySubtree(fullTree, rootId)
-          if (sub?.length) {
-            const rows = flattenCategoryTree(sub)
-            const allowed = new Set(rows.map((r) => r.id))
-            setManualCategoryRows(rows)
-            setAllowedProductCategoryIds(allowed)
-          } else {
-            setManualCategoryRows(flattenCategoryTree(fullTree))
-            setAllowedProductCategoryIds(null)
-            toast.error(
-              "Không tìm thấy danh mục ngành hàng đã đăng ký. Vui lòng liên hệ quản trị viên.",
-            )
-          }
-        } else {
-          setManualCategoryRows(flattenCategoryTree(fullTree))
-          setAllowedProductCategoryIds(null)
-        }
-      } catch {
-        if (mounted) setMyShop(null)
-      } finally {
-        if (mounted) setShopMetaLoading(false)
-      }
+        setManualCategoryRows(flattenCategoryTree(fullTree))
+      } catch { /* ignore */ }
     })()
     return () => {
       mounted = false
@@ -617,7 +561,7 @@ export default function CreateProductPage() {
     return (await Promise.all(batch)).filter((u): u is string => u != null && u.length > 0)
   }, [imageUrls, blobUrlToDataUrl])
 
-  /** Áp dụng kết quả phân tích AI (ECommerceAI đã thu hẹp danh mục theo primary_category_id shop — không cần lọc thêm ở FE). */
+  /** Áp dụng gợi ý từ AI; seller chốt danh mục / tag / chất liệu. Sản phẩm vẫn cần admin duyệt. */
   const applyAnalysisResult = React.useCallback((
     categories: CategorySuggestion[],
     tags: TagSuggestion[],
@@ -643,10 +587,6 @@ export default function CreateProductPage() {
   }, [])
 
   const runAiAnalysis = React.useCallback(async () => {
-    if (shopMetaLoading) {
-      toast.info("Đang tải thông tin ngành hàng shop, vui lòng chờ vài giây rồi phân tích lại.")
-      return
-    }
     const hasImages = imageUrls.length > 0
     if (!hasInput && !hasImages) {
       toast.info("Nhập thông tin hoặc thêm ảnh trước khi phân tích")
@@ -780,19 +720,9 @@ export default function CreateProductPage() {
       setTagLoading(false)
       setImageAnalyzeLoading(false)
     }
-  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult, shopMetaLoading])
+  }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
-    if (
-      allowedProductCategoryIds != null &&
-      allowedProductCategoryIds.size > 0 &&
-      !allowedProductCategoryIds.has(cat.categoryId)
-    ) {
-      toast.error(
-        "Danh mục này không thuộc ngành hàng shop bạn đã đăng ký. Chỉ chọn danh mục trong danh sách bên dưới (cùng nhánh với ngành đã chọn).",
-      )
-      return
-    }
     setSelCategory((prev) => {
       if (prev?.categoryId !== cat.categoryId) {
         setSelTagIds([])
@@ -804,10 +734,9 @@ export default function CreateProductPage() {
 
   const handleSubmit = async () => {
     if (!name.trim() || !price) return
-    
-    if (!selCategory && selMatIds.length ===0 && selTagIds.length ===0) {
-      toast.error("Vui lòng chọn đầy đủ thông tin trước khi đăng bán");
-      return;
+    if (!selCategory?.categoryId) {
+      toast.error("Vui lòng chọn danh mục sản phẩm (thủ công hoặc qua gợi ý AI).")
+      return
     }
 
     setUploadingImages(true)
@@ -957,7 +886,11 @@ export default function CreateProductPage() {
   }, [useVariants, variantRows])
 
   const canSubmit =
-    name.trim().length > 0 && priceRaw > 0 && variantRowsValid && !uploadingImages
+    name.trim().length > 0 &&
+    priceRaw > 0 &&
+    Boolean(selCategory?.categoryId) &&
+    variantRowsValid &&
+    !uploadingImages
   const confidenceBadge = selCategory?.confidenceScore ?? catSuggestions[0]?.confidenceScore
 
   // ── Tag & material toggles ───────────────────────────
@@ -990,8 +923,6 @@ export default function CreateProductPage() {
           <IconChevronRight className="size-3" />
           <span className="text-foreground font-medium">Thêm mới</span>
         </div>
-
-        <ShopPrimaryCategoryBanner shop={myShop} loading={shopMetaLoading} />
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:items-stretch">
 
@@ -1221,7 +1152,7 @@ export default function CreateProductPage() {
                       <p className="text-sm italic text-muted-foreground">Nhấn để nhập mô tả sản phẩm...</p>
                     )}
                     <span className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground group-hover:text-primary transition-colors">
-                      <IconAlignLeft className="size-3" /> Nhấn để chỉnh sậa
+                      <IconAlignLeft className="size-3" /> Nhấn để chỉnh sửa
                     </span>
                   </button>
                 </div>
@@ -1377,7 +1308,7 @@ export default function CreateProductPage() {
                       size="sm"
                       className="h-8 shrink-0 px-3 text-[11px]"
                       onClick={runAiAnalysis}
-                      disabled={shopMetaLoading || catLoading || tagLoading || imageAnalyzeLoading}
+                      disabled={catLoading || tagLoading || imageAnalyzeLoading}
                     >
                       {catLoading || tagLoading || imageAnalyzeLoading ? (
                         <>

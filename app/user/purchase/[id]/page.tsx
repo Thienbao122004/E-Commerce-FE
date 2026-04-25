@@ -22,9 +22,9 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { formatDateVN as formatDate, formatPriceVND as formatPrice } from '@/lib/formatters'
+import { formatDateTimeVN, formatDateVN as formatDate, formatPhoneVn, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
-import { ordersService, type OrderDetail } from '@/services/orders'
+import { ordersService, type OrderDetail, type OrderStatusStep } from '@/services/orders'
 import { createDispute } from '@/services/disputes'
 import { DisputeType } from '@/types/dispute'
 import { EvidenceUploader } from '@/components/common/evidence-uploader'
@@ -53,37 +53,108 @@ const STATUS_LABELS: Record<number, string> = {
   8: 'Đã hoàn tiền',
 }
 
-const STATUS_STEPS = [0, 2, 3, 4, 5, 6] as const
+const STATUS_STEPS = [0, 1, 2, 3, 4, 5, 6] as const
 
 const CANCELLABLE_STATUSES = new Set([0, 1, 2, 3])
 // Có thể khiếu nại: Đã giao (5) hoặc Hoàn thành (6), trong vòng 7 ngày
 const DISPUTE_WINDOW_DAYS = 7
+// NotReceived: Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày — đồng bộ BE CustomerDisputeService
+const NOT_RECEIVED_MIN_DAYS_PROCESSING = 7
+const NOT_RECEIVED_MIN_DAYS_SHIPPING = 5
 const DISPUTE_ALLOWED_STATUSES = new Set([5, 6])
 
+// "Không nhận được hàng" tách riêng thành nút "Báo không nhận được hàng" — không nằm trong dropdown chung
 const DISPUTE_TYPE_OPTIONS = [
   { value: String(DisputeType.Refund), label: 'Hoàn tiền' },
   { value: String(DisputeType.Return), label: 'Trả hàng' },
   { value: String(DisputeType.Damaged), label: 'Hàng hư hỏng' },
-  { value: String(DisputeType.NotReceived), label: 'Không nhận được hàng' },
   { value: String(DisputeType.WrongItem), label: 'Giao sai hàng' },
   { value: String(DisputeType.QualityIssue), label: 'Chất lượng không đảm bảo' },
   { value: String(DisputeType.Other), label: 'Khác' },
 ]
 
-function StatusTimeline({ currentStatus }: { currentStatus: number }) {
+function StatusTimeline({
+  currentStatus,
+  statusTimeline,
+}: {
+  currentStatus: number
+  statusTimeline?: OrderStatusStep[] | null
+}) {
   const isCancelled = currentStatus === 7
   const isRefunded = currentStatus === 8
+  const terminalAt = statusTimeline?.find((s) => s.value === currentStatus)?.reachedAt
 
   if (isCancelled || isRefunded) {
     const statusColor = STATUS_COLORS[currentStatus] || '#6b7280'
     return (
       <div
-        className="flex items-center gap-2.5 rounded-xl border px-4 py-3"
+        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:flex-wrap gap-x-2.5 gap-y-1 rounded-xl border px-4 py-3"
         style={{ borderColor: `${statusColor}55`, backgroundColor: `${statusColor}14`, color: statusColor }}
       >
-        <div className="size-2 rounded-full" style={{ backgroundColor: statusColor }} />
-        <span className="text-sm font-semibold">{STATUS_LABELS[currentStatus] ?? 'Đơn hàng đã kết thúc'}</span>
-        <span className="text-xs opacity-80 ml-1">- Đơn hàng đã kết thúc</span>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="size-2 shrink-0 rounded-full" style={{ backgroundColor: statusColor }} />
+          <span className="text-sm font-semibold">{STATUS_LABELS[currentStatus] ?? 'Đơn hàng đã kết thúc'}</span>
+          <span className="text-xs opacity-80">· Đơn hàng đã kết thúc</span>
+        </div>
+        {terminalAt && (
+          <span className="text-xs tabular-nums opacity-90 sm:ml-1">
+            {formatDateTimeVN(terminalAt)}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  const mainFromApi = statusTimeline?.filter((s) => s.value >= 0 && s.value <= 6) ?? []
+  if (mainFromApi.length > 0) {
+    return (
+      <div className="overflow-x-auto">
+        <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
+          {mainFromApi.map((step, idx) => {
+            const isLast = idx === mainFromApi.length - 1
+            const isDone = step.state === 'completed'
+            const isCurrent = step.state === 'current'
+            const showTime = (isDone || isCurrent) && step.reachedAt
+            return (
+              <div key={step.value} className="contents">
+                <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-[72px] max-w-[100px]">
+                  <div
+                    className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                      isDone
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : isCurrent
+                          ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
+                          : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
+                    }`}
+                  >
+                    {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold text-center leading-tight ${
+                      isDone
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : isCurrent
+                          ? 'text-primary'
+                          : 'text-muted-foreground/50'
+                    }`}
+                  >
+                    {step.displayName || (STATUS_LABELS[step.value] ?? `Bước ${idx + 1}`)}
+                  </span>
+                  {showTime ? (
+                    <span className="text-[9px] text-center leading-tight text-muted-foreground tabular-nums max-w-full">
+                      {formatDateTimeVN(step.reachedAt!)}
+                    </span>
+                  ) : null}
+                </div>
+                {!isLast && (
+                  <div
+                    className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     )
   }
@@ -158,6 +229,8 @@ export default function PurchaseOrderDetailPage() {
   /** Số lượng khiếu nại theo từng order line id (0 = không chọn). */
   const [disputeLineQty, setDisputeLineQty] = useState<Record<string, number>>({})
   const [submittingDispute, setSubmittingDispute] = useState(false)
+  /** true khi dialog mở từ nút "Báo không nhận được hàng" — khóa loại = NotReceived */
+  const [disputeNotReceivedOnly, setDisputeNotReceivedOnly] = useState(false)
 
   // Các trạng thái đơn đã kết thúc — không cần poll
   const FINAL_ORDER_STATUSES = new Set([6, 7, 8]) // Completed, Cancelled, Refunded
@@ -173,8 +246,12 @@ export default function PurchaseOrderDetailPage() {
         return
       }
       setOrder((prev) => {
-        // Chỉ update nếu trạng thái thực sự thay đổi (tránh re-render thừa)
-        if (prev && prev.status === res.order!.status && prev.updatedAt === res.order!.updatedAt) {
+        if (!prev) return res.order!
+        if (
+          prev.status === res.order!.status &&
+          prev.updatedAt === res.order!.updatedAt &&
+          JSON.stringify(prev.statusTimeline ?? null) === JSON.stringify(res.order!.statusTimeline ?? null)
+        ) {
           return prev
         }
         return res.order!
@@ -203,20 +280,59 @@ export default function PurchaseOrderDetailPage() {
     return CANCELLABLE_STATUSES.has(order.status)
   }, [order])
 
-  // Có thể khiếu nại: status Delivered(5)/Completed(6) và trong vòng 7 ngày kể từ updatedAt
-  const canDispute = useMemo(() => {
-    if (!order) return false
-    if (!DISPUTE_ALLOWED_STATUSES.has(order.status)) return false
-    const daysSince = (Date.now() - new Date(order.updatedAt ?? order.createdAt).getTime()) / 86400000
-    return daysSince <= DISPUTE_WINDOW_DAYS
+  // Mốc anchor cho cửa sổ 7 ngày — đồng bộ GetReceiptAnchorUtc trong BE
+  // Dùng lần đầu tiên đơn vào Delivered/Completed (từ statusTimeline), không dùng updatedAt
+  const disputeAnchorDate = useMemo(() => {
+    if (!order) return null
+    const deliveredStep = order.statusTimeline?.find(s => s.value === 5)
+    const completedStep = order.statusTimeline?.find(s => s.value === 6)
+    const candidates = [deliveredStep?.reachedAt, completedStep?.reachedAt]
+      .filter(Boolean)
+      .map(d => new Date(d!).getTime())
+    if (candidates.length > 0) return new Date(Math.min(...candidates))
+    // Fallback khi không có statusTimeline (dữ liệu cũ)
+    return new Date(order.updatedAt ?? order.createdAt)
   }, [order])
 
+  // Có thể khiếu nại loại thông thường: Delivered(5)/Completed(6) trong vòng 7 ngày
+  const canDispute = useMemo(() => {
+    if (!order || !disputeAnchorDate) return false
+    if (!DISPUTE_ALLOWED_STATUSES.has(order.status)) return false
+    return (Date.now() - disputeAnchorDate.getTime()) / 86400000 <= DISPUTE_WINDOW_DAYS
+  }, [order, disputeAnchorDate])
+
+  // Có thể khiếu nại "Không nhận được hàng" — đồng bộ ValidateNotReceivedCreateRules trong BE:
+  //   Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày, Delivered(5) trong 7 ngày kể từ anchor
+  //   Completed(6) KHÔNG cho — khách đã xác nhận nhận hàng rồi
+  const canDisputeNotReceived = useMemo(() => {
+    if (!order) return false
+    if (order.status === 3) { // Processing — cần ≥7 ngày kể từ khi vào trạng thái này
+      const step = order.statusTimeline?.find(s => s.value === 3)
+      const anchor = step?.reachedAt
+        ? new Date(step.reachedAt).getTime()
+        : new Date(order.updatedAt ?? order.createdAt).getTime()
+      return (Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_PROCESSING
+    }
+    if (order.status === 4) { // Shipping — cần ≥5 ngày kể từ khi vào trạng thái này
+      const step = order.statusTimeline?.find(s => s.value === 4)
+      const anchor = step?.reachedAt
+        ? new Date(step.reachedAt).getTime()
+        : new Date(order.updatedAt ?? order.createdAt).getTime()
+      return (Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_SHIPPING
+    }
+    if (order.status === 5 && disputeAnchorDate) { // Delivered — trong 7 ngày (courier đánh dấu giao nhưng khách chưa nhận)
+      return (Date.now() - disputeAnchorDate.getTime()) / 86400000 <= DISPUTE_WINDOW_DAYS
+    }
+    return false
+  }, [order, disputeAnchorDate])
+
   const disputeDeadline = useMemo(() => {
-    if (!order) return null
-    const base = new Date(order.updatedAt ?? order.createdAt)
+    if (!order || !disputeAnchorDate) return null
+    if (!DISPUTE_ALLOWED_STATUSES.has(order.status)) return null
+    const base = new Date(disputeAnchorDate)
     base.setDate(base.getDate() + DISPUTE_WINDOW_DAYS)
     return base
-  }, [order])
+  }, [order, disputeAnchorDate])
 
   /** Backend: confirm only when Delivered (5) → Completed. */
   const canConfirm = order?.status === 5
@@ -229,7 +345,7 @@ export default function PurchaseOrderDetailPage() {
   const shippingFee = useMemo(() => {
     if (!order) return 0
 
-    const raw = order.providerShippingFee ?? order.shippingFee
+    const raw = order.shippingFee
     if (typeof raw === 'number' && Number.isFinite(raw)) {
       return Math.max(0, raw)
     }
@@ -285,12 +401,18 @@ export default function PurchaseOrderDetailPage() {
     router.push(`/shop/${encodeURIComponent(slug)}`)
   }
 
-  const openDisputeDialog = () => {
+  const openDisputeDialog = (notReceivedOnly = false) => {
     if (!order) return
     const init: Record<string, number> = {}
     for (const it of order.items) init[it.id] = 0
     setDisputeLineQty(init)
-    setDisputeForm({ type: String(DisputeType.Damaged), title: '', reason: '', requestedAmount: '' })
+    setDisputeForm({
+      type: notReceivedOnly ? String(DisputeType.NotReceived) : String(DisputeType.Refund),
+      title: '',
+      reason: '',
+      requestedAmount: '',
+    })
+    setDisputeNotReceivedOnly(notReceivedOnly)
     setDisputeEvidenceUrls([])
     setDisputeDialogOpen(true)
   }
@@ -532,7 +654,7 @@ export default function PurchaseOrderDetailPage() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={openDisputeDialog}
+              onClick={() => openDisputeDialog(false)}
               className="cursor-pointer border-orange-300 text-orange-600 hover:bg-orange-50"
             >
               <span className="mr-1">⚠</span>
@@ -542,14 +664,26 @@ export default function PurchaseOrderDetailPage() {
           {!canDispute && DISPUTE_ALLOWED_STATUSES.has(order.status) && (
             <span className="text-xs text-gray-400 self-center">Hết hạn khiếu nại</span>
           )}
+          {canDisputeNotReceived && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => openDisputeDialog(true)}
+              className="cursor-pointer border-orange-300 text-orange-600 hover:bg-orange-50"
+            >
+              <span className="mr-1">⚠</span>
+              Báo không nhận được hàng
+            </Button>
+          )}
         </div>
       </div>
 
       {isEndedOrder ? (
-        <StatusTimeline currentStatus={order.status} />
+        <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
       ) : (
         <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
-          <StatusTimeline currentStatus={order.status} />
+          <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
         </div>
       )}
 
@@ -561,7 +695,9 @@ export default function PurchaseOrderDetailPage() {
           <p className="text-sm" style={{ color: 'var(--color-text-main)' }}>
             {order.shipFullName || 'Không có thông tin người nhận'}
           </p>
-          <p className="text-sm text-muted-foreground">{order.shipPhone || 'Chưa có số điện thoại'}</p>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {order.shipPhone ? formatPhoneVn(order.shipPhone) : 'Chưa có số điện thoại'}
+          </p>
           <p className="text-sm text-muted-foreground">{order.shipAddress || 'Chưa có địa chỉ giao hàng'}</p>
         </div>
 
@@ -705,14 +841,26 @@ export default function PurchaseOrderDetailPage() {
             )}
             <div className="space-y-1.5">
               <Label htmlFor="d-type">Loại khiếu nại <span className="text-red-500">*</span></Label>
-              <Select value={disputeForm.type} onValueChange={handleDisputeTypeChange}>
+              <Select
+                value={disputeForm.type}
+                onValueChange={handleDisputeTypeChange}
+                disabled={disputeNotReceivedOnly}
+              >
                 <SelectTrigger id="d-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DISPUTE_TYPE_OPTIONS.map((opt) => (
+                  {(disputeNotReceivedOnly
+                    ? DISPUTE_TYPE_OPTIONS.filter(o => o.value === String(DisputeType.NotReceived))
+                    : DISPUTE_TYPE_OPTIONS
+                  ).map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {disputeNotReceivedOnly && (
+                <p className="text-xs text-amber-600">
+                  Đơn đang trong trạng thái giao hàng — chỉ có thể tạo khiếu nại «Không nhận được hàng».
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="d-title">Tiêu đề <span className="text-red-500">*</span></Label>

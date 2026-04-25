@@ -10,6 +10,7 @@ import {
   IconGavel,
   IconHelp,
   IconInnerShadowTop,
+  IconClipboardCheck,
   IconList,
   IconListDetails,
   IconMessage2,
@@ -31,6 +32,7 @@ import {
 
 import { NavSellers } from "@/components/nav-sellers"
 import { NavMain } from "@/components/nav-main"
+import { useAdminPendingProductCount } from "@/hooks/use-admin-pending-product-count"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -73,6 +75,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ['admin', 'seller'],
     items: [
       { title: "Tất cả sản phẩm", url: "/dashboard/products", icon: IconList, roles: ['admin', 'seller'] },
+      { title: "Chờ duyệt", url: "/dashboard/products/pending-approval", icon: IconClipboardCheck, roles: ['admin'] },
       { title: "Thêm mới", url: "/dashboard/products/new", icon: IconPlus, roles: ['seller'] },
       { title: "Sản phẩm nổi bật", url: "/dashboard/products/featured", icon: IconStar, roles: ['admin'] },
       { title: "Kho hàng", url: "/dashboard/products/inventory", icon: IconPackage, roles: ['admin', 'seller'] },
@@ -169,6 +172,7 @@ const NAV_SECONDARY = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role } = useAuth()
+  const { count: pendingApprovalCount } = useAdminPendingProductCount(role === "admin")
 
   const prefixUrl = (url: string, basePath: string) => {
     if (url.startsWith('/dashboard') || url.startsWith('/profile')) {
@@ -221,7 +225,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={visibleNavItems} />
+        <NavMain items={visibleNavItems} pendingApprovalCount={pendingApprovalCount} />
         {showSellers && <NavSellers items={SELLERS_ITEMS} />}
         <NavSecondary items={secondaryNavItems} className="mt-auto" />
       </SidebarContent>

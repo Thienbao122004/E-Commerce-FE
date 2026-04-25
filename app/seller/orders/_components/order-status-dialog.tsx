@@ -9,6 +9,7 @@ import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 
 const validTransitions: Record<number, number[]> = {
   [OrderStatus.PendingPayment]: [],
+  [OrderStatus.PendingConfirmation]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
   [OrderStatus.Confirmed]: [OrderStatus.Processing, OrderStatus.Cancelled],
   [OrderStatus.Processing]: [OrderStatus.Shipping, OrderStatus.Cancelled],
   [OrderStatus.Shipping]: [OrderStatus.Delivered],
@@ -33,8 +34,12 @@ export function OrderStatusDialog({ open, onOpenChange, orderId, currentStatus, 
   const [note, setNote] = useState("")
 
   useEffect(() => {
-    if (open) { setNewStatus(transitions[0] ?? null); setNote("") }
-  }, [open])
+    if (open) {
+      const t = validTransitions[currentStatus] ?? []
+      setNewStatus(t[0] ?? null)
+      setNote("")
+    }
+  }, [open, currentStatus])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

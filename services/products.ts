@@ -52,3 +52,13 @@ export function removeProduct(productId: string, reason: string): Promise<Produc
     { reason }
   )
 }
+
+/** POST /api/admin/products/:id/approve — chuyển từ Chờ duyệt → Đang bán */
+export function approveProduct(productId: string): Promise<ProductActionResponse> {
+  return api.post<ProductActionResponse>(`/api/admin/products/${productId}/approve`, {})
+}
+
+/** POST /api/admin/products/:id/reject — từ chối: Chờ duyệt → Nháp (shop sửa và gửi lại) */
+export function rejectProduct(productId: string, reason: string): Promise<ProductActionResponse> {
+  return api.post<ProductActionResponse>(`/api/admin/products/${productId}/reject`, { reason })
+}

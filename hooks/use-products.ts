@@ -8,6 +8,8 @@ import {
   hideProduct as apiHide,
   unhideProduct as apiUnhide,
   removeProduct as apiRemove,
+  approveProduct as apiApprove,
+  rejectProduct as apiReject,
 } from "@/services/products"
 import type { ProductModeration } from "@/types/product"
 
@@ -124,6 +126,49 @@ export function useProducts(initialParams?: Partial<Params>) {
     }
   }, [load])
 
+  const approveProduct = useCallback(async (productId: string) => {
+    setActionLoading(true)
+    try {
+      const res = await apiApprove(productId)
+      if (res.success) {
+        toast.success(res.message ?? "Đã duyệt sản phẩm")
+        await load()
+        return { success: true as const, product: res.product }
+      }
+      toast.error(res.message ?? "Lỗi khi duyệt sản phẩm")
+      return { success: false as const, product: undefined }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi khi duyệt sản phẩm")
+      return { success: false as const, product: undefined }
+    } finally {
+      setActionLoading(false)
+    }
+  }, [load])
+
+  const rejectProduct = useCallback(
+    async (productId: string, reason: string) => {
+      setActionLoading(true)
+      try {
+        const res = await apiReject(productId, reason)
+        if (res.success) {
+          toast.success(res.message ?? "Đã từ chối sản phẩm")
+          await load()
+          return { success: true as const, product: res.product }
+        }
+        toast.error(res.message ?? "Lỗi khi từ chối sản phẩm")
+        return { success: false as const, product: undefined }
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Lỗi khi từ chối sản phẩm"
+        )
+        return { success: false as const, product: undefined }
+      } finally {
+        setActionLoading(false)
+      }
+    },
+    [load]
+  )
+
   const setPage = useCallback((page: number) => {
     setParams(p => ({ ...p, page }))
   }, [])
@@ -151,6 +196,8 @@ export function useProducts(initialParams?: Partial<Params>) {
     hideProduct,
     unhideProduct,
     removeProduct,
+    approveProduct,
+    rejectProduct,
     reload: load,
   }
 }

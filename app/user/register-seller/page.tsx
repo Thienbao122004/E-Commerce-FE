@@ -4,12 +4,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { profileService } from "@/services/profile";
 import { vietnamProvincesService } from "@/services/vietnam-provinces";
-import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories";
 import { recognizeVietnamIdCard, type VnmIdOcrData } from "@/services/vnm-id-ocr";
 import type {
   RegisterSellerRequest,
@@ -19,6 +17,7 @@ import type {
 } from "@/types/profile";
 import type { Province, District, Ward } from "@/types/vietnam-provinces";
 import { createClient } from "@/lib/supabase";
+import { isVietnamPhoneLocal, normalizeVietnamPhone } from "@/lib/phone-vn";
 import { cn } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,19 +39,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -69,12 +55,9 @@ type SellerFormState = {
   city: string;
   businessLicenseNumber: string;
   taxCode: string;
-  businessType: RegisterSellerRequest["businessType"];
   bankName: string;
   bankAccountNumber: string;
   bankAccountName: string;
-  /** Danh mục gốc (cấp 1) — ràng buộc sản phẩm sau này */
-  primaryCategoryId: number;
 };
 
 type DocSlot = {
@@ -109,11 +92,9 @@ const INITIAL_FORM: SellerFormState = {
   city: "",
   businessLicenseNumber: "",
   taxCode: "",
-  businessType: "individual",
   bankName: "",
   bankAccountNumber: "",
   bankAccountName: "",
-  primaryCategoryId: 0,
 };
 
 const DOC_SLOTS_BASE: DocSlot[] = [
@@ -270,8 +251,6 @@ export default function RegisterSellerPage() {
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
-  const [categoryRoots, setCategoryRoots] = useState<StorefrontCategory[]>([]);
-  const [primaryCategoryOpen, setPrimaryCategoryOpen] = useState(false);
   const [ocrLoadingFront, setOcrLoadingFront] = useState(false);
   const [ocrLoadingBack, setOcrLoadingBack] = useState(false);
   const [ocrAnalyzing, setOcrAnalyzing] = useState(false);
@@ -284,26 +263,14 @@ export default function RegisterSellerPage() {
   );
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const docSlots = useMemo(
-    () => getDocSlots(form.businessType),
-    [form.businessType],
-  );
+  const docSlots = useMemo(() => getDocSlots("individual"), []);
 
   useEffect(() => {
     const init = async () => {
-      await Promise.all([loadProfile(), loadProvinces(), loadCategoryRoots()]);
+      await Promise.all([loadProfile(), loadProvinces()]);
     };
     init();
   }, []);
-
-  const loadCategoryRoots = async () => {
-    try {
-      const res = await getCategoryTree();
-      if (res.success && res.tree?.length) setCategoryRoots(res.tree);
-    } catch {
-      /* ignore */
-    }
-  };
 
   const loadProfile = async () => {
     try {
@@ -313,7 +280,7 @@ export default function RegisterSellerPage() {
         setProfile(res.data);
         setForm((prev) => ({
           ...prev,
-          phone: prev.phone || res.data.phone || "",
+          phone: prev.phone || normalizeVietnamPhone(res.data.phone) || "",
         }));
       }
     } catch {
@@ -525,12 +492,8 @@ export default function RegisterSellerPage() {
         toast.error("Vui lòng nhập số điện thoại shop");
         return false;
       }
-      if (!form.businessType) {
-        toast.error("Vui lòng chọn loại hình kinh doanh");
-        return false;
-      }
-      if (!form.primaryCategoryId || form.primaryCategoryId <= 0) {
-        toast.error("Vui lòng chọn ngành hàng bán (danh mục gốc trên sàn)");
+      if (!isVietnamPhoneLocal(normalizeVietnamPhone(form.phone))) {
+        toast.error("Số điện thoại shop không hợp lệ (dùng đầu 0, 10–11 số)");
         return false;
       }
     }
@@ -634,7 +597,7 @@ export default function RegisterSellerPage() {
       const payload: RegisterSellerRequest = {
         shopName: form.shopName.trim(),
         shopDescription: form.shopDescription.trim() || null,
-        phone: form.phone.trim(),
+        phone: normalizeVietnamPhone(form.phone),
         addressLine: form.addressLine.trim(),
         wardCode: form.wardCode,
         districtId,
@@ -642,8 +605,6 @@ export default function RegisterSellerPage() {
         city: form.city.trim(),
         businessLicenseNumber: form.businessLicenseNumber.trim() || null,
         taxCode: form.taxCode.trim() || null,
-        businessType: form.businessType,
-        primaryCategoryId: form.primaryCategoryId,
         bankName: form.bankName.trim() || null,
         bankAccountNumber: form.bankAccountNumber.trim() || null,
         bankAccountName: form.bankAccountName.trim() || null,
@@ -675,14 +636,6 @@ export default function RegisterSellerPage() {
   const selectedWardName = useMemo(
     () => wards.find((w) => w.code === form.wardCode)?.name ?? "",
     [wards, form.wardCode],
-  );
-
-  const selectedPrimaryCategoryName = useMemo(
-    () =>
-      form.primaryCategoryId > 0
-        ? categoryRoots.find((c) => c.id === form.primaryCategoryId)?.name ?? null
-        : null,
-    [categoryRoots, form.primaryCategoryId],
   );
 
   // ── Loading / guard ────────────────────────────────────────────────────────
@@ -841,8 +794,8 @@ export default function RegisterSellerPage() {
         {/* ── Step 1: Shop info ─────────────────────────────────────────── */}
         {step === 1 && (
           <div className="grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2 md:col-span-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="shop-name">Tên shop *</Label>
                 <Input
                   id="shop-name"
@@ -865,103 +818,6 @@ export default function RegisterSellerPage() {
                   placeholder="09xxxxxxxx"
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="business-type">Loại hình kinh doanh *</Label>
-                <Select
-                  value={form.businessType}
-                  onValueChange={(value) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      businessType:
-                        value as RegisterSellerRequest["businessType"],
-                    }))
-                  }
-                >
-                  <SelectTrigger id="business-type" className="w-full">
-                    <SelectValue placeholder="Chọn loại hình" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Cá nhân</SelectItem>
-                    <SelectItem value="household">Hộ kinh doanh</SelectItem>
-                    <SelectItem value="company">Công ty</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="primary-category">Ngành hàng bán chính *</Label>
-              <Popover
-                open={primaryCategoryOpen}
-                onOpenChange={setPrimaryCategoryOpen}
-                modal={false}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    id="primary-category"
-                    type="button"
-                    role="combobox"
-                    variant="outline"
-                    aria-expanded={primaryCategoryOpen}
-                    disabled={categoryRoots.length === 0}
-                    className="w-full justify-between font-normal h-9 px-3"
-                  >
-                    <span
-                      className={cn(
-                        "truncate text-left",
-                        !selectedPrimaryCategoryName && "text-muted-foreground",
-                      )}
-                    >
-                      {categoryRoots.length === 0
-                        ? "Đang tải danh mục…"
-                        : selectedPrimaryCategoryName ?? "Chọn hoặc tìm ngành"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="p-0 w-[var(--radix-popover-trigger-width)] max-w-[min(100%,var(--radix-popover-content-available-width,100%))]"
-                  align="start"
-                  side="bottom"
-                  sideOffset={4}
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                >
-                  <Command>
-                    <CommandInput placeholder="Tìm ngành hàng…" className="h-9" />
-                    <CommandList className="max-h-[min(16rem,50vh)]">
-                      <CommandEmpty>Không tìm thấy danh mục phù hợp.</CommandEmpty>
-                      <CommandGroup>
-                        {categoryRoots.map((c) => (
-                          <CommandItem
-                            key={c.id}
-                            value={`${c.name} ${c.id}`}
-                            onSelect={() => {
-                              setForm((prev) => ({
-                                ...prev,
-                                primaryCategoryId: c.id,
-                              }));
-                              setPrimaryCategoryOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 size-4 shrink-0",
-                                form.primaryCategoryId === c.id ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                            {c.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground">
-                Sau khi duyệt, bạn chỉ có thể đăng sản phẩm thuộc nhánh danh mục này (theo cây danh mục
-                sàn).
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -1397,13 +1253,6 @@ export default function RegisterSellerPage() {
                 Thông tin sẽ gửi:
               </p>
               <p className="text-muted-foreground">Shop: {form.shopName || "—"}</p>
-              <p className="text-muted-foreground">Loại hình: {form.businessType}</p>
-              <p className="text-muted-foreground">
-                Ngành hàng:{" "}
-                {form.primaryCategoryId > 0
-                  ? categoryRoots.find((c) => c.id === form.primaryCategoryId)?.name ?? "—"
-                  : "—"}
-              </p>
               <p className="text-muted-foreground">
                 Địa chỉ GHN: {form.addressLine || "—"}
                 {selectedWardName ? `, ${selectedWardName}` : ""}

@@ -72,6 +72,11 @@ export default function NewDisputePage() {
 
     if (!form.title.trim()) { toast.error("Vui lòng nhập tiêu đề"); setCreating(false); return }
     if (form.reason.trim().length < 20) { toast.error("Lý do phải có ít nhất 20 ký tự"); setCreating(false); return }
+    if (Number(form.type) === DisputeType.Refund && (!form.requestedAmount || Number(form.requestedAmount) <= 0)) {
+      toast.error("Với loại hoàn tiền, vui lòng nhập số tiền lớn hơn 0")
+      setCreating(false)
+      return
+    }
 
     setCreating(true)
     try {

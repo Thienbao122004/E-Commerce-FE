@@ -64,6 +64,7 @@ export default function SellerOrdersPage() {
       options: [
         { value: "all", label: "Tất cả trạng thái" },
         { value: String(OrderStatus.PendingPayment), label: "Chờ thanh toán" },
+        { value: String(OrderStatus.PendingConfirmation), label: "Chờ xác nhận" },
         { value: String(OrderStatus.Confirmed), label: "Đã xác nhận" },
         { value: String(OrderStatus.Processing), label: "Đang chuẩn bị" },
         { value: String(OrderStatus.Shipping), label: "Đang giao hàng" },
