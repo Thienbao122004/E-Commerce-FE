@@ -14,6 +14,8 @@ import {
   type PendingPaymentMethod,
 } from '@/lib/pending-payment-session'
 import { toast } from 'sonner'
+import { useAuth } from '@/contexts/auth-context'
+import { getShopStorefrontPath } from '@/lib/shop-routes'
 import { useGHNShippingFee } from '@/hooks/useGHNShippingFee'
 import { CheckoutAddressModal } from './_components/CheckoutAddressModal'
 import {
@@ -38,6 +40,7 @@ interface ShopGroup {
   key: string
   shopId?: string
   shopName: string
+  shopSlug?: string | null
   items: CartItemWithShop[]
   subtotal: number
   shippingFee: number
@@ -86,6 +89,7 @@ const PAYMENT_METHODS: Array<{
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const { session } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [placingOrder, setPlacingOrder] = useState(false)
@@ -172,6 +176,29 @@ export default function CheckoutPage() {
     void loadCheckoutData()
   }, [loadCheckoutData])
 
+  const openSellerChat = useCallback(
+    (e: React.MouseEvent, shopId: string | undefined) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!shopId) {
+        toast.info('Chưa có mã shop để mở chat. Hãy thêm sản phẩm từ gian hàng hợp lệ.', { duration: 5000 })
+        return
+      }
+      if (!session) {
+        if (typeof window !== 'undefined') {
+          const returnUrl = window.location.pathname + window.location.search
+          router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
+        } else {
+          router.push('/login')
+        }
+        toast.info('Vui lòng đăng nhập để chat với người bán')
+        return
+      }
+      window.dispatchEvent(new CustomEvent('open-chat-widget', { detail: { shopId } }))
+    },
+    [session, router],
+  )
+
   const groupedByShop = useMemo<ShopGroup[]>(() => {
     const groupMap = new Map<string, ShopGroup>()
 
@@ -184,6 +211,9 @@ export default function CheckoutPage() {
         existing.items.push(item)
         existing.subtotal += item.lineTotal
         existing.itemCount += item.quantity
+        if (!existing.shopSlug && item.shopSlug) {
+          existing.shopSlug = item.shopSlug
+        }
         return
       }
 
@@ -191,6 +221,7 @@ export default function CheckoutPage() {
         key,
         shopId: item.shopId ?? undefined,
         shopName: normalizedShopName,
+        shopSlug: item.shopSlug ?? undefined,
         items: [item],
         subtotal: item.lineTotal,
         shippingFee: 0,
@@ -475,28 +506,43 @@ export default function CheckoutPage() {
                   <span className="text-xs text-muted-foreground">{group.itemCount} sản phẩm</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    toast.message(`Chat với shop "${group.shopName}"`)
-                  }}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => openSellerChat(e, group.shopId)}
                   className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-[rgba(236,127,19,0.08)]"
                   style={{ borderColor: '#d9cec2', color: 'var(--color-primary)' }}
                 >
                   <MessageCircle size={13} />
                   <span>Chat với người bán</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => toast.message(`Trang chi tiết của shop "${group.shopName}"`)}
-                  className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-gray-50"
-                  style={{ borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }}
-                >
-                  <StoreIcon size={13} />
-                  <span>Xem chi tiết shop</span>
                 </button>
+                {(() => {
+                  const href = getShopStorefrontPath(group.shopSlug, group.shopName)
+                  if (!href) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => toast.info('Không tìm thấy liên kết tới gian hàng.')}
+                        className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-gray-50"
+                        style={{ borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }}
+                      >
+                        <StoreIcon size={13} />
+                        <span>Xem chi tiết shop</span>
+                      </button>
+                    )
+                  }
+                  return (
+                    <Link
+                      href={href}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-gray-50"
+                      style={{ borderColor: '#d9cec2', color: 'var(--color-text-secondary)' }}
+                    >
+                      <StoreIcon size={13} />
+                      <span>Xem chi tiết shop</span>
+                    </Link>
+                  )
+                })()}
               </div>
             </div>
 
