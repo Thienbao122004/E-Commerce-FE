@@ -671,6 +671,11 @@ export default function PurchaseOrderDetailPage() {
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
               <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
               Đang chờ shop xác nhận hủy
+              {order?.cancelRequestDeadline && (
+                <span className="opacity-70">
+                  · hạn {formatDate(order.cancelRequestDeadline)}
+                </span>
+              )}
             </span>
           )}
           {canConfirm && (
@@ -772,7 +777,27 @@ export default function PurchaseOrderDetailPage() {
           )}
         </div>
 
-        {order.cancelReason && (order.status === 7 || order.status === 8) && (
+          {order.cancelRequestedAt && order.status === 3 && (
+            <div className="p-4 border-b" style={{ borderColor: '#e5ded6' }}>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1">
+                <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+                  Yêu cầu hủy đang chờ shop xác nhận
+                </p>
+                {order.cancelReason && (
+                  <p className="text-xs text-amber-700">Lý do bạn cung cấp: {order.cancelReason}</p>
+                )}
+                <p className="text-xs text-amber-600">
+                  Gửi lúc {formatDateTimeVN(order.cancelRequestedAt)}
+                  {order.cancelRequestDeadline && (
+                    <> · Shop phải phản hồi trước <strong>{formatDateTimeVN(order.cancelRequestDeadline)}</strong>. Nếu shop không phản hồi, đơn sẽ tự động bị hủy.</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {order.cancelReason && (order.status === 7 || order.status === 8) && (
           <div className="p-4 border-b" style={{ borderColor: '#e5ded6' }}>
             <p className="text-sm font-semibold mb-1" style={{ color: '#b91c1c' }}>
               Lý do hủy đơn

@@ -56,6 +56,8 @@ export interface OrderDetail extends OrderSummary {
   shippingProvider?: string | null
   /** Null = không có yêu cầu hủy đang chờ. Có giá trị = đơn đang chờ shop duyệt hủy. */
   cancelRequestedAt?: string | null
+  /** Hạn shop phải phản hồi (= cancelRequestedAt + 24h). Quá hạn → tự động hủy. */
+  cancelRequestDeadline?: string | null
 }
 
 export interface CancelOrderResponse {
@@ -64,6 +66,7 @@ export interface CancelOrderResponse {
   /** true = hủy ngay; false = yêu cầu đã gửi đến shop, chờ duyệt */
   cancelledImmediately?: boolean
   cancelRequestedAt?: string | null
+  cancelRequestDeadline?: string | null
 }
 
 export interface OrderDetailResponse {

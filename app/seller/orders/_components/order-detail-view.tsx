@@ -545,10 +545,11 @@ export function OrderDetailView({ orderId }: Props) {
                         {order?.cancelReason
                           ? `Lý do: ${order.cancelReason}`
                           : "Khách không cung cấp lý do."}
-                        {order?.cancelRequestedAt && (
-                          <span className="ml-2 opacity-70">
-                            · Gửi lúc {fmtDate(order.cancelRequestedAt)}
-                          </span>
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                        {order?.cancelRequestedAt && <>Gửi lúc {fmtDate(order.cancelRequestedAt)}.</>}
+                        {order?.cancelRequestDeadline && (
+                          <> Phải phản hồi trước <strong>{fmtDate(order.cancelRequestDeadline)}</strong> — quá hạn đơn tự động bị hủy.</>
                         )}
                       </p>
                     </div>

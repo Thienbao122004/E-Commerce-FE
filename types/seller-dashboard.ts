@@ -124,6 +124,8 @@ export type SellerOrder = {
   shopFromWardCode?: string | null
   /** Null = không có yêu cầu hủy đang chờ. Có giá trị = khách đang yêu cầu hủy, chờ shop duyệt. */
   cancelRequestedAt?: string | null
+  /** Hạn shop phải phản hồi (= cancelRequestedAt + 24h). Quá hạn → tự động hủy. */
+  cancelRequestDeadline?: string | null
 }
 
 export type SellerOrdersResponse = {
