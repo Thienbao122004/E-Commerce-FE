@@ -21,6 +21,7 @@ import {
   IconHash,
   IconShoppingBag,
   IconBarcode,
+  IconAlertTriangle,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -58,6 +59,8 @@ import {
 import {
   fetchMyOrderById,
   updateMyOrderStatus,
+  approveCancelRequest,
+  rejectCancelRequest,
 } from "@/services/seller-dashboard"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import type { OrderStatusStep } from "@/types/customer-order"
@@ -70,6 +73,7 @@ import {
   isVietnamPhoneLocal,
   normalizeVietnamPhone,
 } from "@/lib/formatters"
+import { estimatedNetAfterPlatformFeeVnd, platformFeeVndFromGross } from "@/lib/seller-platform-fee"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 // ── Status config ──
@@ -298,6 +302,10 @@ export function OrderDetailView({ orderId }: Props) {
   const [showStatusDialog, setShowStatusDialog] = React.useState(false)
   const [selectedStatus, setSelectedStatus] = React.useState<number | null>(null)
   const [note, setNote] = React.useState("")
+  const [approvingCancel, setApprovingCancel] = React.useState(false)
+  const [rejectingCancel, setRejectingCancel] = React.useState(false)
+  const [rejectNote, setRejectNote] = React.useState("")
+  const [showRejectDialog, setShowRejectDialog] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -411,15 +419,56 @@ export function OrderDetailView({ orderId }: Props) {
     }
   }
 
+  const handleApproveCancel = async () => {
+    if (!order) return
+    setApprovingCancel(true)
+    try {
+      const res = await approveCancelRequest(order.id)
+      if (res.success) {
+        toast.success(res.message ?? "Đã phê duyệt hủy đơn")
+        await load()
+      } else {
+        toast.error(res.message ?? "Lỗi phê duyệt")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi phê duyệt")
+    } finally {
+      setApprovingCancel(false)
+    }
+  }
+
+  const handleRejectCancel = async () => {
+    if (!order) return
+    setRejectingCancel(true)
+    try {
+      const res = await rejectCancelRequest(order.id, rejectNote.trim() || undefined)
+      if (res.success) {
+        toast.success(res.message ?? "Đã từ chối yêu cầu hủy")
+        setShowRejectDialog(false)
+        setRejectNote("")
+        await load()
+      } else {
+        toast.error(res.message ?? "Lỗi từ chối")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lỗi từ chối")
+    } finally {
+      setRejectingCancel(false)
+    }
+  }
+
   const deliveryDisplayPhone = order
     ? formatPhoneVn(order.shipPhone, "—") : "—"
 
   const cfg = order ? statusConfig[order.status] : null
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
+  const subtotalForFee =
+    order?.subtotal != null && order.subtotal > 0 ? order.subtotal : subtotal
   const itemCount = order?.items?.reduce((s, i) => s + i.quantity, 0) ?? 0
   const paid = order ? order.status !== OrderStatus.PendingPayment : false
   const isEndedOrder =
     order?.status === OrderStatus.Cancelled || order?.status === OrderStatus.Refunded
+  const hasPendingCancelRequest = !!(order?.cancelRequestedAt && order.status === OrderStatus.Processing)
 
   return (
     <>
@@ -479,6 +528,55 @@ export function OrderDetailView({ orderId }: Props) {
                     cancelReason={order.cancelReason}
                     statusTimeline={order.statusTimeline}
                   />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Banner yêu cầu hủy đơn đang chờ shop xử lý */}
+            {hasPendingCancelRequest && (
+              <Card className="rounded shadow-sm overflow-hidden border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0">
+                      <IconAlertTriangle className="size-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                        Khách hàng yêu cầu hủy đơn
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                        {order?.cancelReason
+                          ? `Lý do: ${order.cancelReason}`
+                          : "Khách không cung cấp lý do."}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
+                        {order?.cancelRequestedAt && <>Gửi lúc {fmtDate(order.cancelRequestedAt)}.</>}
+                        {order?.cancelRequestDeadline && (
+                          <> Phải phản hồi trước <strong>{fmtDate(order.cancelRequestDeadline)}</strong> — quá hạn đơn tự động bị hủy.</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => void handleApproveCancel()}
+                      disabled={approvingCancel || rejectingCancel}
+                      className="text-xs"
+                    >
+                      {approvingCancel ? "Đang xử lý..." : "Phê duyệt hủy"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowRejectDialog(true)}
+                      disabled={approvingCancel || rejectingCancel}
+                      className="text-xs"
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -640,6 +738,55 @@ export function OrderDetailView({ orderId }: Props) {
                     <span>Phí vận chuyển</span>
                     <span className="font-medium tabular-nums">{currency(order.shippingFee)}</span>
                   </div>
+                  {order.platformFeePercent != null && subtotalForFee > 0 && (
+                    <div className="rounded-lg border border-violet-200/70 bg-violet-50/50 dark:border-violet-900/50 dark:bg-violet-950/20 px-3 py-2.5 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:text-violet-300">
+                        Lợi nhuận shop (sau phí nền tảng)
+                      </p>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Phí tính trên tiền hàng, không tính phí ship. Khách trả: vẫn theo tổng cộng bên dưới.
+                      </p>
+                      {order.platformFeeSettled &&
+                      order.platformFeeAmount != null &&
+                      order.netToSellerAfterPlatformFee != null ? (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Phí sàn (đã quyết toán)</span>
+                            <span className="font-medium tabular-nums text-amber-800 dark:text-amber-300">
+                              −{currency(order.platformFeeAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Về ví (phần tiền hàng)</span>
+                            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              {currency(order.netToSellerAfterPlatformFee)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Phí sàn ước tính ({order.platformFeePercent}%)</span>
+                            <span className="font-medium tabular-nums text-amber-800 dark:text-amber-300">
+                              −{currency(
+                                platformFeeVndFromGross(subtotalForFee, order.platformFeePercent)
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Dự kiến về ví (phần tiền hàng)</span>
+                            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              {currency(
+                                order.estimatedNetAfterPlatformFee != null
+                                  ? order.estimatedNetAfterPlatformFee
+                                  : estimatedNetAfterPlatformFeeVnd(subtotalForFee, order.platformFeePercent)
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold">Tổng tiền</span>
@@ -771,6 +918,38 @@ export function OrderDetailView({ orderId }: Props) {
               ) : (
                 <><IconCheck className="size-3.5" /> Xác nhận</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog từ chối yêu cầu hủy */}
+      <Dialog open={showRejectDialog} onOpenChange={(v) => { if (!v) { setShowRejectDialog(false); setRejectNote("") } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Từ chối yêu cầu hủy đơn</DialogTitle>
+            <DialogDescription>
+              Đơn hàng sẽ tiếp tục được xử lý. Bạn có thể nhập lý do để thông báo cho khách.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reject-note" className="text-sm font-medium">
+              Lý do từ chối <span className="text-muted-foreground font-normal">(không bắt buộc)</span>
+            </Label>
+            <Input
+              id="reject-note"
+              placeholder="Ví dụ: Đơn hàng đã được đóng gói xong, không thể hủy..."
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              maxLength={300}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowRejectDialog(false); setRejectNote("") }} disabled={rejectingCancel}>
+              Bỏ qua
+            </Button>
+            <Button onClick={() => void handleRejectCancel()} disabled={rejectingCancel}>
+              {rejectingCancel ? "Đang xử lý..." : "Xác nhận từ chối"}
             </Button>
           </DialogFooter>
         </DialogContent>

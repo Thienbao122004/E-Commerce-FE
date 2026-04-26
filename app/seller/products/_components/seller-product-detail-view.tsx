@@ -88,6 +88,8 @@ import type { MaterialDto } from "@/types/material"
 import type { Tag } from "@/types/tag"
 import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency, formatNumberVN } from "@/lib/formatters"
+import { useSellerPlatformFee } from "@/hooks/use-seller-platform-fee"
+import { SellerPlatformFeeHint } from "@/components/seller/seller-platform-fee-hint"
 
 const statusMap: Record<number, { label: string; cls: string; dotCls: string }> = {
   [ProductStatus.Draft]: {
@@ -134,9 +136,9 @@ type Props = { productId: string; onBack: () => void }
 
 function DetailSkeleton() {
   return (
-    <div className="grid gap-4 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
-      <div className="flex flex-col gap-4">
-        <Skeleton className="aspect-[4/3] w-full" />
+    <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr] xl:grid-cols-[minmax(280px,360px)_1fr] items-start">
+      <div className="flex flex-col gap-4 w-full max-w-md lg:max-w-none mx-auto lg:mx-0">
+        <Skeleton className="aspect-[3/2] sm:aspect-[4/3] w-full max-w-sm mx-auto rounded-lg" />
         <div className="grid grid-cols-4 gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="aspect-square rounded-xl" />
@@ -230,6 +232,7 @@ function parseAttributesStr(attrStr: string): Record<string, string> {
 
 export function SellerProductDetailView({ productId, onBack }: Props) {
   const { resolvedTheme } = useTheme()
+  const { commissionPercent, loading: platformFeeLoading } = useSellerPlatformFee()
 
   const [product, setProduct] = React.useState<SellerProductDetail | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -728,18 +731,41 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         {loading ? (
           <DetailSkeleton />
         ) : product ? (
-          <div className="grid gap-4 lg:grid-cols-[420px_1fr] xl:grid-cols-[460px_1fr] items-start">
-            {/* ══ LEFT COLUMN ══ */}
-            <div className="flex flex-col gap-4">
-              <Card className="overflow-hidden rounded border shadow-sm">
+          <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_1fr] xl:grid-cols-[minmax(280px,360px)_1fr] items-start">
+            {/* ═= LEFT: ảnh — cột hẹp hơn + preview cap để vùng tag/AI bên phải có chỗ. ═= */}
+            <div className="flex flex-col gap-4 w-full max-w-md mx-auto lg:max-w-none lg:mx-0 min-w-0">
+              <Card className="overflow-hidden rounded border shadow-sm w-full max-w-sm lg:max-w-none mx-auto lg:mx-0">
                 {/* Main image */}
-                <div className="relative aspect-[4/3] w-full bg-muted/30 group">
+                <div
+                  className={`relative aspect-[3/2] sm:aspect-[4/3] w-full max-w-sm mx-auto lg:max-w-full bg-muted/30 group ${
+                    mainUrl
+                      ? "cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
+                      : ""
+                  }`}
+                  title={mainUrl ? "Nhấn để xem lớn" : undefined}
+                  role={mainUrl ? "button" : undefined}
+                  tabIndex={mainUrl ? 0 : undefined}
+                  onClick={() => {
+                    if (mainUrl) {
+                      setPreviewUrl(mainUrl)
+                      setPreviewOpen(true)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (!mainUrl) return
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      setPreviewUrl(mainUrl)
+                      setPreviewOpen(true)
+                    }
+                  }}
+                >
                   {mainUrl ? (
                     <Image
                       src={mainUrl}
                       alt="Main Preview"
                       fill
-                      className="object-contain p-2"
+                      className="object-contain p-2 pointer-events-none"
                     />
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -761,9 +787,14 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                     </div>
                     {mainUrl && (
                       <button
+                        type="button"
                         className="pointer-events-auto bg-black/50 hover:bg-black/70 text-white size-8 rounded-lg flex items-center justify-center backdrop-blur-sm transition-colors"
-                        onClick={() => { setPreviewUrl(mainUrl); setPreviewOpen(true) }}
-                        title="Phóng to"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setPreviewUrl(mainUrl)
+                          setPreviewOpen(true)
+                        }}
+                        title="Phóng to (hoặc nhấn vào ảnh)"
                       >
                         <IconPhoto className="size-3.5" />
                       </button>
@@ -815,11 +846,12 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                             </div>
                           )}
 
-                          {/* Delete overlay */}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          {/* Xóa: chỉ góc phải, không lớp phủ full — còn lại cả ô bấm để chọn ảnh chính */}
+                          {file.url && !file.error && !file.uploading && (
                             <button
+                              type="button"
                               title="Xóa ảnh"
-                              className="bg-red-500 hover:bg-red-600 text-white size-6 rounded-lg flex items-center justify-center shadow-lg transition-colors"
+                              className="absolute top-0.5 right-0.5 z-20 flex size-6 sm:size-7 items-center justify-center rounded-md bg-red-500 text-white shadow-md ring-1 ring-white/20 transition-[opacity,transform] sm:scale-90 sm:opacity-0 sm:group-hover:scale-100 sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto sm:pointer-events-none"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 const newFiles = [...fileList]
@@ -832,7 +864,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                             >
                               <IconTrash className="size-3" />
                             </button>
-                          </div>
+                          )}
 
                           {idx === 0 && (
                             <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-[8px] px-1.5 py-0.5 rounded-md font-bold uppercase shadow">
@@ -1025,6 +1057,20 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                       </Select>
                     </div>
                   </div>
+
+                  <SellerPlatformFeeHint
+                    commissionPercent={commissionPercent}
+                    loading={platformFeeLoading}
+                    grossVnd={
+                      product &&
+                      (product.variants == null || product.variants.length === 0) &&
+                      Number.isFinite(Number(editPrice)) &&
+                      Number(editPrice) > 0
+                        ? Number(editPrice)
+                        : undefined
+                    }
+                    isMultiPrice={!!(product && product.variants && product.variants.length > 0)}
+                  />
 
                   {/* Categorization block
                   <div className="space-y-3 pt-2">
@@ -1350,8 +1396,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <img
-              src={previewUrl || mainUrl}
-              alt="preview"
+              src={fileList[selectedImg]?.url || previewUrl || mainUrl}
+              alt="Xem trước ảnh sản phẩm"
               className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl"
             />
             <button
@@ -1367,8 +1413,14 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                 {images.map((_, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     className={`rounded-full transition-all ${idx === selectedImg ? "size-2.5 bg-white" : "size-2 bg-white/40 hover:bg-white/70"}`}
-                    onClick={() => setSelectedImg(idx)}
+                    onClick={() => {
+                      setSelectedImg(idx)
+                      const u = fileList[idx]?.url
+                      if (u) setPreviewUrl(u)
+                    }}
+                    aria-label={`Xem ảnh ${idx + 1}`}
                   />
                 ))}
               </div>

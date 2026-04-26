@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { IconArrowUpRight, IconRefresh } from "@tabler/icons-react"
 import { useSellerWallet } from "@/hooks/use-seller-wallet"
+import { useSellerPlatformFee } from "@/hooks/use-seller-platform-fee"
 import { WalletSummary } from "./_components/wallet-summary"
 import { WithdrawalHistory } from "./_components/withdrawal-history"
 import { WithdrawalDialog } from "./_components/withdrawal-dialog"
@@ -24,6 +25,8 @@ export default function SellerWalletPage() {
     reload,
   } = useSellerWallet()
 
+  const { commissionPercent: platformFeePercent, loading: platformFeeLoading } = useSellerPlatformFee()
+
   const [dialogOpen, setDialogOpen] = useState(false)
 
   return (
@@ -42,7 +45,12 @@ export default function SellerWalletPage() {
         </Button>
       </SetHeaderActions>
 
-      <WalletSummary wallet={wallet} loading={loading} />
+      <WalletSummary
+        wallet={wallet}
+        loading={loading}
+        platformFeePercent={platformFeePercent}
+        platformFeeLoading={platformFeeLoading}
+      />
 
       <WithdrawalHistory
         withdrawals={withdrawals}
