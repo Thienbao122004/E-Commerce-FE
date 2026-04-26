@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, MessageCircle, Package, Store, StoreIcon, Truck } from 'lucide-react'
+import { ArrowLeft, Check, Lock, MessageCircle, Package, Store, StoreIcon, Truck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -60,10 +60,19 @@ const STATUS_STEPS = [0, 1, 2, 3, 4, 5, 6] as const
 const CANCELLABLE_STATUSES = new Set([0, 1, 2])
 // Có thể khiếu nại: Đã giao (5) hoặc Hoàn thành (6), trong vòng 7 ngày
 const DISPUTE_WINDOW_DAYS = 7
-// NotReceived: Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày — đồng bộ BE CustomerDisputeService
+// NotReceived: Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày hoặc quá ETA+1 (nếu có) — đồng bộ BE CustomerDisputeService
 const NOT_RECEIVED_MIN_DAYS_PROCESSING = 7
 const NOT_RECEIVED_MIN_DAYS_SHIPPING = 5
+/** Khớp BE `NotReceivedDaysPastEta`: sau N ngày kể từ mốc dự kiến giao (thời điểm tuyệt đối) */
+const NOT_RECEIVED_DAYS_PAST_ETA = 3
 const DISPUTE_ALLOWED_STATUSES = new Set([5, 6])
+
+function isPastEstimatedDeliveryPlusDays(estimatedIso: string | null | undefined, daysAfter: number) {
+  if (!estimatedIso) return false
+  const etaMs = new Date(estimatedIso).getTime()
+  if (Number.isNaN(etaMs)) return false
+  return Date.now() >= etaMs + daysAfter * 86400000
+}
 
 // "Không nhận được hàng" tách riêng thành nút "Báo không nhận được hàng" — không nằm trong dropdown chung
 const DISPUTE_TYPE_OPTIONS = [
@@ -315,7 +324,7 @@ export default function PurchaseOrderDetailPage() {
   }, [order, disputeAnchorDate])
 
   // Có thể khiếu nại "Không nhận được hàng" — đồng bộ ValidateNotReceivedCreateRules trong BE:
-  //   Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày, Delivered(5) trong 7 ngày kể từ anchor
+  //   Processing(3) ≥7 ngày, Shipping(4) ≥5 ngày hoặc quá ETA+1, Delivered(5) trong 7 ngày kể từ anchor
   //   Completed(6) KHÔNG cho — khách đã xác nhận nhận hàng rồi
   const canDisputeNotReceived = useMemo(() => {
     if (!order) return false
@@ -326,12 +335,14 @@ export default function PurchaseOrderDetailPage() {
         : new Date(order.updatedAt ?? order.createdAt).getTime()
       return (Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_PROCESSING
     }
-    if (order.status === 4) { // Shipping — cần ≥5 ngày kể từ khi vào trạng thái này
+    if (order.status === 4) { // Shipping — ≥5 ngày từ khi vào Đang giao, hoặc quá 1 ngày sau mốc ETA (BE: NotReceivedShippingDelayOrEtaElapsed)
       const step = order.statusTimeline?.find(s => s.value === 4)
       const anchor = step?.reachedAt
         ? new Date(step.reachedAt).getTime()
         : new Date(order.updatedAt ?? order.createdAt).getTime()
-      return (Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_SHIPPING
+      if ((Date.now() - anchor) / 86400000 >= NOT_RECEIVED_MIN_DAYS_SHIPPING) return true
+      if (isPastEstimatedDeliveryPlusDays(order.estimatedDeliveryDate, NOT_RECEIVED_DAYS_PAST_ETA)) return true
+      return false
     }
     if (order.status === 5 && disputeAnchorDate) { // Delivered — trong 7 ngày (courier đánh dấu giao nhưng khách chưa nhận)
       return (Date.now() - disputeAnchorDate.getTime()) / 86400000 <= DISPUTE_WINDOW_DAYS
@@ -936,25 +947,32 @@ export default function PurchaseOrderDetailPage() {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="d-type">Loại khiếu nại <span className="text-red-500">*</span></Label>
-              <Select
-                value={disputeForm.type}
-                onValueChange={handleDisputeTypeChange}
-                disabled={disputeNotReceivedOnly}
-              >
-                <SelectTrigger id="d-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(disputeNotReceivedOnly
-                    ? DISPUTE_TYPE_OPTIONS.filter(o => o.value === String(DisputeType.NotReceived))
-                    : DISPUTE_TYPE_OPTIONS
-                  ).map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-sm font-medium leading-none" id="d-type-label">Loại khiếu nại <span className="text-red-500">*</span></span>
+              {disputeNotReceivedOnly ? (
+                <div
+                  className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-dashed border-muted-foreground/45 bg-muted/40 px-3 text-sm"
+                  role="status"
+                  aria-labelledby="d-type-label"
+                >
+                  <span className="font-medium text-foreground">Không nhận được</span>
+                  <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                </div>
+              ) : (
+                <Select
+                  value={disputeForm.type}
+                  onValueChange={handleDisputeTypeChange}
+                >
+                  <SelectTrigger id="d-type" aria-labelledby="d-type-label"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DISPUTE_TYPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {disputeNotReceivedOnly && (
                 <p className="text-xs text-amber-600">
-                  Đơn đang trong trạng thái giao hàng — chỉ có thể tạo khiếu nại «Không nhận được hàng».
+                  Bạn mở từ «Báo không nhận được hàng» trên đơn — loại này đã cố định, không đổi sang loại khác.
                 </p>
               )}
             </div>
