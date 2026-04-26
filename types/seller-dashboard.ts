@@ -126,6 +126,13 @@ export type SellerOrder = {
   cancelRequestedAt?: string | null
   /** Hạn shop phải phản hồi (= cancelRequestedAt + 24h). Quá hạn → tự động hủy. */
   cancelRequestDeadline?: string | null
+  /** Tiền hàng (API chi tiết đơn) */
+  subtotal?: number
+  platformFeePercent?: number
+  estimatedNetAfterPlatformFee?: number
+  platformFeeSettled?: boolean
+  platformFeeAmount?: number
+  netToSellerAfterPlatformFee?: number
 }
 
 export type SellerOrdersResponse = {

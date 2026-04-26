@@ -35,6 +35,7 @@ import { NavMain } from "@/components/nav-main"
 import { useAdminPendingProductCount } from "@/hooks/use-admin-pending-product-count"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { SellerPlatformFeeFooter } from "@/components/seller/seller-platform-fee-footer"
 import {
   Sidebar,
   SidebarContent,
@@ -230,6 +231,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={secondaryNavItems} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
+        <SellerPlatformFeeFooter />
         <NavUser />
       </SidebarFooter>
     </Sidebar>

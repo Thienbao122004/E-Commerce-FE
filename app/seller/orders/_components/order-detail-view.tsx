@@ -73,6 +73,7 @@ import {
   isVietnamPhoneLocal,
   normalizeVietnamPhone,
 } from "@/lib/formatters"
+import { estimatedNetAfterPlatformFeeVnd, platformFeeVndFromGross } from "@/lib/seller-platform-fee"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 
 // ── Status config ──
@@ -461,6 +462,8 @@ export function OrderDetailView({ orderId }: Props) {
 
   const cfg = order ? statusConfig[order.status] : null
   const subtotal = order?.items?.reduce((s, i) => s + i.totalPrice, 0) ?? 0
+  const subtotalForFee =
+    order?.subtotal != null && order.subtotal > 0 ? order.subtotal : subtotal
   const itemCount = order?.items?.reduce((s, i) => s + i.quantity, 0) ?? 0
   const paid = order ? order.status !== OrderStatus.PendingPayment : false
   const isEndedOrder =
@@ -735,6 +738,55 @@ export function OrderDetailView({ orderId }: Props) {
                     <span>Phí vận chuyển</span>
                     <span className="font-medium tabular-nums">{currency(order.shippingFee)}</span>
                   </div>
+                  {order.platformFeePercent != null && subtotalForFee > 0 && (
+                    <div className="rounded-lg border border-violet-200/70 bg-violet-50/50 dark:border-violet-900/50 dark:bg-violet-950/20 px-3 py-2.5 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:text-violet-300">
+                        Lợi nhuận shop (sau phí nền tảng)
+                      </p>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Phí tính trên tiền hàng, không tính phí ship. Khách trả: vẫn theo tổng cộng bên dưới.
+                      </p>
+                      {order.platformFeeSettled &&
+                      order.platformFeeAmount != null &&
+                      order.netToSellerAfterPlatformFee != null ? (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Phí sàn (đã quyết toán)</span>
+                            <span className="font-medium tabular-nums text-amber-800 dark:text-amber-300">
+                              −{currency(order.platformFeeAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Về ví (phần tiền hàng)</span>
+                            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              {currency(order.netToSellerAfterPlatformFee)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Phí sàn ước tính ({order.platformFeePercent}%)</span>
+                            <span className="font-medium tabular-nums text-amber-800 dark:text-amber-300">
+                              −{currency(
+                                platformFeeVndFromGross(subtotalForFee, order.platformFeePercent)
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Dự kiến về ví (phần tiền hàng)</span>
+                            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                              {currency(
+                                order.estimatedNetAfterPlatformFee != null
+                                  ? order.estimatedNetAfterPlatformFee
+                                  : estimatedNetAfterPlatformFeeVnd(subtotalForFee, order.platformFeePercent)
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold">Tổng tiền</span>

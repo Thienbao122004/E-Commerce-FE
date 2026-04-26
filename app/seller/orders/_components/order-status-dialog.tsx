@@ -7,13 +7,17 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 
+/**
+ * Seller chỉ được chuyển tối đa đến "Đang chuẩn bị" (Processing).
+ * Các bước sau (đang giao, đã giao, hoàn thành) do hệ thống/đối tác vận chuyển hoặc admin xử lý.
+ */
 const validTransitions: Record<number, number[]> = {
   [OrderStatus.PendingPayment]: [],
   [OrderStatus.PendingConfirmation]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
   [OrderStatus.Confirmed]: [OrderStatus.Processing, OrderStatus.Cancelled],
-  [OrderStatus.Processing]: [OrderStatus.Shipping, OrderStatus.Cancelled],
-  [OrderStatus.Shipping]: [OrderStatus.Delivered],
-  [OrderStatus.Delivered]: [OrderStatus.Completed],
+  [OrderStatus.Processing]: [OrderStatus.Cancelled],
+  [OrderStatus.Shipping]: [],
+  [OrderStatus.Delivered]: [],
   [OrderStatus.Completed]: [],
   [OrderStatus.Cancelled]: [],
   [OrderStatus.Refunded]: [],

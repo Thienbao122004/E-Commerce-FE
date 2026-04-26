@@ -6,6 +6,7 @@ import {
   IconArrowDownRight,
   IconClock,
   IconLock,
+  IconPercentage,
   IconTrendingUp,
   IconWallet,
 } from "@tabler/icons-react"
@@ -15,13 +16,21 @@ import { formatPriceVND as currency } from "@/lib/formatters"
 type Props = {
   wallet: SellerWallet | null
   loading: boolean
+  /** Tỷ lệ phí sàn 0–100; null nếu chưa tải */
+  platformFeePercent?: number | null
+  platformFeeLoading?: boolean
 }
 
-export function WalletSummary({ wallet, loading }: Props) {
+export function WalletSummary({
+  wallet,
+  loading,
+  platformFeePercent = null,
+  platformFeeLoading = false,
+}: Props) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
           <Card key={i}>
             <CardContent className="p-4 lg:p-5">
               <div className="flex items-center gap-3">
@@ -47,8 +56,19 @@ export function WalletSummary({ wallet, loading }: Props) {
   const netIncome =
     wallet?.netEarningsAfterRefunds ?? Math.max(0, grossCredited - refunded)
 
+  const feePct =
+    platformFeePercent != null && Number.isFinite(platformFeePercent)
+      ? platformFeePercent
+      : null
+  const feePctLabel =
+    feePct != null
+      ? Number.isInteger(feePct)
+        ? String(feePct)
+        : feePct.toFixed(1).replace(/\.0$/, "")
+      : null
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent transition-shadow hover:shadow-md">
         <CardContent className="p-4 lg:p-5">
           <div className="flex items-start gap-3">
@@ -61,6 +81,33 @@ export function WalletSummary({ wallet, loading }: Props) {
                 {currency(available)}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5">Có thể rút ngay</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-violet-200/60 dark:border-violet-900/50 bg-violet-50/40 dark:bg-violet-950/20 transition-shadow hover:shadow-md">
+        <CardContent className="p-4 lg:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40 shrink-0">
+              <IconPercentage className="size-5 text-violet-700 dark:text-violet-300" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground">Phí nền tảng</p>
+              {platformFeeLoading ? (
+                <p className="text-sm text-muted-foreground mt-1.5">Đang tải…</p>
+              ) : feePctLabel != null ? (
+                <>
+                  <p className="text-lg xl:text-xl font-bold tabular-nums text-violet-700 dark:text-violet-300 mt-1 leading-tight">
+                    {feePctLabel}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                    Trên tiền hàng mỗi đơn (khi ghi có ví; không tính phí ship)
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1.5">Chưa lấy được cấu hình</p>
+              )}
             </div>
           </div>
         </CardContent>

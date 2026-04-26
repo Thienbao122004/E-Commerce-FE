@@ -43,6 +43,8 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet"
 import { useSellerProducts } from "@/hooks/use-seller-products"
+import { useSellerPlatformFee } from "@/hooks/use-seller-platform-fee"
+import { SellerPlatformFeeHint } from "@/components/seller/seller-platform-fee-hint"
 import {
   aiAnalyzeProduct,
   aiAnalyzeImage,
@@ -344,6 +346,7 @@ async function resolveImageUrlForProduct(u: string): Promise<string> {
 export default function CreateProductPage() {
   const router = useRouter()
   const { create, actionLoading } = useSellerProducts()
+  const { commissionPercent, loading: platformFeeLoading } = useSellerPlatformFee()
 
   const [name, setName] = React.useState("")
   const [price, setPrice] = React.useState("")
@@ -969,6 +972,13 @@ export default function CreateProductPage() {
                   {priceTouched && priceRaw <= 0 && (
                     <p className="text-[11px] text-red-500">Giá bán phải lớn hơn 0</p>
                   )}
+                  <SellerPlatformFeeHint
+                    commissionPercent={commissionPercent}
+                    loading={platformFeeLoading}
+                    grossVnd={!useVariants && priceRaw > 0 ? priceRaw : undefined}
+                    isMultiPrice={useVariants}
+                    className="mt-1"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-muted-foreground/15 bg-muted/20 px-3 py-2.5">
@@ -1161,14 +1171,18 @@ export default function CreateProductPage() {
 
             <Card className="!rounded">
               <CardContent className="grid gap-3">
+                {/*
+                  Giới hạn rộng vùng ảnh: cột form rộng nên nếu không cap thì preview rất lớn.
+                */}
+                <div className="relative w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
                 <div
-                  className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer select-none ${
+                  className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer select-none w-full ${
                     imageUrls.length >= 6
                       ? "cursor-not-allowed border-muted-foreground/25"
                       : isDragging
                         ? "border-primary"
                         : "border-muted-foreground/25 hover:border-primary/50"
-                  } ${hasMainPreview ? "aspect-[4/3] overflow-hidden p-0" : "min-h-[180px] p-6"}`}
+                  } ${hasMainPreview ? "aspect-[3/2] sm:aspect-[4/3] overflow-hidden p-0" : "min-h-[160px] p-5 sm:min-h-[180px] sm:p-6"}`}
                   onClick={() => { if (imageUrls.length < 6) fileInputRef.current?.click() }}
                   onDragOver={(e) => { e.preventDefault(); if (imageUrls.length < 6) setIsDragging(true) }}
                   onDragLeave={() => setIsDragging(false)}
@@ -1215,8 +1229,9 @@ export default function CreateProductPage() {
                     </div>
                   )}
                 </div>
+                </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
                   {extraSlots.map((_, i) => {
                     const url = imageUrls[i + 1]
                     if (url && !brokenUrls.has(url)) {
@@ -1240,7 +1255,7 @@ export default function CreateProductPage() {
                   })}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
                   <Input
                     placeholder="Hoặc dán URL ảnh vào đây..."
                     value={imageInput}
