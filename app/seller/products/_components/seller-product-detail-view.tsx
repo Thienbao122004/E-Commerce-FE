@@ -1050,7 +1050,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                           <SelectItem value={String(ProductStatus.Draft)}>Lưu nháp</SelectItem>
-                          <SelectItem value={String(ProductStatus.Active)}>Đang bán (gửi duyệt)</SelectItem>
+                          <SelectItem value={String(ProductStatus.Active)}>Đang bán</SelectItem>
                           <SelectItem value={String(ProductStatus.Hidden)}>Đã ẩn</SelectItem>
                           <SelectItem value={String(ProductStatus.OutOfStock)}>Hết hàng</SelectItem>
                         </SelectContent>
