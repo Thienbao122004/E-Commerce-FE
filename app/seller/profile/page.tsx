@@ -11,6 +11,10 @@ export default function SellerProfilePage() {
     return save({ logoUrl: url || undefined })
   }
 
+  const handleUpdateCover = async (url: string) => {
+    return save({ coverUrl: url })
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-5 p-4 lg:gap-6 lg:p-6">
       <div className="mb-0.5 space-y-1">
@@ -20,7 +24,13 @@ export default function SellerProfilePage() {
         <p className="text-sm text-muted-foreground">Thương hiệu và mặt hàng bạn bán trên sàn</p>
       </div>
 
-      <ProfileCover shop={shop} loading={loading} saving={saving} onUpdateLogo={handleUpdateLogo} />
+      <ProfileCover
+        shop={shop}
+        loading={loading}
+        saving={saving}
+        onUpdateLogo={handleUpdateLogo}
+        onUpdateCover={handleUpdateCover}
+      />
 
       {/* Form + Info Cards */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
