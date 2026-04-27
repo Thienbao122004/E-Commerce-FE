@@ -28,26 +28,30 @@ import { toast } from "sonner"
 
 const COVER_MAX_FILE_BYTES = 2 * 1024 * 1024
 
+function resolveCoverDisplay(shop: SellerShopInfo | null): string {
+  if (!shop?.id) return ""
+  const api = shop.coverUrl?.trim() ?? ""
+  if (api) return api
+  if (typeof window === "undefined") return ""
+  return localStorage.getItem(`shop-cover-${shop.id}`)?.trim() ?? ""
+}
+
 type Props = {
   shop: SellerShopInfo | null
   loading: boolean
   saving: boolean
   onUpdateLogo: (url: string) => Promise<boolean>
+  onUpdateCover: (url: string) => Promise<boolean>
 }
 
-export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
+export function ProfileCover({ shop, loading, saving, onUpdateLogo, onUpdateCover }: Props) {
   const [logoDialog, setLogoDialog] = useState(false)
   const [logoInput, setLogoInput] = useState("")
   const [logoPreview, setLogoPreview] = useState("")
   const [logoPreviewError, setLogoPreviewError] = useState(false)
 
   const coverKey = shop ? `shop-cover-${shop.id}` : ""
-  const [coverUrl, setCoverUrl] = useState(() => {
-    if (typeof window !== "undefined" && coverKey) {
-      return localStorage.getItem(coverKey) || ""
-    }
-    return ""
-  })
+  const coverDisplay = resolveCoverDisplay(shop)
   const [coverDialog, setCoverDialog] = useState(false)
   const [coverInput, setCoverInput] = useState("")
   const [coverPreview, setCoverPreview] = useState("")
@@ -89,8 +93,8 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
   }
 
   const handleOpenCoverDialog = () => {
-    setCoverInput(coverUrl)
-    setCoverPreview(coverUrl)
+    setCoverInput(coverDisplay)
+    setCoverPreview(coverDisplay)
     setCoverPreviewError(false)
     if (coverFileInputRef.current) coverFileInputRef.current.value = ""
     setCoverDialog(true)
@@ -125,14 +129,13 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
     reader.readAsDataURL(file)
   }
 
-  const handleSaveCover = () => {
-    if (coverKey) {
-      if (coverInput.trim()) {
-        localStorage.setItem(coverKey, coverInput.trim())
-      } else {
-        localStorage.removeItem(coverKey)
-      }
-      setCoverUrl(coverInput.trim())
+  const handleSaveCover = async () => {
+    if (coverPreviewError) return
+    const trimmed = coverInput.trim()
+    const ok = await onUpdateCover(trimmed)
+    if (!ok) return
+    if (typeof window !== "undefined" && coverKey) {
+      localStorage.removeItem(coverKey)
     }
     setCoverDialog(false)
   }
@@ -160,12 +163,17 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
     <>
       <div className="rounded-xl border overflow-hidden bg-card shadow-sm">
         <div className="relative h-48 group cursor-pointer" onClick={handleOpenCoverDialog}>
-          {coverUrl ? (
+          {coverDisplay ? (
             <img
-              src={coverUrl}
+              key={coverDisplay}
+              src={coverDisplay}
               alt="Cover"
               className="w-full h-full object-cover"
-              onError={() => setCoverUrl("")}
+              onError={() => {
+                if (typeof window !== "undefined" && coverKey) {
+                  localStorage.removeItem(coverKey)
+                }
+              }}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-stone-800 via-stone-700 to-stone-900">
@@ -330,7 +338,7 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
               Cập nhật ảnh bìa
             </DialogTitle>
             <DialogDescription>
-              Tải ảnh từ máy hoặc dán URL — ảnh bìa hiển thị trên trang hồ sơ (lưu trên trình duyệt của bạn).
+              Tải ảnh từ máy hoặc dán URL — ảnh bìa được lưu trên tài khoản cửa hàng của bạn.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -398,8 +406,15 @@ export function ProfileCover({ shop, loading, saving, onUpdateLogo }: Props) {
             <Button variant="outline" onClick={() => setCoverDialog(false)}>
               Hủy
             </Button>
-            <Button onClick={handleSaveCover} disabled={coverPreviewError}>
-              Lưu ảnh bìa
+            <Button onClick={() => void handleSaveCover()} disabled={coverPreviewError || saving}>
+              {saving ? (
+                <>
+                  <IconLoader2 className="mr-2 size-4 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                "Lưu ảnh bìa"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

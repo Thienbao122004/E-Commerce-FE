@@ -10,6 +10,8 @@ export type SellerShopInfo = {
   slug: string
   description: string | null
   logoUrl: string | null
+  /** Ảnh bìa cửa hàng (URL hoặc data URL) */
+  coverUrl?: string | null
   status: number
   verificationStatus: number
   createdAt: string
@@ -25,6 +27,7 @@ export type UpdateShopPayload = {
   name?: string
   description?: string
   logoUrl?: string
+  coverUrl?: string
 }
 
 // ====== Wallet ======
