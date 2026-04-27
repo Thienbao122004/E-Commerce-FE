@@ -927,9 +927,9 @@ export default function CreateProductPage() {
           <span className="text-foreground font-medium">Thêm mới</span>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3 lg:items-stretch">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-10 lg:items-stretch">
 
-          <div className="lg:col-span-2 flex flex-col gap-4 lg:h-full">
+          <div className="lg:col-span-6 flex flex-col gap-4 lg:h-full">
             <Card className="!rounded">
               <CardContent className="grid gap-3">
                 <div className="grid gap-2">
@@ -1171,10 +1171,7 @@ export default function CreateProductPage() {
 
             <Card className="!rounded">
               <CardContent className="grid gap-3">
-                {/*
-                  Giới hạn rộng vùng ảnh: cột form rộng nên nếu không cap thì preview rất lớn.
-                */}
-                <div className="relative w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+                <div className="relative w-full">
                 <div
                   className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all cursor-pointer select-none w-full ${
                     imageUrls.length >= 6
@@ -1231,7 +1228,7 @@ export default function CreateProductPage() {
                 </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+                <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {extraSlots.map((_, i) => {
                     const url = imageUrls[i + 1]
                     if (url && !brokenUrls.has(url)) {
@@ -1255,13 +1252,13 @@ export default function CreateProductPage() {
                   })}
                 </div>
 
-                <div className="flex gap-2 w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto">
+                <div className="flex w-full min-w-0 gap-2">
                   <Input
                     placeholder="Hoặc dán URL ảnh vào đây..."
                     value={imageInput}
                     onChange={(e) => setImageInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addImageUrl() } }}
-                    className="h-8 text-xs"
+                    className="h-8 min-w-0 flex-1 text-xs"
                     disabled={imageUrls.length >= 6}
                   />
                   <Button type="button" variant="outline" size="sm" className="h-8 px-2"
@@ -1298,7 +1295,7 @@ export default function CreateProductPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 lg:h-full min-w-0">
+          <div className="lg:col-span-4 flex flex-col gap-4 lg:h-full min-w-0">
             <Card className="!rounded">
               <CardHeader>
                 <div className="flex items-start gap-2">

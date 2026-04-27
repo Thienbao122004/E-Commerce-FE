@@ -108,18 +108,18 @@ export function ProfileEditForm({ shop, loading, saving, onSave }: Props) {
               </p>
             </div>
 
+            <div className="flex justify-end pt-1">
+              <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
+                {saving ? (
+                  <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>
+                ) : (
+                  <><IconDeviceFloppy className="mr-2 size-4" />Lưu thay đổi</>
+                )}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
-      <div className="flex justify-end mt-4">
-        <Button type="submit" disabled={saving || !hasChanges} className="min-w-[140px]">
-          {saving ? (
-            <><IconLoader2 className="mr-2 size-4 animate-spin" />Đang lưu...</>
-          ) : (
-            <><IconDeviceFloppy className="mr-2 size-4" />Lưu thay đổi</>
-          )}
-        </Button>
-      </div>
     </>
   )
 }
