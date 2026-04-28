@@ -98,7 +98,14 @@ export function ProductDetailView({
     if (!onApprove) return
     const res = await onApprove(product.id)
     if (res.success) {
-      if (res.product) onProductUpdated(res.product)
+      const updated: ProductModeration =
+        res.product ??
+        {
+          ...product,
+          status: ProductStatus.Active,
+          statusName: ProductStatusLabels[ProductStatus.Active] ?? "Active",
+        }
+      onProductUpdated(updated)
     }
   }
 

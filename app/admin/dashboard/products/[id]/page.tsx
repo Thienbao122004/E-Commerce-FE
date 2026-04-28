@@ -122,11 +122,7 @@ export default function ProductDetailPage() {
       const res = await approveProduct(product.id)
       if (res.success) {
         toast.success(res.message ?? "Đã duyệt sản phẩm")
-        if (res.product) {
-          setProduct(res.product)
-        } else {
-          await load()
-        }
+        router.push("/admin/dashboard/products")
       } else {
         toast.error(res.message ?? "Duyệt thất bại")
       }

@@ -1403,9 +1403,9 @@ export function ShopioAssistantWidget() {
                     </p>
                     <div className="grid grid-cols-1 gap-1.5 w-full">
                       {[
-                        "Áo thun nam dưới 200k",
-                        "Son môi đỏ đẹp",
-                        "Laptop gaming tầm 15 triệu",
+                        "Đặc sản bánh kẹo dưới 200k",
+                        "Bánh kẹo ngon",
+                        "Bánh tráng Tây Ninh ngon",
                       ].map((s) => (
                         <button
                           key={s}

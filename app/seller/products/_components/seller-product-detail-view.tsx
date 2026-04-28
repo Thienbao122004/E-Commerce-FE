@@ -78,6 +78,7 @@ import type {
   SellerProductDetail,
   SellerProductVariant,
   SellerProductVariantPayload,
+  UpdateSellerProductPayload,
 } from "@/types/seller-dashboard"
 import {
   getCategoryTree,
@@ -325,11 +326,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         setEditName(p.name)
         setEditDesc(p.description ?? "")
         setEditPrice(String(p.basePrice))
-        setEditStatus(
-          p.status === ProductStatus.PendingApproval
-            ? String(ProductStatus.Active)
-            : String(p.status)
-        )
+        setEditStatus(String(p.status))
         setEditCategoryId(p.categoryId ?? null)
         setEditTagIds(p.tagIds ?? [])
         setEditMaterialIds(p.materialIds ?? [])
@@ -522,22 +519,22 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     if (!product) return
     setSaving(true)
     try {
-      const statusToSend =
-        editStatus.trim() === "" && product
-          ? product.status === ProductStatus.PendingApproval
-            ? ProductStatus.Active
-            : product.status
-          : Number(editStatus)
-      const res = await updateMyProduct(product.id, {
+      const payload: UpdateSellerProductPayload = {
         name: editName.trim(),
         description: editDesc.trim() || undefined,
         basePrice: Number(editPrice),
-        status: statusToSend,
         imageUrls: fileList.map((f) => f.url).filter(Boolean),
         categoryId: editCategoryId ?? undefined,
         tagIds: editTagIds,
         materialIds: editMaterialIds,
-      })
+      }
+      // Chờ admin duyệt: không gửi status — BE giữ nguyên PendingApproval.
+      if (product.status !== ProductStatus.PendingApproval) {
+        const statusToSend =
+          editStatus.trim() === "" ? product.status : Number(editStatus)
+        payload.status = statusToSend
+      }
+      const res = await updateMyProduct(product.id, payload)
       if (res.success) {
         toast.success(res.message ?? "Cập nhật thành công")
         await load()
@@ -1027,34 +1024,35 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                       </Label>
                       {product?.status === ProductStatus.PendingApproval ? (
                         <div
-                          className={`mb-1.5 h-9 flex items-center gap-1.5 rounded-xl border px-2.5 text-xs font-medium ${statusMap[ProductStatus.PendingApproval].cls}`}
+                          className={`h-10 flex items-center gap-1.5 rounded-xl border px-2.5 text-xs font-medium ${statusMap[ProductStatus.PendingApproval].cls}`}
                         >
                           <span
                             className={`size-1.5 rounded-full ${statusMap[ProductStatus.PendingApproval].dotCls}`}
                           />
                           Chờ admin duyệt
                         </div>
-                      ) : null}
-                      <Select
-                        value={editStatus}
-                        onValueChange={(v) => {
-                          setEditStatus(v)
-                          mark()
-                        }}
-                      >
-                        <SelectTrigger
-                          id="ed-status"
-                          className="h-10 text-sm rounded-xl bg-muted/20 border-muted focus-visible:bg-background"
+                      ) : (
+                        <Select
+                          value={editStatus}
+                          onValueChange={(v) => {
+                            setEditStatus(v)
+                            mark()
+                          }}
                         >
-                          <SelectValue placeholder="Chọn" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          <SelectItem value={String(ProductStatus.Draft)}>Lưu nháp</SelectItem>
-                          <SelectItem value={String(ProductStatus.Active)}>Đang bán</SelectItem>
-                          <SelectItem value={String(ProductStatus.Hidden)}>Đã ẩn</SelectItem>
-                          <SelectItem value={String(ProductStatus.OutOfStock)}>Hết hàng</SelectItem>
-                        </SelectContent>
-                      </Select>
+                          <SelectTrigger
+                            id="ed-status"
+                            className="h-10 text-sm rounded-xl bg-muted/20 border-muted focus-visible:bg-background"
+                          >
+                            <SelectValue placeholder="Chọn" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value={String(ProductStatus.Draft)}>Lưu nháp</SelectItem>
+                            <SelectItem value={String(ProductStatus.Active)}>Đang bán</SelectItem>
+                            <SelectItem value={String(ProductStatus.Hidden)}>Đã ẩn</SelectItem>
+                            <SelectItem value={String(ProductStatus.OutOfStock)}>Hết hàng</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   </div>
 

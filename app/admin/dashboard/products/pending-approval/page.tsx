@@ -38,6 +38,7 @@ import { SetHeaderActions } from "@/hooks/use-header-actions"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
 const PENDING_PATH = "/admin/dashboard/products/pending-approval"
+const ALL_PRODUCTS_PATH = "/admin/dashboard/products"
 
 export default function ProductsPendingApprovalPage() {
   const router = useRouter()
@@ -126,12 +127,28 @@ export default function ProductsPendingApprovalPage() {
       }
       if (p.status !== ProductStatus.PendingApproval) {
         setSelectedProduct(null)
-        router.push(PENDING_PATH, { scroll: false })
+        if (p.status === ProductStatus.Active) {
+          router.push(ALL_PRODUCTS_PATH, { scroll: false })
+        } else {
+          router.push(PENDING_PATH, { scroll: false })
+        }
         return
       }
       setSelectedProduct(p)
     },
     [router]
+  )
+
+  const approveAndGoToAllProducts = React.useCallback(
+    async (id: string) => {
+      const res = await approveProduct(id)
+      if (res.success) {
+        setSelectedProduct(null)
+        router.push(ALL_PRODUCTS_PATH, { scroll: false })
+      }
+      return res
+    },
+    [approveProduct, router]
   )
 
   if (selectedProduct) {
@@ -254,7 +271,7 @@ export default function ProductsPendingApprovalPage() {
                           <Button
                             size="icon"
                             className="size-8 text-white shadow-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
-                            onClick={() => approveProduct(product.id)}
+                            onClick={() => void approveAndGoToAllProducts(product.id)}
                             disabled={actionLoading}
                             title="Duyệt nhanh"
                             type="button"
