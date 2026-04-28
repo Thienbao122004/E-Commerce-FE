@@ -51,13 +51,11 @@ export default function AdminMaterialsPage() {
   const debouncedSearch = useDebounce(searchInput)
   const [activeFilter, setActiveFilter] = React.useState<ActiveFilter>("all")
 
-  // Sheet (create / edit)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [editTarget, setEditTarget] = React.useState<MaterialDto | null>(null)
   const [formName, setFormName] = React.useState("")
   const [formDesc, setFormDesc] = React.useState("")
 
-  // Delete dialog
   const [deleteTarget, setDeleteTarget] = React.useState<MaterialDto | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
