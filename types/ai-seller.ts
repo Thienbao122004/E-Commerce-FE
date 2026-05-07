@@ -33,18 +33,9 @@ export type SuggestMaterialsResponse = {
 }
 
 export type AnalyzeImageResponse = {
-  quality: {
-    score: number
-    rating: string
-    hasGoodLighting: boolean
-    hasCleanBackground: boolean
-    isProductCentered: boolean
-    hasHighResolution: boolean
-  }
   suggestedCategories: CategorySuggestion[]
   suggestedTags: TagSuggestion[]
   suggestedMaterials: MaterialSuggestion[]
-  improvements: string[]
   summary: string
   success: boolean
   errorMessage?: string

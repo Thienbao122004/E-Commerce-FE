@@ -612,88 +612,15 @@ export default function CreateProductPage() {
       const aiImageUrls = hasImages ? await normalizeAiImageUrls() : []
       if (reqId !== analysisReqRef.current) return
       const hasUsableImages = aiImageUrls.length > 0
-      if (hasUsableImages && hasInput) {
-        const [imageSettled, textSettled] = await Promise.allSettled([
-          aiAnalyzeImage({
-            imageUrls: aiImageUrls,
-            productTitle: name.trim() || undefined,
-            productDescription: description.trim() || undefined,
-          }),
-          aiAnalyzeProduct({
-            title: name.trim(),
-            description: description.trim() || undefined,
-          }),
-        ])
-        if (reqId !== analysisReqRef.current) return
-
-        const imageRes = imageSettled.status === "fulfilled" && imageSettled.value.success
-          ? imageSettled.value
-          : null
-        const textRes = textSettled.status === "fulfilled" && textSettled.value.success
-          ? textSettled.value
-          : null
-
-        setImageAnalyzeResult(imageRes)
-
-        if (!imageRes && !textRes) {
-          setCatError(true)
-          return
-        }
-
-        const catMap = new Map<number, CategorySuggestion>()
-        for (const cat of [
-          ...(imageRes?.suggestedCategories ?? []),
-          ...(textRes?.categories ?? []),
-        ]) {
-          const existing = catMap.get(cat.categoryId)
-          if (!existing || cat.confidenceScore > existing.confidenceScore) {
-            catMap.set(cat.categoryId, cat)
-          }
-        }
-        const mergedCats = [...catMap.values()]
-          .sort((a, b) => b.confidenceScore - a.confidenceScore)
-          .slice(0, 3)
-
-        const tagMap = new Map<number, TagSuggestion>()
-        for (const tag of [...(imageRes?.suggestedTags ?? []), ...(textRes?.tags ?? [])]) {
-          const tid = parseTagIdFromSuggestion(tag as TagSuggestion & { tag_id?: unknown })
-          if (tid != null && !tagMap.has(tid)) {
-            tagMap.set(tid, { ...tag, tagId: tid })
-          }
-        }
-        const mergedTags = [...tagMap.values()].slice(0, 10)
-
-        const matKey = (m: MaterialSuggestion): string =>
-          m.materialId ?? `__name__:${(m.materialName ?? "").trim().toLowerCase()}`
-        const matMap = new Map<string, MaterialSuggestion>()
-        for (const mat of imageRes?.suggestedMaterials ?? []) {
-          const k = matKey(mat)
-          if (k && !matMap.has(k)) {
-            matMap.set(k, mat)
-          }
-        }
-        const imageNames = new Set(
-          [...matMap.values()].map((m) => (m.materialName ?? "").trim().toLowerCase()),
-        )
-        for (const mat of textRes?.materials ?? []) {
-          const k = matKey(mat)
-          const nameLow = (mat.materialName ?? "").trim().toLowerCase()
-          if (k && !matMap.has(k) && !imageNames.has(nameLow)) {
-            matMap.set(k, mat)
-          }
-        }
-        const mergedMats = [...matMap.values()].slice(0, 5)
-
-        applyAnalysisResult(mergedCats, mergedTags, mergedMats)
-
-      } else if (hasUsableImages) {
-        // Chỉ có ảnh (không có text)
+      if (hasUsableImages) {
+        // Đã có ảnh: Dùng API AnalyzeImage (AI tự kết hợp Multimodal: xem ảnh + đọc title/description)
         const imageRes = await aiAnalyzeImage({
           imageUrls: aiImageUrls,
           productTitle: name.trim() || undefined,
           productDescription: description.trim() || undefined,
         })
         if (reqId !== analysisReqRef.current) return
+        
         if (imageRes.success) {
           setImageAnalyzeResult(imageRes)
           applyAnalysisResult(imageRes.suggestedCategories, imageRes.suggestedTags, imageRes.suggestedMaterials)
@@ -701,17 +628,22 @@ export default function CreateProductPage() {
           setImageAnalyzeResult(null)
           setCatError(true)
         }
-
       } else {
-        // Chỉ có text (hoặc ảnh không load được)
+        // Không có ảnh: Dùng API AnalyzeProduct (text-only)
         setImageAnalyzeResult(null)
         if (!hasInput) return
+        
         const res = await aiAnalyzeProduct({
           title: name.trim(),
           description: description.trim() || undefined,
         })
         if (reqId !== analysisReqRef.current) return
-        applyAnalysisResult(res.categories, res.tags, res.materials)
+        
+        if (res.success) {
+          applyAnalysisResult(res.categories, res.tags, res.materials)
+        } else {
+          setCatError(true)
+        }
       }
     } catch {
       if (reqId !== analysisReqRef.current) return
@@ -1367,7 +1299,7 @@ export default function CreateProductPage() {
                         <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
                           <IconAlertCircle className="size-3.5 shrink-0" />
                           <span>
-                            Không thể kết nối AI. Kiểm tra microservice. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
+                            Không thể kết nối AI. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
                           </span>
                         </div>
                       )}
