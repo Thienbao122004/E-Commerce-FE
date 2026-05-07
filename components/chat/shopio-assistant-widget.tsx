@@ -57,7 +57,14 @@ import {
   removeAiChatUiCache,
 } from "@/lib/ai-chat-ui-cache"
 import { dedupeMergedChatMessages } from "@/lib/ai-chat-merge-messages"
-import { mapHistoryMessageToUi } from "@/lib/ai-chat-map-history"
+import { defaultVariantIdForProduct, mapHistoryMessageToUi } from "@/lib/ai-chat-map-history"
+import { extractFirstQuantityFromUserText, resolveAutoAddToCartPayload } from "@/lib/ai-chat-auto-add-cart"
+import { sanitizeAiAssistantDisplayText } from "@/lib/ai-chat-sanitize-reply"
+import {
+  isOrderIntentUserMessage,
+  findLastAssistantWithProducts,
+  buildImplicitCartLinesFromLastCard,
+} from "@/lib/ai-chat-order-intent"
 
 type PaymentMethod = "vnpay" | "momo"
 
@@ -87,6 +94,8 @@ type ConfirmPreview = {
 type ProductSelection = {
   checked: boolean
   quantity: number
+  /** Guid biến thể; bắt buộc khi sản phẩm có nhiều hơn một phân loại */
+  variantId?: string
 }
 
 type ConfirmTargetState = {
@@ -107,10 +116,6 @@ function getSessionFilterLabel(filter: SessionFilter) {
   if (filter === "unread") return "Chưa đọc"
   if (filter === "muted") return "Đã tắt thông báo"
   return "Tất cả"
-}
-
-function isOrderRequestText(text: string) {
-  return /tạo đơn|đặt đơn|checkout|thanh toán|mua luôn|chốt đơn/i.test(text)
 }
 
 function TypingDots() {
@@ -757,7 +762,9 @@ export function ShopioAssistantWidget() {
         .map((p) => {
           const sel = selections[p.id]
           if (!sel?.checked) return null
-          return { ...p, quantity: Math.max(1, Number(sel.quantity) || 1) }
+          const quantity = Math.max(1, Number(sel.quantity) || 1)
+          const variantId = sel.variantId ?? defaultVariantIdForProduct(p)
+          return { ...p, quantity, variantId }
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
     },
@@ -770,10 +777,22 @@ export function ShopioAssistantWidget() {
     const selectedItems = getSelectedProducts(message.id, products)
     if (!selectedItems.length) { toast.message("Bạn hãy tick ít nhất 1 sản phẩm trước khi bấm OK."); return }
 
+    const missingVariant = selectedItems.find(
+      (it) => (it.variants?.length ?? 0) > 1 && !it.variantId
+    )
+    if (missingVariant) {
+      toast.error(`Vui lòng chọn phân loại cho "${missingVariant.name}".`)
+      return
+    }
+
     setApplyingSelectionMessageId(message.id)
     try {
       for (const item of selectedItems) {
-        await cartService.addItem({ productId: item.id, quantity: item.quantity })
+        await cartService.addItem({
+          productId: item.id,
+          quantity: item.quantity,
+          ...(item.variantId ? { variantId: item.variantId } : {}),
+        })
       }
       const cart = await cartService.getMyCart()
       window.dispatchEvent(new Event(CART_UPDATED_EVENT))
@@ -805,7 +824,14 @@ export function ShopioAssistantWidget() {
   const handleSend = useCallback(async () => {
     if (!sessionId || !input.trim() || sending) return
     const msg = input.trim()
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: "user", content: msg, createdAt: new Date().toISOString() }])
+    const userEntry: UiMessage = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: msg,
+      createdAt: new Date().toISOString(),
+    }
+    const thread = [...messages, userEntry]
+    setMessages(thread)
     setInput("")
     setSending(true)
     try {
@@ -813,19 +839,129 @@ export function ShopioAssistantWidget() {
       const fallback = (res.products?.length ?? 0) > 0
         ? "Mình đã tìm thấy sản phẩm phù hợp ở bên dưới."
         : "Mình chưa tìm thấy sản phẩm phù hợp. Bạn thử thêm từ khóa ngành hàng, mức giá hoặc thương hiệu nhé."
+      let assistantContent = sanitizeAiAssistantDisplayText((res.reply ?? "").trim() || fallback)
+      const assistantId = `a-${Date.now()}`
+
+      const addPayload = resolveAutoAddToCartPayload(res, msg)
+      let didAutoAddToCart = false
+      if (addPayload) {
+        try {
+          await cartService.addItem({
+            productId: addPayload.productId,
+            quantity: addPayload.quantity,
+            ...(addPayload.variantId ? { variantId: addPayload.variantId } : {}),
+          })
+          window.dispatchEvent(new Event(CART_UPDATED_EVENT))
+          const cartWrap = await cartService.getMyCart()
+          if (cartWrap?.id) {
+            didAutoAddToCart = true
+            const pp = res.products?.find((x) => x.id === addPayload.productId)
+            setConfirmTarget({
+              cartId: cartWrap.id,
+              messageId: assistantId,
+              preview: {
+                id: addPayload.productId,
+                name: pp?.name ?? "Sản phẩm",
+                imageUrl: pp?.imageUrl,
+                basePrice: pp?.basePrice ?? 0,
+                quantity: addPayload.quantity,
+              },
+              previews: [
+                {
+                  id: addPayload.productId,
+                  name: pp?.name ?? "Sản phẩm",
+                  imageUrl: pp?.imageUrl,
+                  basePrice: pp?.basePrice ?? 0,
+                  quantity: addPayload.quantity,
+                },
+              ],
+            })
+          }
+          toast.success("Đã thêm vào giỏ hàng")
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Không thể thêm vào giỏ hàng")
+        }
+      }
+
+      if (!didAutoAddToCart && isOrderIntentUserMessage(msg)) {
+        const lastCard = findLastAssistantWithProducts(thread.slice(0, -1))
+        const prods = lastCard?.responseMeta?.products
+        if (lastCard && prods?.length) {
+          const lines = buildImplicitCartLinesFromLastCard(prods, selectedProductsByMessageId[lastCard.id], msg)
+          if (lines?.length) {
+            try {
+              for (const row of lines) {
+                await cartService.addItem({
+                  productId: row.productId,
+                  quantity: row.quantity,
+                  ...(row.variantId ? { variantId: row.variantId } : {}),
+                })
+              }
+              window.dispatchEvent(new Event(CART_UPDATED_EVENT))
+              const cartWrap = await cartService.getMyCart()
+              if (cartWrap?.id) {
+                didAutoAddToCart = true
+                const first = lines[0]
+                setConfirmTarget({
+                  cartId: cartWrap.id,
+                  messageId: assistantId,
+                  preview: {
+                    id: first.productId,
+                    name: first.name,
+                    imageUrl: first.imageUrl,
+                    basePrice: first.basePrice,
+                    quantity: first.quantity,
+                  },
+                  previews: lines.map((row) => ({
+                    id: row.productId,
+                    name: row.name,
+                    imageUrl: row.imageUrl,
+                    basePrice: row.basePrice,
+                    quantity: row.quantity,
+                  })),
+                })
+              }
+              if (/chưa tìm thấy sản phẩm/i.test(assistantContent)) {
+                assistantContent =
+                  lines.length === 1
+                    ? `Mình đã thêm ${lines[0].quantity} x "${lines[0].name}" vào giỏ. Bạn có muốn tạo đơn ngay không?`
+                    : `Mình đã thêm ${lines.length} sản phẩm vào giỏ. Bạn có muốn tạo đơn ngay không?`
+              }
+              toast.success("Đã thêm vào giỏ hàng")
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Không thể thêm vào giỏ hàng")
+            }
+          } else {
+            if (prods.length === 1) {
+              toast.message("Chọn phân loại (size/hương vị) trên thẻ trước khi đặt hàng nhé.")
+            } else {
+              toast.message("Tick sản phẩm rồi bấm Thêm vào giỏ, hoặc chọn đủ phân loại rồi đặt hàng.")
+            }
+          }
+        }
+      }
+
       const assistantMsg: UiMessage = {
-        id: `a-${Date.now()}`, role: "assistant",
-        content: res.reply?.trim() || fallback,
+        id: assistantId,
+        role: "assistant",
+        content: assistantContent || fallback,
         createdAt: new Date().toISOString(),
         responseMeta: { ...res, cartId: res.cartId },
       }
+
       setMessages((prev) => [...prev, assistantMsg])
 
       if (res.products?.length) {
+        const qtyHint = Math.max(1, extractFirstQuantityFromUserText(msg) ?? 1)
         setSelectedProductsByMessageId((prev) => {
           const oldMap = prev[assistantMsg.id] ?? {}
           const nextMap = res.products.reduce<Record<string, ProductSelection>>((acc, p) => {
-            acc[p.id] = { checked: oldMap[p.id]?.checked ?? false, quantity: oldMap[p.id]?.quantity ?? 1 }
+            const old = oldMap[p.id]
+            acc[p.id] = {
+              checked: old?.checked ?? false,
+              quantity: old?.quantity ?? qtyHint,
+              variantId: old?.variantId ?? defaultVariantIdForProduct(p),
+            }
             return acc
           }, {})
           return { ...prev, [assistantMsg.id]: nextMap }
@@ -833,15 +969,18 @@ export function ShopioAssistantWidget() {
       }
 
       const shouldConfirm =
+        didAutoAddToCart ||
         (res.needsConfirmation && res.intent === "checkout") || res.intent === "checkout" ||
-        isOrderRequestText(msg) || /bạn có muốn.*tạo đơn|xác nhận.*đơn|tạo đơn hàng/i.test(res.reply)
+        isOrderIntentUserMessage(msg) || /bạn có muốn.*tạo đơn|xác nhận.*đơn|tạo đơn hàng/i.test(res.reply)
 
       if (shouldConfirm) {
-        if (res.cartId) {
+        if (didAutoAddToCart) {
+          /* confirmTarget đã gán khi addItem */
+        } else if (res.cartId) {
           setConfirmTarget({ cartId: res.cartId, messageId: assistantMsg.id })
         } else {
           const ok = await buildConfirmFromCart(assistantMsg.id)
-          if (!ok && isOrderRequestText(msg)) toast.error("Hiện chưa có sản phẩm trong giỏ để tạo đơn")
+          if (!ok && isOrderIntentUserMessage(msg)) toast.error("Hiện chưa có sản phẩm trong giỏ để tạo đơn")
         }
       }
     } catch (err) {
@@ -849,7 +988,7 @@ export function ShopioAssistantWidget() {
     } finally {
       setSending(false)
     }
-  }, [sessionId, input, sending, buildConfirmFromCart])
+  }, [sessionId, input, sending, buildConfirmFromCart, messages, selectedProductsByMessageId])
 
   const handleConfirmOrder = useCallback(async () => {
     if (!sessionId) { toast.message("Phiên chưa sẵn sàng."); return }
@@ -1130,9 +1269,9 @@ export function ShopioAssistantWidget() {
           style={{
             bottom: "88px",
             right: "8px",
-            width: view === "chat" ? "390px" : "310px",
-            height: "560px",
-            maxHeight: "80vh",
+            width: view === "chat" ? "440px" : "360px",
+            height: "620px",
+            maxHeight: "77vh",
             borderColor: "#e5ded6",
             transition: "width 0.2s ease",
           }}
@@ -1429,7 +1568,7 @@ export function ShopioAssistantWidget() {
                         {m.role === "assistant" && <ShopioAvatar size="xs" />}
                         <div
                           className={`flex flex-col gap-0.5 min-w-0 ${
-                            m.role === "user" ? "max-w-[min(100%,18.5rem)] items-end" : "flex-1 max-w-full items-stretch pr-0.5"
+                            m.role === "user" ? "max-w-[min(100%,22rem)] items-end" : "flex-1 max-w-full items-stretch pr-0.5"
                           }`}
                         >
                           <div
@@ -1444,7 +1583,9 @@ export function ShopioAssistantWidget() {
                           >
                             {/* Text */}
                             {!(m.role === "assistant" && m.responseMeta?.products?.length) && (
-                              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.content}</p>
+                              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                                {m.role === "assistant" ? sanitizeAiAssistantDisplayText(m.content) : m.content}
+                              </p>
                             )}
 
                             {/* Product cards */}
@@ -1454,6 +1595,11 @@ export function ShopioAssistantWidget() {
                                   const sel = selectedProductsByMessageId[m.id]?.[p.id]
                                   const checked = sel?.checked ?? false
                                   const quantity = Math.max(1, Number(sel?.quantity) || 1)
+                                  const resolvedVariant = p.variants?.find((v) => String(v.id) === (sel?.variantId ?? ""))
+                                  const linePrice =
+                                    resolvedVariant?.price != null ? resolvedVariant.price : p.basePrice
+                                  const needVariantPick = (p.variants?.length ?? 0) > 1
+                                  const variantMissing = checked && needVariantPick && !sel?.variantId
                                   return (
                                     <div
                                       key={p.id}
@@ -1466,8 +1612,22 @@ export function ShopioAssistantWidget() {
                                           onClick={() =>
                                             setSelectedProductsByMessageId((prev) => {
                                               const mm = prev[m.id] ?? {}
-                                              const cur = mm[p.id] ?? { checked: false, quantity: 1 }
-                                              return { ...prev, [m.id]: { ...mm, [p.id]: { checked: !cur.checked, quantity: Math.max(1, Number(cur.quantity) || 1) } } }
+                                              const cur = mm[p.id] ?? {
+                                                checked: false,
+                                                quantity: 1,
+                                                variantId: defaultVariantIdForProduct(p),
+                                              }
+                                              return {
+                                                ...prev,
+                                                [m.id]: {
+                                                  ...mm,
+                                                  [p.id]: {
+                                                    ...cur,
+                                                    checked: !cur.checked,
+                                                    quantity: Math.max(1, Number(cur.quantity) || 1),
+                                                  },
+                                                },
+                                              }
                                             })
                                           }
                                           className="mt-0.5 size-3.5 rounded border shrink-0 flex items-center justify-center"
@@ -1491,9 +1651,52 @@ export function ShopioAssistantWidget() {
                                         <div className="min-w-0 flex-1 flex flex-col gap-1">
                                           <p className="text-[11px] font-semibold leading-snug break-words line-clamp-3" style={{ color: "#2f2f2f" }}>{p.name}</p>
                                           <p className="text-[10px] text-muted-foreground line-clamp-2 break-words">{p.categoryName ?? "Sản phẩm gợi ý"}</p>
+                                          {needVariantPick ? (
+                                            <div className="flex flex-wrap gap-1 items-center">
+                                              <span className="text-[9px] text-muted-foreground shrink-0">Phân loại:</span>
+                                              {p.variants!.map((v) => {
+                                                const vid = String(v.id)
+                                                const picked = (sel?.variantId ?? "") === vid
+                                                return (
+                                                  <button
+                                                    key={vid}
+                                                    type="button"
+                                                    onClick={() =>
+                                                      setSelectedProductsByMessageId((prev) => {
+                                                        const mm = prev[m.id] ?? {}
+                                                        const cur = mm[p.id] ?? {
+                                                          checked: false,
+                                                          quantity: 1,
+                                                          variantId: defaultVariantIdForProduct(p),
+                                                        }
+                                                        return {
+                                                          ...prev,
+                                                          [m.id]: {
+                                                            ...mm,
+                                                            [p.id]: { ...cur, variantId: vid },
+                                                          },
+                                                        }
+                                                      })
+                                                    }
+                                                    className="px-1.5 py-0.5 rounded text-[9px] font-medium border transition-colors"
+                                                    style={{
+                                                      borderColor: picked ? "var(--color-primary)" : "#e3d3b7",
+                                                      backgroundColor: picked ? "#fff7ed" : "#fff",
+                                                      color: picked ? "var(--color-primary)" : "#57534e",
+                                                    }}
+                                                  >
+                                                    {v.variantName}
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          ) : null}
+                                          {variantMissing ? (
+                                            <p className="text-[9px] text-amber-700">Chọn phân loại trước khi thêm giỏ.</p>
+                                          ) : null}
                                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                             <span className="text-[11px] font-bold shrink-0" style={{ color: "var(--color-primary)" }}>
-                                              {formatPrice(p.basePrice)}
+                                              {formatPrice(linePrice)}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0">
                                               <span className="text-[10px] text-muted-foreground">SL</span>
@@ -1503,8 +1706,18 @@ export function ShopioAssistantWidget() {
                                                   const nextQty = Math.max(1, Math.floor(Number(e.target.value) || 1))
                                                   setSelectedProductsByMessageId((prev) => {
                                                     const mm = prev[m.id] ?? {}
-                                                    const cur = mm[p.id] ?? { checked: false, quantity: 1 }
-                                                    return { ...prev, [m.id]: { ...mm, [p.id]: { checked: cur.checked, quantity: nextQty } } }
+                                                    const cur = mm[p.id] ?? {
+                                                      checked: false,
+                                                      quantity: 1,
+                                                      variantId: defaultVariantIdForProduct(p),
+                                                    }
+                                                    return {
+                                                      ...prev,
+                                                      [m.id]: {
+                                                        ...mm,
+                                                        [p.id]: { ...cur, quantity: nextQty },
+                                                      },
+                                                    }
                                                   })
                                                 }}
                                                 className="h-5 w-11 rounded border px-1 text-[10px] focus:outline-none text-center"
@@ -1536,14 +1749,25 @@ export function ShopioAssistantWidget() {
                                   <button
                                     type="button"
                                     onClick={() => void handleApplySelectedProducts(m)}
-                                    disabled={applyingSelectionMessageId === m.id || getSelectedProducts(m.id, m.responseMeta.products).length === 0}
+                                    disabled={
+                                      applyingSelectionMessageId === m.id ||
+                                      getSelectedProducts(m.id, m.responseMeta.products).length === 0 ||
+                                      m.responseMeta.products.some((p) => {
+                                        const s = selectedProductsByMessageId[m.id]?.[p.id]
+                                        return Boolean(
+                                          s?.checked && (p.variants?.length ?? 0) > 1 && !s?.variantId
+                                        )
+                                      })
+                                    }
                                     className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-white text-[10px] font-medium disabled:opacity-50"
                                     style={{ backgroundColor: "var(--color-primary)" }}
                                   >
                                     {applyingSelectionMessageId === m.id ? "Đang xử lý..." : <><CircleCheck size={10} /> Thêm vào giỏ</>}
                                   </button>
                                 </div>
-                                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs pt-1 border-t" style={{ borderColor: "#f0ebe3" }}>{m.content}</p>
+                                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs pt-1 border-t" style={{ borderColor: "#f0ebe3" }}>
+                                  {sanitizeAiAssistantDisplayText(m.content)}
+                                </p>
                               </div>
                             ) : null}
 

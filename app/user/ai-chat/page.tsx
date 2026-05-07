@@ -19,7 +19,14 @@ import { profileService } from '@/services/profile'
 import { formatPriceVND as formatPrice, formatTimeVN as formatTime } from '@/lib/formatters'
 import { readAiChatUiCache, writeAiChatUiCache, removeAiChatUiCache } from '@/lib/ai-chat-ui-cache'
 import { dedupeMergedChatMessages } from '@/lib/ai-chat-merge-messages'
-import { mapHistoryMessageToUi } from '@/lib/ai-chat-map-history'
+import { defaultVariantIdForProduct, mapHistoryMessageToUi } from '@/lib/ai-chat-map-history'
+import { extractFirstQuantityFromUserText, resolveAutoAddToCartPayload } from '@/lib/ai-chat-auto-add-cart'
+import { sanitizeAiAssistantDisplayText } from '@/lib/ai-chat-sanitize-reply'
+import {
+  isOrderIntentUserMessage,
+  findLastAssistantWithProducts,
+  buildImplicitCartLinesFromLastCard,
+} from '@/lib/ai-chat-order-intent'
 import type { AddressResponse } from '@/types/profile'
 
 const CART_UPDATED_EVENT = 'cart:updated'
@@ -43,6 +50,7 @@ type ConfirmPreview = {
 type ProductSelection = {
   checked: boolean
   quantity: number
+  variantId?: string
 }
 
 type ConfirmTargetState = {
@@ -50,10 +58,6 @@ type ConfirmTargetState = {
   messageId: string
   preview?: ConfirmPreview
   previews?: ConfirmPreview[]
-}
-
-function isOrderRequestText(text: string) {
-  return /tạo đơn|đặt đơn|checkout|thanh toán|mua luôn|chốt đơn/i.test(text)
 }
 
 function ShopioAvatar({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
@@ -294,7 +298,9 @@ export default function UserAiChatPage() {
         .map((p) => {
           const selection = selections[p.id]
           if (!selection?.checked) return null
-          return { ...p, quantity: Math.max(1, Number(selection.quantity) || 1) }
+          const quantity = Math.max(1, Number(selection.quantity) || 1)
+          const variantId = selection.variantId ?? defaultVariantIdForProduct(p)
+          return { ...p, quantity, variantId }
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
     },
@@ -312,10 +318,22 @@ export default function UserAiChatPage() {
         return
       }
 
+      const missingVariant = selectedItems.find(
+        (it) => (it.variants?.length ?? 0) > 1 && !it.variantId
+      )
+      if (missingVariant) {
+        toast.error(`Vui lòng chọn phân loại (size/màu) cho "${missingVariant.name}".`)
+        return
+      }
+
       setApplyingSelectionMessageId(message.id)
       try {
         for (const item of selectedItems) {
-          await cartService.addItem({ productId: item.id, quantity: item.quantity })
+          await cartService.addItem({
+            productId: item.id,
+            quantity: item.quantity,
+            ...(item.variantId ? { variantId: item.variantId } : {}),
+          })
         }
 
         const cart = await cartService.getMyCart()
@@ -379,7 +397,8 @@ export default function UserAiChatPage() {
       content: msg,
       createdAt: new Date().toISOString(),
     }
-    setMessages((prev) => [...prev, userMsg])
+    const thread = [...messages, userMsg]
+    setMessages(thread)
     setInput('')
     setSending(true)
 
@@ -391,22 +410,127 @@ export default function UserAiChatPage() {
           ? 'Mình đã tìm thấy sản phẩm phù hợp ở bên dưới.'
           : 'Mình chưa tìm thấy sản phẩm phù hợp. Bạn thử thêm từ khóa ngành hàng, mức giá, thuộc tính hoặc thương hiệu để mình lọc chính xác hơn nhé.'
 
+      let assistantContent = sanitizeAiAssistantDisplayText((res.reply ?? '').trim() || fallbackAssistantReply)
+      const assistantId = `a-${Date.now()}`
+
+      const addPayload = resolveAutoAddToCartPayload(res, msg)
+      let didAutoAddToCart = false
+      if (addPayload) {
+        try {
+          await cartService.addItem({
+            productId: addPayload.productId,
+            quantity: addPayload.quantity,
+            ...(addPayload.variantId ? { variantId: addPayload.variantId } : {}),
+          })
+          window.dispatchEvent(new Event(CART_UPDATED_EVENT))
+          const cartWrap = await cartService.getMyCart()
+          if (cartWrap?.id) {
+            didAutoAddToCart = true
+            const pp = res.products?.find((x) => x.id === addPayload.productId)
+            setConfirmTarget({
+              cartId: cartWrap.id,
+              messageId: assistantId,
+              preview: {
+                id: addPayload.productId,
+                name: pp?.name ?? 'Sản phẩm',
+                imageUrl: pp?.imageUrl,
+                basePrice: pp?.basePrice ?? 0,
+                quantity: addPayload.quantity,
+              },
+              previews: [
+                {
+                  id: addPayload.productId,
+                  name: pp?.name ?? 'Sản phẩm',
+                  imageUrl: pp?.imageUrl,
+                  basePrice: pp?.basePrice ?? 0,
+                  quantity: addPayload.quantity,
+                },
+              ],
+            })
+          }
+          toast.success('Đã thêm vào giỏ hàng')
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Không thể thêm vào giỏ hàng')
+        }
+      }
+
+      if (!didAutoAddToCart && isOrderIntentUserMessage(msg)) {
+        const lastCard = findLastAssistantWithProducts(thread.slice(0, -1))
+        const prods = lastCard?.responseMeta?.products
+        if (lastCard && prods?.length) {
+          const lines = buildImplicitCartLinesFromLastCard(prods, selectedProductsByMessageId[lastCard.id], msg)
+          if (lines?.length) {
+            try {
+              for (const row of lines) {
+                await cartService.addItem({
+                  productId: row.productId,
+                  quantity: row.quantity,
+                  ...(row.variantId ? { variantId: row.variantId } : {}),
+                })
+              }
+              window.dispatchEvent(new Event(CART_UPDATED_EVENT))
+              const cartWrap = await cartService.getMyCart()
+              if (cartWrap?.id) {
+                didAutoAddToCart = true
+                const first = lines[0]
+                setConfirmTarget({
+                  cartId: cartWrap.id,
+                  messageId: assistantId,
+                  preview: {
+                    id: first.productId,
+                    name: first.name,
+                    imageUrl: first.imageUrl,
+                    basePrice: first.basePrice,
+                    quantity: first.quantity,
+                  },
+                  previews: lines.map((row) => ({
+                    id: row.productId,
+                    name: row.name,
+                    imageUrl: row.imageUrl,
+                    basePrice: row.basePrice,
+                    quantity: row.quantity,
+                  })),
+                })
+              }
+              if (/chưa tìm thấy sản phẩm/i.test(assistantContent)) {
+                assistantContent =
+                  lines.length === 1
+                    ? `Mình đã thêm ${lines[0].quantity} x "${lines[0].name}" vào giỏ. Bạn có muốn tạo đơn ngay không?`
+                    : `Mình đã thêm ${lines.length} sản phẩm vào giỏ. Bạn có muốn tạo đơn ngay không?`
+              }
+              toast.success('Đã thêm vào giỏ hàng')
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : 'Không thể thêm vào giỏ hàng')
+            }
+          } else {
+            if (prods.length === 1) {
+              toast.message('Chọn phân loại (size/hương vị) trên thẻ trước khi đặt hàng nhé.')
+            } else {
+              toast.message('Tick sản phẩm rồi bấm Thêm vào giỏ, hoặc chọn đủ phân loại rồi đặt hàng.')
+            }
+          }
+        }
+      }
+
       const assistantMsg: UiMessage = {
-        id: `a-${Date.now()}`,
+        id: assistantId,
         role: 'assistant',
-        content: res.reply?.trim() || fallbackAssistantReply,
+        content: assistantContent || fallbackAssistantReply,
         createdAt: new Date().toISOString(),
         responseMeta: { ...res, cartId: resolvedCartId },
       }
 
       setMessages((prev) => [...prev, assistantMsg])
       if (res.products?.length) {
+        const qtyHint = Math.max(1, extractFirstQuantityFromUserText(msg) ?? 1)
         setSelectedProductsByMessageId((prev) => {
           const oldMap = prev[assistantMsg.id] ?? {}
           const nextMap = res.products.reduce<Record<string, ProductSelection>>((acc, product) => {
+            const old = oldMap[product.id]
             acc[product.id] = {
-              checked: oldMap[product.id]?.checked ?? false,
-              quantity: oldMap[product.id]?.quantity ?? 1,
+              checked: old?.checked ?? false,
+              quantity: old?.quantity ?? qtyHint,
+              variantId: old?.variantId ?? defaultVariantIdForProduct(product),
             }
             return acc
           }, {})
@@ -415,17 +539,20 @@ export default function UserAiChatPage() {
       }
 
       const shouldOpenConfirm =
+        didAutoAddToCart ||
         (res.needsConfirmation && res.intent === 'checkout') ||
         res.intent === 'checkout' ||
-        isOrderRequestText(msg) ||
+        isOrderIntentUserMessage(msg) ||
         /bạn có muốn.*tạo đơn|xác nhận.*đơn|tạo đơn hàng/i.test(res.reply)
 
       if (shouldOpenConfirm) {
-        if (resolvedCartId) {
+        if (didAutoAddToCart) {
+          /* confirmTarget đã gán */
+        } else if (resolvedCartId) {
           setConfirmTarget({ cartId: resolvedCartId, messageId: assistantMsg.id })
         } else {
           const ok = await buildConfirmFromCart(assistantMsg.id)
-          if (!ok && isOrderRequestText(msg)) {
+          if (!ok && isOrderIntentUserMessage(msg)) {
             toast.error('Hiện chưa có sản phẩm trong giỏ để tạo đơn')
           }
         }
@@ -435,7 +562,7 @@ export default function UserAiChatPage() {
     } finally {
       setSending(false)
     }
-  }, [sessionId, input, sending, buildConfirmFromCart])
+  }, [sessionId, input, sending, buildConfirmFromCart, messages, selectedProductsByMessageId])
 
   const handleConfirmOrder = useCallback(async () => {
     if (!sessionId) {
@@ -686,7 +813,9 @@ export default function UserAiChatPage() {
                   >
                     {/* Text content */}
                     {!(m.role === 'assistant' && m.responseMeta?.products?.length) && (
-                      <p className="whitespace-pre-wrap">{m.content}</p>
+                      <p className="whitespace-pre-wrap">
+                        {m.role === 'assistant' ? sanitizeAiAssistantDisplayText(m.content) : m.content}
+                      </p>
                     )}
 
                     {/* Product list */}
@@ -696,6 +825,11 @@ export default function UserAiChatPage() {
                           const selection = selectedProductsByMessageId[m.id]?.[p.id]
                           const checked = selection?.checked ?? false
                           const quantity = Math.max(1, Number(selection?.quantity) || 1)
+                          const resolvedVariant = p.variants?.find((v) => String(v.id) === (selection?.variantId ?? ''))
+                          const linePrice =
+                            resolvedVariant?.price != null ? resolvedVariant.price : p.basePrice
+                          const needVariantPick = (p.variants?.length ?? 0) > 1
+                          const variantMissing = checked && needVariantPick && !selection?.variantId
 
                           return (
                             <div
@@ -710,12 +844,17 @@ export default function UserAiChatPage() {
                                   onClick={() =>
                                     setSelectedProductsByMessageId((prev) => {
                                       const messageMap = prev[m.id] ?? {}
-                                      const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
+                                      const current = messageMap[p.id] ?? {
+                                        checked: false,
+                                        quantity: 1,
+                                        variantId: defaultVariantIdForProduct(p),
+                                      }
                                       return {
                                         ...prev,
                                         [m.id]: {
                                           ...messageMap,
                                           [p.id]: {
+                                            ...current,
                                             checked: !current.checked,
                                             quantity: Math.max(1, Number(current.quantity) || 1),
                                           },
@@ -751,9 +890,52 @@ export default function UserAiChatPage() {
                                     {p.name}
                                   </p>
                                   <p className="text-[11px] text-muted-foreground">{p.categoryName ?? 'Sản phẩm gợi ý'}</p>
+                                  {needVariantPick ? (
+                                    <div className="flex flex-wrap gap-1 items-center">
+                                      <span className="text-[10px] text-muted-foreground shrink-0">Phân loại:</span>
+                                      {p.variants!.map((v) => {
+                                        const vid = String(v.id)
+                                        const picked = (selection?.variantId ?? '') === vid
+                                        return (
+                                          <button
+                                            key={vid}
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedProductsByMessageId((prev) => {
+                                                const messageMap = prev[m.id] ?? {}
+                                                const current = messageMap[p.id] ?? {
+                                                  checked: false,
+                                                  quantity: 1,
+                                                  variantId: defaultVariantIdForProduct(p),
+                                                }
+                                                return {
+                                                  ...prev,
+                                                  [m.id]: {
+                                                    ...messageMap,
+                                                    [p.id]: { ...current, variantId: vid },
+                                                  },
+                                                }
+                                              })
+                                            }
+                                            className="px-2 py-0.5 rounded text-[10px] font-medium border transition-colors"
+                                            style={{
+                                              borderColor: picked ? 'var(--color-primary)' : '#e3d3b7',
+                                              backgroundColor: picked ? '#fff7ed' : '#fff',
+                                              color: picked ? 'var(--color-primary)' : '#57534e',
+                                            }}
+                                          >
+                                            {v.variantName}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  ) : null}
+                                  {variantMissing ? (
+                                    <p className="text-[10px] text-amber-700">Chọn phân loại trước khi thêm giỏ.</p>
+                                  ) : null}
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>
-                                      {formatPrice(p.basePrice)}
+                                      {formatPrice(linePrice)}
                                     </span>
                                     <div className="flex items-center gap-1">
                                       <label className="text-[11px] text-muted-foreground">SL</label>
@@ -766,12 +948,16 @@ export default function UserAiChatPage() {
                                           const nextQty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1
                                           setSelectedProductsByMessageId((prev) => {
                                             const messageMap = prev[m.id] ?? {}
-                                            const current = messageMap[p.id] ?? { checked: false, quantity: 1 }
+                                            const current = messageMap[p.id] ?? {
+                                              checked: false,
+                                              quantity: 1,
+                                              variantId: defaultVariantIdForProduct(p),
+                                            }
                                             return {
                                               ...prev,
                                               [m.id]: {
                                                 ...messageMap,
-                                                [p.id]: { checked: current.checked, quantity: nextQty },
+                                                [p.id]: { ...current, quantity: nextQty },
                                               },
                                             }
                                           })
@@ -809,7 +995,11 @@ export default function UserAiChatPage() {
                             onClick={() => void handleApplySelectedProducts(m)}
                             disabled={
                               applyingSelectionMessageId === m.id ||
-                              getSelectedProducts(m.id, m.responseMeta.products).length === 0
+                              getSelectedProducts(m.id, m.responseMeta.products).length === 0 ||
+                              m.responseMeta.products.some((p) => {
+                                const s = selectedProductsByMessageId[m.id]?.[p.id]
+                                return Boolean(s?.checked && (p.variants?.length ?? 0) > 1 && !s?.variantId)
+                              })
                             }
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[11px] font-medium disabled:opacity-50 transition-opacity"
                             style={{ backgroundColor: 'var(--color-primary)' }}
@@ -826,7 +1016,9 @@ export default function UserAiChatPage() {
                         </div>
 
                         {/* Text below products */}
-                        <p className="whitespace-pre-wrap text-sm pt-1">{m.content}</p>
+                        <p className="whitespace-pre-wrap text-sm pt-1">
+                          {sanitizeAiAssistantDisplayText(m.content)}
+                        </p>
                       </div>
                     ) : null}
 
