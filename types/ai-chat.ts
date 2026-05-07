@@ -13,6 +13,13 @@ export interface ProductToAdd {
   quantity: number
 }
 
+export interface VariantSuggestion {
+  id: string
+  variantName: string
+  /** Giá riêng biến thể (nếu có), ưu tiên hiển thị khi đã chọn phân loại */
+  price?: number
+}
+
 export interface ProductSuggestion {
   id: string
   slug?: string
@@ -20,6 +27,8 @@ export interface ProductSuggestion {
   basePrice: number
   imageUrl?: string
   categoryName?: string
+  /** Các phân loại (size, màu, …) — bắt buộc chọn khi thêm giỏ nếu có nhiều hơn 1 */
+  variants?: VariantSuggestion[]
   matchScore?: number
   matchReason?: string
 }
