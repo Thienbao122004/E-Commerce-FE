@@ -76,61 +76,119 @@ function ProductCardSkeleton() {
   )
 }
 
-const HERO_SLIDES = [
-  {
-    image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&q=80",
-    badge: "Thời trang",
-    badgeColor: "#ec7f13",
-    title: "Bộ sưu tập\nThời trang 2025",
-    titleHighlight: "Phong cách mới",
-    desc: "Cập nhật xu hướng thời trang hiện đại kết hợp nét truyền thống",
-    cta: "Mua ngay",
-    btnColor: "#ec7f13",
-    overlay: "rgba(28, 14, 4, 0.58)",
-    link: "/search?category=thoi-trang-nu",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1200&q=80",
-    badge: "Đặc sản vùng miền",
-    badgeColor: "#9a734c",
-    title: "Tinh hoa\nẩm thực Việt",
-    titleHighlight: "Giao tận nhà",
-    desc: "Mùi vị chắt lọc từ những nguyên liệu tươi ngon và chất lượng nhất",
-    cta: "Đặt hàng",
-    btnColor: "#9a734c",
-    overlay: "rgba(20, 12, 6, 0.60)",
-    link: "/search?category=bach-hoa-online",
-  },
-  {
-    image: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=1200&q=80",
-    badge: "Đồ thủ công",
-    badgeColor: "#c47a2b",
-    title: "Nghệ thuật\nthủ công mỹ nghệ",
-    titleHighlight: "Độc đáo & Tinh xảo",
-    desc: "Sản phẩm từ những nghệ nhân tài ba, mang đậm bản sắc văn hóa",
-    cta: "Khám phá",
-    btnColor: "#c47a2b",
-    overlay: "rgba(24, 12, 2, 0.55)",
-    link: "/search?category=nha-cua-doi-song",
-  },
-]
+type CategoryPreset = {
+  badgeColor: string
+  btnColor: string
+  region: string
+  regionIcon: string
+  highlight: string
+  desc: string
+  fallbackImage: string
+  overlayDark: string
+  cta: string
+}
 
-const SIDE_BANNERS = [
-  {
-    image: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&q=80",
-    sub: "Làm đẹp",
-    title: "Chăm sóc\ncơ thể & sắc đẹp",
-    overlay: "rgba(28, 14, 4, 0.52)",
-    link: "/search?category=sac-dep",
+const CATEGORY_PRESETS: Record<string, CategoryPreset> = {
+  food: {
+    badgeColor: "#b85c1a",
+    btnColor: "#b85c1a",
+    region: "Đặc sản 63 tỉnh thành",
+    regionIcon: "pin_drop",
+    highlight: "100% chính gốc địa phương",
+    desc: "Đặc sản tươi ngon từ tay người làng, người bản — giao tận nhà trên toàn quốc.",
+    fallbackImage: "https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(18,8,2,0.80) 40%, rgba(18,8,2,0.20) 100%)",
+    cta: "Khám phá ngay",
   },
-  {
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80",
-    sub: "Trang trí",
-    title: "Nội thất\nkhông gian sống",
-    overlay: "rgba(28, 14, 4, 0.52)",
-    link: "/search?category=nha-cua-doi-song",
+  thu_cong: {
+    badgeColor: "#6b4226",
+    btnColor: "#6b4226",
+    region: "Hội An · Bát Tràng · Vạn Phúc",
+    regionIcon: "handyman",
+    highlight: "Từ tay nghệ nhân làng nghề",
+    desc: "Sản phẩm độc bản, mang đậm hồn cốt văn hóa — mỗi chiếc là câu chuyện của người thợ lành nghề.",
+    fallbackImage: "https://images.unsplash.com/photo-1509773896068-7fd415d91e2e?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(14,6,2,0.82) 40%, rgba(14,6,2,0.18) 100%)",
+    cta: "Xem bộ sưu tập",
   },
-]
+  ca_phe: {
+    badgeColor: "#2d5a27",
+    btnColor: "#2d5a27",
+    region: "Tây Nguyên · Sơn La · Cầu Đất",
+    regionIcon: "grass",
+    highlight: "Đặc sản thuần Việt",
+    desc: "Hương vị thượng hạng từ vùng đất trồng cà phê nổi tiếng — rang xay thủ công, không pha trộn.",
+    fallbackImage: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(10,14,6,0.82) 40%, rgba(10,14,6,0.18) 100%)",
+    cta: "Đặt hàng",
+  },
+  thoi_trang: {
+    badgeColor: "#a13f5d",
+    btnColor: "#a13f5d",
+    region: "Thương hiệu thuần Việt",
+    regionIcon: "checkroom",
+    highlight: "Phong cách Việt đương đại",
+    desc: "Cảm hứng từ truyền thống, kết tinh trong từng đường may — tôn vinh vẻ đẹp người Việt.",
+    fallbackImage: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(20,6,12,0.80) 40%, rgba(20,6,12,0.18) 100%)",
+    cta: "Mua ngay",
+  },
+  sac_dep: {
+    badgeColor: "#7c5530",
+    btnColor: "#7c5530",
+    region: "Thảo dược bản địa",
+    regionIcon: "spa",
+    highlight: "Lành tính · Thiên nhiên",
+    desc: "Mỹ phẩm thuần tự nhiên, công thức truyền thống kết hợp công nghệ hiện đại của thương hiệu Việt.",
+    fallbackImage: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(14,8,2,0.78) 40%, rgba(14,8,2,0.18) 100%)",
+    cta: "Khám phá",
+  },
+  trang_tri: {
+    badgeColor: "#5a6f3a",
+    btnColor: "#5a6f3a",
+    region: "Nội thất thủ công Việt",
+    regionIcon: "chair",
+    highlight: "Không gian sống Việt",
+    desc: "Đồ trang trí, nội thất mang đậm phong cách Á Đông — tinh tế trong từng chi tiết nhỏ.",
+    fallbackImage: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(12,14,6,0.80) 40%, rgba(12,14,6,0.18) 100%)",
+    cta: "Khám phá",
+  },
+  qua: {
+    badgeColor: "#9a3a3a",
+    btnColor: "#9a3a3a",
+    region: "Quà tặng đặc trưng vùng miền",
+    regionIcon: "card_giftcard",
+    highlight: "Trao gửi tinh hoa Việt",
+    desc: "Hộp quà ý nghĩa, đóng gói cẩn thận — món quà mang đậm bản sắc dành cho người thân.",
+    fallbackImage: "https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=1200&q=80",
+    overlayDark: "linear-gradient(100deg, rgba(20,6,6,0.78) 40%, rgba(20,6,6,0.18) 100%)",
+    cta: "Chọn quà",
+  },
+}
+
+const DEFAULT_CATEGORY_PRESET: CategoryPreset = {
+  badgeColor: "#b85c1a",
+  btnColor: "#b85c1a",
+  region: "Thương hiệu Việt",
+  regionIcon: "storefront",
+  highlight: "Sản phẩm địa phương đặc sắc",
+  desc: "Khám phá những thương hiệu địa phương Việt Nam — chất lượng, chính gốc, giao tận nhà.",
+  fallbackImage: "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=1200&q=80",
+  overlayDark: "linear-gradient(100deg, rgba(18,8,2,0.80) 40%, rgba(18,8,2,0.20) 100%)",
+  cta: "Xem ngay",
+}
+
+function getCategoryPreset(code: string): CategoryPreset {
+  const k = code.toLowerCase().replace(/-/g, "_")
+  for (const [key, preset] of Object.entries(CATEGORY_PRESETS)) {
+    if (k.includes(key)) return preset
+  }
+  return DEFAULT_CATEGORY_PRESET
+}
+
+const SIDE_BANNER_OVERLAY = "linear-gradient(to top, rgba(14,7,2,0.82) 45%, rgba(14,7,2,0.10) 100%)"
 
 export default function LandingPage() {
   const { session, isLoading: authLoading, role } = useAuth()
@@ -204,6 +262,56 @@ export default function LandingPage() {
     })
   }, [featuredProducts])
 
+  // Sort all categories by productCount desc — use all regardless of count
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => b.productCount - a.productCount),
+    [categories]
+  )
+
+  // Hero: top 3 categories
+  const heroSlides = useMemo(() => {
+    return sortedCategories.slice(0, 3).map((cat) => {
+      const preset = getCategoryPreset(cat.code)
+      return {
+        id: cat.id,
+        image: cat.image || preset.fallbackImage,
+        badge: cat.name,
+        badgeColor: preset.badgeColor,
+        title: `Tinh hoa\n${cat.name}`,
+        titleHighlight: preset.highlight,
+        desc: preset.desc,
+        cta: preset.cta,
+        btnColor: preset.btnColor,
+        overlay: preset.overlayDark,
+        region: preset.region,
+        regionIcon: preset.regionIcon,
+        productCount: cat.productCount,
+        link: `/search?category=${cat.slug}`,
+      }
+    })
+  }, [sortedCategories])
+
+  // Side banners: next 2 categories after hero (index 3-4)
+  // If not enough, wrap around from the beginning (different from hero)
+  const sideBanners = useMemo(() => {
+    if (sortedCategories.length === 0) return []
+    const picks = sortedCategories.length >= 5
+      ? sortedCategories.slice(3, 5)
+      : sortedCategories.slice(0, 2)
+    return picks.map((cat) => {
+      const preset = getCategoryPreset(cat.code)
+      return {
+        id: cat.id,
+        image: cat.image || preset.fallbackImage,
+        sub: preset.region,
+        title: cat.name,
+        productCount: cat.productCount,
+        overlay: SIDE_BANNER_OVERLAY,
+        link: `/search?category=${cat.slug}`,
+      }
+    })
+  }, [sortedCategories])
+
   const hasMore = uniqueFeaturedProducts.length < totalFeaturedCount
 
   const handleLoadMore = useCallback(async () => {
@@ -249,9 +357,11 @@ export default function LandingPage() {
   }, [flashProducts, updateFlashScroll])
 
   useEffect(() => {
-    const t = setInterval(() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length), 4000)
+    if (heroSlides.length <= 1) return
+    setHeroSlide((p) => (p >= heroSlides.length ? 0 : p))
+    const t = setInterval(() => setHeroSlide((p) => (p + 1) % heroSlides.length), 4500)
     return () => clearInterval(t)
-  }, [])
+  }, [heroSlides.length])
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -277,111 +387,159 @@ export default function LandingPage() {
     >
       <header>
         <MainStorefrontHeader />
-        <nav className="border-t bg-white" style={{ borderColor: "#e5ded6" }}>
-          <div className="max-w-[1440px] mx-auto px-10">
-            <ul className="flex items-center gap-8 py-3 overflow-x-auto no-scrollbar">
-              <li>
-                <Link href="/" className="text-sm font-bold whitespace-nowrap" style={{ color: "var(--color-primary)" }}>
-                  Trang chủ
-                </Link>
-              </li>
-              {categories.slice(0, 5).map((cat) => (
-                <li key={cat.id}>
-                  <Link
-                    href={`/search?category=${cat.slug}`}
-                    className="text-sm font-medium whitespace-nowrap transition-colors hover:text-[var(--color-primary)]"
-                    style={{ color: "var(--color-text-main)" }}
-                  >
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </nav>
       </header>
 
       <main className="flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-10 py-4 space-y-6">
-        <section className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
-          <div className="relative rounded-xl overflow-hidden" style={{ height: "300px" }}>
-            {HERO_SLIDES.map((slide, i) => (
-              <div
-                key={i}
-                className={`absolute inset-0 transition-opacity duration-700 ${heroSlide === i ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-              >
-                <div
-                  className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[6000ms]"
-                  style={{
-                    backgroundImage: `url(${slide.image})`,
-                    transform: heroSlide === i ? "scale(1.05)" : "scale(1)",
-                  }}
-                />
-                <div className="absolute inset-0" style={{ backgroundColor: slide.overlay }} />
-                <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6 max-w-md">
-                  <span
-                    className="self-start px-2.5 py-0.5 rounded text-white text-[11px] font-bold uppercase tracking-wide mb-3"
-                    style={{ backgroundColor: slide.badgeColor }}
-                  >
-                    {slide.badge}
-                  </span>
-                  <h2 className="text-white font-black text-3xl md:text-4xl leading-tight mb-1 whitespace-pre-line">
-                    {slide.title}
-                  </h2>
-                  <span className="text-lg font-bold mb-2" style={{ color: "#ffd580" }}>
-                    {slide.titleHighlight}
-                  </span>
-                  <p className="text-white/75 text-sm mb-5 leading-relaxed">{slide.desc}</p>
-                  <Link
-                    href={slide.link}
-                    className="self-start px-5 py-2 rounded-lg text-white font-bold text-sm flex items-center gap-1.5 transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: slide.btnColor }}
-                  >
-                    {slide.cta}
-                    <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>arrow_forward</span>
-                  </Link>
+        <div className="flex items-center gap-3 px-1">
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
+            Nền tảng thương hiệu địa phương Việt Nam
+          </div>
+          <div className="flex-1 h-px" style={{ backgroundColor: "#e5ded6" }} />
+          <div className="flex items-center gap-3 text-[11px] text-gray-400 font-medium">
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>verified</span>Chính gốc
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>eco</span>Thuần Việt
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>local_shipping</span>Toàn quốc
+            </span>
+          </div>
+        </div>
+
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-2">
+          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300" style={{ height: "360px" }}>
+            {loadingCats || heroSlides.length === 0 ? (
+              <div className="absolute inset-0 animate-pulse">
+                <div className="absolute inset-0 bg-gradient-to-br from-stone-300 via-stone-200 to-stone-300" />
+                <div className="relative z-10 h-full flex flex-col justify-center px-8 py-6 max-w-[420px] gap-3">
+                  <div className="h-5 w-28 bg-white/40 rounded-md" />
+                  <div className="h-9 w-72 bg-white/40 rounded" />
+                  <div className="h-9 w-56 bg-white/40 rounded" />
+                  <div className="h-4 w-64 bg-white/30 rounded mt-1" />
+                  <div className="h-10 w-36 bg-white/40 rounded-lg mt-2" />
                 </div>
               </div>
-            ))}
+            ) : (
+              <>
+                {heroSlides.map((slide, i) => (
+                  <div
+                    key={slide.id}
+                    className={`absolute inset-0 transition-opacity duration-700 ${heroSlide === i ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                  >
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-[7000ms]"
+                      style={{
+                        backgroundImage: `url(${slide.image})`,
+                        transform: heroSlide === i ? "scale(1.06)" : "scale(1)",
+                      }}
+                    />
+                    <div className="absolute inset-0" style={{ background: slide.overlay }} />
 
-            <button
-              onClick={() => setHeroSlide((p) => (p - 1 + HERO_SLIDES.length) % HERO_SLIDES.length)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_left</span>
-            </button>
-            <button
-              onClick={() => setHeroSlide((p) => (p + 1) % HERO_SLIDES.length)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-colors"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_right</span>
-            </button>
+                    <div className="relative z-10 h-full flex flex-col justify-center px-20 py-6 max-w-[600px]">
+                      <span
+                        className="self-start px-2.5 py-1 rounded-md text-white text-[10px] font-bold uppercase tracking-widest mb-3"
+                        style={{ backgroundColor: slide.badgeColor }}
+                      >
+                        {slide.badge}
+                      </span>
 
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
-              {HERO_SLIDES.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setHeroSlide(i)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${heroSlide === i ? "w-6 bg-white" : "w-1.5 bg-white/50"}`}
-                />
-              ))}
-            </div>
+                      <h2 className="text-white font-black text-[2.1rem] md:text-[2.5rem] leading-[1.15] mb-1.5 whitespace-pre-line drop-shadow-md">
+                        {slide.title}
+                      </h2>
+                      <span className="text-base font-bold mb-3 drop-shadow" style={{ color: "#ffd580" }}>
+                        {slide.titleHighlight}
+                      </span>
+                      <p className="text-white/70 text-sm mb-5 leading-relaxed max-w-[320px]">{slide.desc}</p>
+
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Link
+                          href={slide.link}
+                          className="px-5 py-2 rounded-lg text-white font-bold text-sm flex items-center gap-1.5 transition-all hover:brightness-110 active:scale-95"
+                          style={{ backgroundColor: slide.btnColor }}
+                        >
+                          {slide.cta}
+                          <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>arrow_forward</span>
+                        </Link>
+
+                        <span className="flex items-center gap-1 text-white/60 text-[11px] font-medium">
+                          <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>{slide.regionIcon}</span>
+                          {slide.region}
+                        </span>
+
+                        {slide.productCount > 0 && (
+                          <span className="text-white/50 text-[11px] font-medium border-l border-white/20 pl-3">
+                            {slide.productCount.toLocaleString("vi-VN")} sản phẩm
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="absolute top-4 right-4 z-20 text-white/40 text-xs font-mono font-bold tabular-nums select-none">
+                      {String(i + 1).padStart(2, "0")} / {String(heroSlides.length).padStart(2, "0")}
+                    </div>
+                  </div>
+                ))}
+
+                {heroSlides.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setHeroSlide((p) => (p - 1 + heroSlides.length) % heroSlides.length)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full bg-black/25 hover:bg-black/45 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>chevron_left</span>
+                    </button>
+                    <button
+                      onClick={() => setHeroSlide((p) => (p + 1) % heroSlides.length)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 z-20 size-9 rounded-full bg-black/25 hover:bg-black/45 text-white flex items-center justify-center transition-colors backdrop-blur-sm"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>chevron_right</span>
+                    </button>
+
+                    <div className="absolute bottom-4 left-8 z-20 flex items-center gap-2">
+                      {heroSlides.map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setHeroSlide(i)}
+                          className={`rounded-full transition-all duration-300 ${heroSlide === i ? "w-7 h-2 bg-white" : "size-2 bg-white/40 hover:bg-white/65"}`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
 
           <div className="hidden lg:flex flex-col gap-2">
-            {SIDE_BANNERS.map((b, i) => (
+            {loadingCats || sideBanners.length === 0
+              ? Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="relative flex-1 rounded-2xl overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300 animate-pulse" />
+              ))
+              : sideBanners.map((b) => (
               <Link
-                key={i}
+                key={b.id}
                 href={b.link}
-                className="relative flex-1 rounded-xl overflow-hidden cursor-pointer group block"
+                className="relative flex-1 rounded-2xl overflow-hidden cursor-pointer group block"
               >
                 <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-107"
                   style={{ backgroundImage: `url(${b.image})` }}
                 />
-                <div className="absolute inset-0" style={{ background: b.overlay }} />
+                <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-80" style={{ background: b.overlay }} />
                 <div className="relative z-10 h-full flex flex-col justify-end p-4">
-                  <span className="text-[11px] font-semibold text-white/75 mb-0.5">{b.sub}</span>
-                  <h3 className="font-black text-white text-base leading-tight whitespace-pre-line">{b.title}</h3>
+                  <span
+                    className="self-start px-2 py-0.5 rounded text-white/80 text-[10px] font-bold uppercase tracking-wider mb-1"
+                    style={{ backgroundColor: "rgba(0,0,0,0.30)" }}
+                  >
+                    {b.sub}
+                  </span>
+                  <h3 className="font-black text-white text-[0.95rem] leading-snug whitespace-pre-line drop-shadow">{b.title}</h3>
+                  <span className="mt-2 text-white/60 text-[11px] flex items-center gap-0.5 font-medium group-hover:text-white/90 transition-colors">
+                    Xem ngay
+                    <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>arrow_forward</span>
+                  </span>
                 </div>
               </Link>
             ))}
