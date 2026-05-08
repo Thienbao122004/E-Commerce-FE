@@ -53,6 +53,8 @@ function SearchPageContent() {
   const [appliedMinPrice, setAppliedMinPrice] = useState<number | undefined>(undefined)
   const [appliedMaxPrice, setAppliedMaxPrice] = useState<number | undefined>(undefined)
   const [appliedMinRating, setAppliedMinRating] = useState<number | undefined>(undefined)
+  const [priceError, setPriceError] = useState("")
+  const [showMobileFilter, setShowMobileFilter] = useState(false)
 
   const PAGE_SIZE = 110
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
@@ -225,9 +227,31 @@ function SearchPageContent() {
   const formatThousands = (raw: string) =>
     raw ? raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''
 
+  const PRICE_PRESETS = [
+    { label: "Dưới 100k", min: undefined, max: 100000 },
+    { label: "100k – 500k", min: 100000, max: 500000 },
+    { label: "500k – 1tr", min: 500000, max: 1000000 },
+    { label: "Trên 1 triệu", min: 1000000, max: undefined },
+  ]
+
   const handleApplyPrice = () => {
-    setAppliedMinPrice(priceMinInput ? Number(priceMinInput) : undefined)
-    setAppliedMaxPrice(priceMaxInput ? Number(priceMaxInput) : undefined)
+    const min = priceMinInput ? Number(priceMinInput) : undefined
+    const max = priceMaxInput ? Number(priceMaxInput) : undefined
+    if (min !== undefined && max !== undefined && min > max) {
+      setPriceError("Giá tối thiểu không được lớn hơn tối đa")
+      return
+    }
+    setPriceError("")
+    setAppliedMinPrice(min)
+    setAppliedMaxPrice(max)
+  }
+
+  const handleApplyPricePreset = (min: number | undefined, max: number | undefined) => {
+    setPriceError("")
+    setPriceMinInput(min ? String(min) : "")
+    setPriceMaxInput(max ? String(max) : "")
+    setAppliedMinPrice(min)
+    setAppliedMaxPrice(max)
   }
 
   const handleCategoryChange = (cat: StorefrontCategory | undefined) => {
@@ -258,6 +282,7 @@ function SearchPageContent() {
     setSubCategories([])
     setPriceMinInput("")
     setPriceMaxInput("")
+    setPriceError("")
     setAppliedMinPrice(undefined)
     setAppliedMaxPrice(undefined)
     setAppliedMinRating(undefined)
@@ -266,6 +291,25 @@ function SearchPageContent() {
     if (query) params.set('q', query)
     router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
   }
+
+  const handleBackToParent = () => {
+    setSelectedCategory(undefined)
+    setActiveParentCategory(null)
+    setSubCategories([])
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    router.replace(`/search${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false })
+  }
+
+  const priceChipLabel = useMemo(() => {
+    if (appliedMinPrice !== undefined && appliedMaxPrice !== undefined)
+      return `${(appliedMinPrice / 1000).toFixed(0)}k – ${(appliedMaxPrice / 1000).toFixed(0)}k`
+    if (appliedMinPrice !== undefined)
+      return `Từ ${(appliedMinPrice / 1000).toFixed(0)}k`
+    if (appliedMaxPrice !== undefined)
+      return `Đến ${(appliedMaxPrice / 1000).toFixed(0)}k`
+    return null
+  }, [appliedMinPrice, appliedMaxPrice])
 
   const hasActiveFilters = activeParentCategory !== null || selectedCategory !== undefined || appliedMinPrice !== undefined || appliedMaxPrice !== undefined || appliedMinRating !== undefined
 
@@ -309,15 +353,64 @@ function SearchPageContent() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          <aside className="w-full lg:w-56 shrink-0">
+          {/* Mobile filter toggle */}
+          <div className="lg:hidden flex items-center gap-2">
+            <button
+              onClick={() => setShowMobileFilter((p) => !p)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors"
+              style={{
+                borderColor: showMobileFilter ? "var(--color-primary)" : "#d1d5db",
+                color: showMobileFilter ? "var(--color-primary)" : "var(--color-text-main)",
+                backgroundColor: showMobileFilter ? "rgba(var(--color-primary-rgb, 236,127,19),0.06)" : "white",
+              }}
+            >
+              <span className="material-symbols-outlined text-base">filter_list</span>
+              Bộ lọc
+              {hasActiveFilters && (
+                <span className="size-4 rounded-full text-white text-[10px] flex items-center justify-center font-bold" style={{ backgroundColor: "var(--color-primary)" }}>
+                  {[activeParentCategory, appliedMinPrice ?? appliedMaxPrice, appliedMinRating].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+            {hasActiveFilters && (
+              <button onClick={handleClearAll} className="text-xs text-red-400 hover:text-red-600 font-medium transition-colors">
+                Xóa lọc
+              </button>
+            )}
+          </div>
+
+          <aside className={`w-full lg:w-56 shrink-0 ${showMobileFilter ? "block" : "hidden lg:block"}`}>
             <div className="bg-white rounded border border-gray-100 overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-                <span className="material-symbols-outlined text-base" style={{ color: "var(--color-text-secondary)" }}>filter_list</span>
-                <h3 className="text-sm font-black tracking-wide uppercase" style={{ color: "var(--color-text-main)" }}>Bộ lọc tìm kiếm</h3>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base" style={{ color: "var(--color-text-secondary)" }}>filter_list</span>
+                  <h3 className="text-sm font-black tracking-wide uppercase" style={{ color: "var(--color-text-main)" }}>Bộ lọc</h3>
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleClearAll}
+                    className="text-[11px] font-semibold text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    Xóa tất cả
+                  </button>
+                )}
               </div>
 
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>Theo Danh Mục</p>
+                {/* Back button khi ở subcategory */}
+                {activeParentCategory && (
+                  <button
+                    onClick={handleBackToParent}
+                    className="flex items-center gap-1 text-xs font-semibold mb-2 transition-colors hover:text-[var(--color-primary)]"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
+                    {activeParentCategory.name}
+                  </button>
+                )}
+                <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>
+                  {activeParentCategory ? "Danh mục con" : "Theo Danh Mục"}
+                </p>
                 <ul className="space-y-0.5">
                   <li>
                     <button
@@ -353,7 +446,10 @@ function SearchPageContent() {
                         >
                           {selectedCategory === cat.id && <span className="material-symbols-outlined text-white" style={{ fontSize: 10 }}>check</span>}
                         </span>
-                        {cat.name}
+                        <span className="flex-1 truncate">{cat.name}</span>
+                        {cat.productCount > 0 && (
+                          <span className="text-[10px] text-gray-400 tabular-nums shrink-0">{cat.productCount}</span>
+                        )}
                       </button>
                     </li>
                   ))}
@@ -364,7 +460,7 @@ function SearchPageContent() {
                     className="mt-1 flex items-center gap-1 text-xs font-medium transition-colors hover:text-[var(--color-primary)]"
                     style={{ color: "var(--color-text-secondary)" }}
                   >
-                    {showMoreCategories ? "Thu gọn" : "Thêm"}
+                    {showMoreCategories ? "Thu gọn" : `Thêm ${displayCategories.length - 5}`}
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
                       {showMoreCategories ? "expand_less" : "expand_more"}
                     </span>
@@ -374,32 +470,53 @@ function SearchPageContent() {
 
               <div className="px-4 py-3 border-b border-gray-100">
                 <p className="text-xs font-bold mb-2" style={{ color: "var(--color-text-main)" }}>Khoảng Giá</p>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="flex items-center flex-1 rounded border border-gray-200 overflow-hidden">
+                {/* Preset price ranges */}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {PRICE_PRESETS.map((preset) => {
+                    const isActive = appliedMinPrice === preset.min && appliedMaxPrice === preset.max
+                    return (
+                      <button
+                        key={preset.label}
+                        onClick={() => handleApplyPricePreset(preset.min, preset.max)}
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors"
+                        style={{
+                          borderColor: isActive ? "var(--color-primary)" : "#e5e7eb",
+                          color: isActive ? "var(--color-primary)" : "var(--color-text-secondary)",
+                          backgroundColor: isActive ? "rgba(236,127,19,0.08)" : "transparent",
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="flex items-center flex-1 rounded border overflow-hidden" style={{ borderColor: priceError ? "#ef4444" : "#e5e7eb" }}>
                     <span className="text-[10px] text-gray-400 pl-1.5">₫</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       placeholder="TỪ"
                       value={formatThousands(priceMinInput)}
-                      onChange={(e) => setPriceMinInput(e.target.value.replace(/[^\d]/g, ""))}
+                      onChange={(e) => { setPriceMinInput(e.target.value.replace(/[^\d]/g, "")); setPriceError("") }}
                       className="w-full bg-transparent text-xs py-1.5 px-1 focus:outline-none placeholder:text-gray-300"
                     />
                   </div>
                   <span className="text-gray-300 text-xs">—</span>
-                  <div className="flex items-center flex-1 rounded border border-gray-200 overflow-hidden">
+                  <div className="flex items-center flex-1 rounded border overflow-hidden" style={{ borderColor: priceError ? "#ef4444" : "#e5e7eb" }}>
                     <span className="text-[10px] text-gray-400 pl-1.5">₫</span>
                     <input
                       type="text"
                       inputMode="numeric"
                       placeholder="ĐẾN"
                       value={formatThousands(priceMaxInput)}
-                      onChange={(e) => setPriceMaxInput(e.target.value.replace(/[^\d]/g, ""))}
+                      onChange={(e) => { setPriceMaxInput(e.target.value.replace(/[^\d]/g, "")); setPriceError("") }}
                       onKeyDown={(e) => e.key === "Enter" && handleApplyPrice()}
                       className="w-full bg-transparent text-xs py-1.5 px-1 focus:outline-none placeholder:text-gray-300"
                     />
                   </div>
                 </div>
+                {priceError && <p className="text-[10px] text-red-500 mb-1.5">{priceError}</p>}
                 <button
                   onClick={handleApplyPrice}
                   className="w-full py-1.5 rounded text-xs font-bold text-white transition-opacity hover:opacity-90"
@@ -449,27 +566,14 @@ function SearchPageContent() {
                   ))}
                 </ul>
               </div>
-
-              {/* Clear all */}
-              {hasActiveFilters && (
-                <div className="px-4 py-3">
-                  <button
-                    onClick={handleClearAll}
-                    className="w-full py-1.5 rounded border text-xs font-bold transition-colors hover:border-red-400 hover:text-red-500"
-                    style={{ borderColor: "#d1d5db", color: "var(--color-text-secondary)" }}
-                  >
-                    XÓA TẤT CẢ
-                  </button>
-                </div>
-              )}
             </div>
           </aside>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-gray-400 hidden sm:block">Sắp xếp:</span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap">
                   {SORT_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
@@ -486,6 +590,57 @@ function SearchPageContent() {
                 </div>
               </div>
             </div>
+
+            {/* Active filter chips */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {selectedCategoryName && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                    style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)", backgroundColor: "rgba(236,127,19,0.07)" }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>category</span>
+                    {selectedCategoryName}
+                    <button
+                      onClick={() => { setSelectedCategory(undefined); setActiveParentCategory(null); setSubCategories([]) }}
+                      className="ml-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                    </button>
+                  </span>
+                )}
+                {priceChipLabel && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                    style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)", backgroundColor: "rgba(236,127,19,0.07)" }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>payments</span>
+                    {priceChipLabel}
+                    <button
+                      onClick={() => { setPriceMinInput(""); setPriceMaxInput(""); setAppliedMinPrice(undefined); setAppliedMaxPrice(undefined) }}
+                      className="ml-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                    </button>
+                  </span>
+                )}
+                {appliedMinRating !== undefined && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border"
+                    style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)", backgroundColor: "rgba(236,127,19,0.07)" }}
+                  >
+                    <span className="material-symbols-outlined text-amber-500" style={{ fontSize: 12, fontVariationSettings: "'FILL' 1" }}>star</span>
+                    {appliedMinRating}⭐ trở lên
+                    <button
+                      onClick={() => setAppliedMinRating(undefined)}
+                      className="ml-0.5 hover:opacity-70 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
 
             {loading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">

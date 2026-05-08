@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   Card,
   CardContent,
@@ -55,6 +56,7 @@ function timeAgo(dateStr: string): string {
 }
 
 function Avatar({ name, url }: { name: string; url?: string | null }) {
+  const [imgError, setImgError] = useState(false)
   const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
   const color = colors[name.charCodeAt(0) % colors.length]
   const sizeClass = "size-10 text-sm"
@@ -62,10 +64,10 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
 
   return (
     <div className="relative shrink-0">
-      {url ? (
+      {url && !imgError ? (
         <div className={cn("rounded-full overflow-hidden", sizeClass)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={name} className="size-full object-cover" />
+          <img src={url} alt={name} className="size-full object-cover" onError={() => setImgError(true)} />
         </div>
       ) : (
         <div className={cn("rounded-full flex items-center justify-center text-white font-semibold", color, sizeClass)}>

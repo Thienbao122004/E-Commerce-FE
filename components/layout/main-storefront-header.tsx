@@ -28,9 +28,7 @@ export function MainStorefrontHeader() {
     >
       <div className="max-w-[1440px] mx-auto px-4 md:px-10 py-3 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="material-symbols-outlined text-4xl" style={{ color: 'var(--color-primary)' }}>
-            local_florist
-          </span>
+          <img src="/favicon.ico" alt="EcomViet" className="size-9 object-contain" style={{ mixBlendMode: "multiply" }} />
           <h1 className="text-xl md:text-2xl font-bold tracking-tight hidden sm:block" style={{ color: 'var(--color-text-main)' }}>
             EcomViet
           </h1>

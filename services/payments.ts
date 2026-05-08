@@ -26,4 +26,10 @@ export const paymentsService = {
       orderId,
       ...momoCallbackUrlOverrides(),
     }),
+
+  createMoMoBatchPayment: (orderIds: string[]) =>
+    api.post<CreatePaymentResponse>('/api/payments/momo/create-batch', {
+      orderIds,
+      ...momoCallbackUrlOverrides(),
+    }),
 }

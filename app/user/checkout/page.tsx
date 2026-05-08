@@ -379,10 +379,9 @@ export default function CheckoutPage() {
         if (paymentMethod === 'vnpay') {
           paymentRes = await paymentsService.createVNPayBatchPayment(orderIds)
         } else {
-          if (orderIds.length > 1) {
-            toast.info('Đã tạo nhiều đơn theo shop. Hệ thống sẽ thanh toán MoMo cho đơn đầu tiên.')
-          }
-          paymentRes = await paymentsService.createMoMoPayment(orderIds[0])
+          paymentRes = orderIds.length > 1
+            ? await paymentsService.createMoMoBatchPayment(orderIds)
+            : await paymentsService.createMoMoPayment(orderIds[0])
         }
         if (!paymentRes.success || !paymentRes.paymentUrl) {
           toast.error(paymentRes.message || `Không thể tạo giao dịch ${gatewayLabel}`)
