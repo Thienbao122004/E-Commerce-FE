@@ -7,6 +7,7 @@ import type {
   AiChatSessionResponse,
   AiChatSendResponse,
   AiChatConfirmOrderResponse,
+  AiChatShopShippingOption,
   AiSessionsResponse,
   AiSessionMessagesResponse,
 } from "@/types/ai-chat"
@@ -18,6 +19,7 @@ export type {
   AiChatSessionResponse,
   AiChatSendResponse,
   AiChatConfirmOrderResponse,
+  AiChatShopShippingOption,
   AiSessionSummary,
   AiSessionsResponse,
   AiSessionMessage,
@@ -79,10 +81,15 @@ export const aiChatService = {
       body: JSON.stringify({ sessionId, message }),
     }),
 
-  confirmOrder: (sessionId: string, cartId: string, shippingAddressId: string) =>
+  confirmOrder: (
+    sessionId: string,
+    cartId: string,
+    shippingAddressId: string,
+    shippingOptions: AiChatShopShippingOption[],
+  ) =>
     aiRequest<AiChatConfirmOrderResponse>("/api/ai/chat/confirm-order", {
       method: "POST",
-      body: JSON.stringify({ sessionId, cartId, shippingAddressId }),
+      body: JSON.stringify({ sessionId, cartId, shippingAddressId, shippingOptions }),
     }),
 
   listSessions: (page = 1, pageSize = 20) =>

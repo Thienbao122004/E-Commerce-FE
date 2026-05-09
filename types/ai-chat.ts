@@ -50,6 +50,14 @@ export interface AiChatSendResponse {
   productToAdd?: ProductToAdd | null
 }
 
+export interface AiChatShopShippingOption {
+  shopId: string
+  shippingProvider?: string
+  shippingServiceId?: string
+  shippingFee: number
+  estimatedDeliveryDate?: string | null
+}
+
 export interface AiChatConfirmOrderResponse {
   success: boolean
   orderId?: string
