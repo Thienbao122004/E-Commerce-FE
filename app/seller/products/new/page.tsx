@@ -433,9 +433,11 @@ export default function CreateProductPage() {
   }, [platformTagQuery, allPlatformTags])
 
   const manualCategoryOptions = React.useMemo(() => {
+    // Chỉ cho seller chọn category cấp 2 — đồng nhất rule với BE.
+    const tier2 = manualCategoryRows.filter((c) => c.level === 2)
     const q = debouncedManualCatQuery.trim().toLowerCase()
-    if (!q) return manualCategoryRows.slice(0, 12)
-    return manualCategoryRows
+    if (!q) return tier2.slice(0, 12)
+    return tier2
       .filter(
         (c) =>
           c.pathLabel.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
@@ -658,6 +660,17 @@ export default function CreateProductPage() {
   }, [hasInput, imageUrls, name, description, normalizeAiImageUrls, applyAnalysisResult])
 
   const handleSelectCategory = (cat: CategorySuggestion) => {
+    // Cross-check level từ manualCategoryRows (BE trả về). Nếu AI suggestion là
+    // tier 1 (root), reject để buộc seller chọn category cụ thể hơn.
+    const meta = manualCategoryRows.find((r) => r.id === cat.categoryId)
+    if (meta && meta.level !== 2) {
+      toast.error(
+        meta.level === 1
+          ? `"${cat.categoryName}" là danh mục cấp 1 (quá rộng). Hãy chọn 1 danh mục cấp 2 cụ thể hơn.`
+          : `"${cat.categoryName}" không phải danh mục cấp 2. Vui lòng chọn lại.`
+      )
+      return
+    }
     setSelCategory((prev) => {
       if (prev?.categoryId !== cat.categoryId) {
         setSelTagIds([])

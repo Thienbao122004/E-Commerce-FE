@@ -4,7 +4,7 @@ import * as React from "react"
 import { IconGitCompare } from "@tabler/icons-react"
 
 import type { ProductApprovedSnapshot, ProductModeration } from "@/types/product"
-import { formatPriceVND } from "@/lib/formatters"
+import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 import {
   Collapsible,
   CollapsibleContent,
@@ -139,7 +139,7 @@ export function ProductModerationDiff({ product, snapshot }: { product: ProductM
       </div>
       {snapshot.capturedAtUtc && (
         <p className="px-3 pt-2 text-xs text-muted-foreground">
-          Ảnh chụp bản cũ (UTC): {snapshot.capturedAtUtc}
+          Bản cũ được chụp lúc: {formatDateTimeVN(snapshot.capturedAtUtc)}
         </p>
       )}
       {!hasAny && (
