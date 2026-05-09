@@ -25,6 +25,14 @@ export const profileService = {
   confirmEmailChange: (newEmail: string, otp: string) =>
     api.post<ApiDataResponse<null>>('/api/user/profile/confirm-email-change', { newEmail, otp }),
 
+  /**
+   * Yêu cầu BE xóa cache snapshot Supabase Auth của user hiện tại.
+   * Dùng sau khi đổi avatar / email / metadata để các nơi khác (review,
+   * chat, ...) đọc thấy dữ liệu mới ngay thay vì chờ TTL cache hết.
+   */
+  refreshAuthCache: () =>
+    api.post<{ success: boolean }>('/api/user/profile/refresh-auth-cache'),
+
   getAddresses: () =>
     api.get<ApiDataResponse<AddressResponse[]>>('/api/user/addresses'),
 
