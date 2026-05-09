@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,16 +10,26 @@ import { IconDotsVertical, IconMessage2, IconSearch } from "@tabler/icons-react"
 import type { ConversationDto } from "./chat-types"
 
 function Avatar({ name, url, online, size = "md" }: { name: string; url?: string | null; online?: boolean; size?: "sm" | "md" }) {
+  const [imgError, setImgError] = useState(false)
+  useEffect(() => {
+    setImgError(false)
+  }, [url])
   const colors = ["bg-violet-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"]
   const color = colors[name.charCodeAt(0) % colors.length]
   const sizeClass = size === "sm" ? "size-8 text-xs" : "size-9 text-sm"
   const initials = name.split(" ").slice(-2).map((w) => w[0]).join("").toUpperCase().slice(0, 2)
   return (
     <div className="relative shrink-0">
-      {url ? (
+      {url && !imgError ? (
         <div className={cn("rounded-full overflow-hidden", sizeClass)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt={name} className="size-full object-cover" />
+          <img
+            src={url}
+            alt={name}
+            className="size-full object-cover"
+            referrerPolicy="no-referrer"
+            onError={() => setImgError(true)}
+          />
         </div>
       ) : (
         <div className={cn("rounded-full flex items-center justify-center text-white font-semibold", color, sizeClass)}>
