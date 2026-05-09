@@ -36,9 +36,9 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
+import { dispatchPendingCountRefresh } from "@/hooks/use-admin-pending-product-count"
 
 const PENDING_PATH = "/admin/dashboard/products/pending-approval"
-const ALL_PRODUCTS_PATH = "/admin/dashboard/products"
 
 export default function ProductsPendingApprovalPage() {
   const router = useRouter()
@@ -121,34 +121,25 @@ export default function ProductsPendingApprovalPage() {
 
   const handleProductUpdatedAfterAction = React.useCallback(
     (p: ProductModeration | null) => {
-      if (p == null) {
-        setSelectedProduct(null)
-        return
-      }
-      if (p.status !== ProductStatus.PendingApproval) {
-        setSelectedProduct(null)
-        if (p.status === ProductStatus.Active) {
-          router.push(ALL_PRODUCTS_PATH, { scroll: false })
-        } else {
-          router.push(PENDING_PATH, { scroll: false })
-        }
-        return
-      }
-      setSelectedProduct(p)
+      // Sau approve / reject: luôn ở lại trang Chờ duyệt, không chuyển sang all-products.
+      dispatchPendingCountRefresh()
+      setSelectedProduct(null)
+      router.push(PENDING_PATH, { scroll: false })
+      void reload()
     },
-    [router]
+    [router, reload]
   )
 
-  const approveAndGoToAllProducts = React.useCallback(
+  const approveFromTable = React.useCallback(
     async (id: string) => {
       const res = await approveProduct(id)
       if (res.success) {
-        setSelectedProduct(null)
-        router.push(ALL_PRODUCTS_PATH, { scroll: false })
+        dispatchPendingCountRefresh()
+        void reload()
       }
       return res
     },
-    [approveProduct, router]
+    [approveProduct, reload]
   )
 
   if (selectedProduct) {
@@ -271,7 +262,7 @@ export default function ProductsPendingApprovalPage() {
                           <Button
                             size="icon"
                             className="size-8 text-white shadow-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
-                            onClick={() => void approveAndGoToAllProducts(product.id)}
+                            onClick={() => void approveFromTable(product.id)}
                             disabled={actionLoading}
                             title="Duyệt nhanh"
                             type="button"
