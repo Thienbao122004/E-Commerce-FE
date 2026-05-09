@@ -709,7 +709,6 @@ export default function PurchaseOrderDetailPage() {
               onClick={() => openDisputeDialog(false)}
               className="cursor-pointer border-orange-300 text-orange-600 hover:bg-orange-50"
             >
-              <span className="mr-1">⚠</span>
               Khiếu nại đơn hàng
             </Button>
           )}
@@ -724,7 +723,6 @@ export default function PurchaseOrderDetailPage() {
               onClick={() => openDisputeDialog(true)}
               className="cursor-pointer border-orange-300 text-orange-600 hover:bg-orange-50"
             >
-              <span className="mr-1">⚠</span>
               Báo không nhận được hàng
             </Button>
           )}
