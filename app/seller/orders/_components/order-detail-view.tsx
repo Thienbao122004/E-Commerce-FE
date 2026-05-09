@@ -331,7 +331,6 @@ export function OrderDetailView({ orderId }: Props) {
 
   const transitions = order ? (validTransitions[order.status] ?? []) : []
   const canUpdate = transitions.length > 0
-  const canCancel = transitions.includes(OrderStatus.Cancelled)
 
   const handleOpenStatusDialog = (nextStatus?: number) => {
     setSelectedStatus(nextStatus ?? transitions[0] ?? null)

@@ -8,14 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 
 /**
- * Seller chỉ được chuyển tối đa đến "Đang chuẩn bị" (Processing).
- * Các bước sau (đang giao, đã giao, hoàn thành) do hệ thống/đối tác vận chuyển hoặc admin xử lý.
+ * Seller chỉ được phép thực hiện 2 transition tiến lên:
+ *   - Chờ xác nhận → Đã xác nhận
+ *   - Đã xác nhận → Đang chuẩn bị
+ *
+ * Các bước sau (đang giao, đã giao, hoàn thành) do hệ thống/đối tác vận chuyển
+ * hoặc admin xử lý. Hủy đơn do buyer yêu cầu và seller duyệt qua endpoint
+ * riêng (approve-cancel/reject-cancel) — không cho seller chủ động hủy qua
+ * dialog cập nhật trạng thái này.
  */
 const validTransitions: Record<number, number[]> = {
   [OrderStatus.PendingPayment]: [],
-  [OrderStatus.PendingConfirmation]: [OrderStatus.Confirmed, OrderStatus.Cancelled],
-  [OrderStatus.Confirmed]: [OrderStatus.Processing, OrderStatus.Cancelled],
-  [OrderStatus.Processing]: [OrderStatus.Cancelled],
+  [OrderStatus.PendingConfirmation]: [OrderStatus.Confirmed],
+  [OrderStatus.Confirmed]: [OrderStatus.Processing],
+  [OrderStatus.Processing]: [],
   [OrderStatus.Shipping]: [],
   [OrderStatus.Delivered]: [],
   [OrderStatus.Completed]: [],
