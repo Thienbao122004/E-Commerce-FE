@@ -20,6 +20,8 @@ import {
   IconCheck,
   IconX,
   IconPencil,
+  IconBox,
+  IconSearch,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -157,6 +159,27 @@ function DetailSkeleton() {
       </div>
     </div>
   )
+}
+
+/**
+ * Đi ngược chuỗi parentId để tìm root category id.
+ * Trả về null nếu không tìm thấy hoặc data lỗi (cap depth = 10).
+ */
+function getRootCategoryIdFromList(
+  categoryId: number | null | undefined,
+  list: { id: number; parentId: number | null }[],
+): number | null {
+  if (categoryId == null) return null
+  let current = list.find((c) => c.id === categoryId)
+  if (!current) return null
+  let depth = 0
+  while (current.parentId != null && depth < 10) {
+    const parent = list.find((c) => c.id === current!.parentId)
+    if (!parent) return current.id
+    current = parent
+    depth++
+  }
+  return current.id
 }
 
 function parseAttributesStr(attrStr: string): Record<string, string> {
@@ -306,12 +329,13 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
       ])
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const flatten = (arr: any[], level = 1): (StorefrontCategory & { level: number; pathLabel: string })[] => {
+      const flatten = (arr: any[], level = 1, parentPath = ""): (StorefrontCategory & { level: number; pathLabel: string })[] => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return arr.reduce((acc: any[], cat: any) => {
-              const flatCat = { ...cat, level, pathLabel: "- ".repeat(level-1) + cat.name }
+              const pathLabel = parentPath ? `${parentPath} › ${cat.name}` : cat.name
+              const flatCat = { ...cat, level, pathLabel }
               const kids = cat.subcategories ?? cat.children ?? []
-              return acc.concat(flatCat, flatten(kids, level + 1))
+              return acc.concat(flatCat, flatten(kids, level + 1, pathLabel))
           }, [])
       }
       if (catTreeRes.success && catTreeRes.tree?.length) {
@@ -626,6 +650,71 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
     const par = categoriesList.find((c) => c.id === cat.parentId)
     return { parentName: par?.name ?? null, currentName }
   }, [editCategoryId, product?.categoryId, product?.categoryName, categoriesList])
+
+  // Root category id của SP **lúc load** — dùng làm mốc so sánh để biết
+  // seller có đang đổi sang nhánh khác không. Không dùng `editCategoryId`
+  // hiện tại vì nó là target, sẽ cho kết quả luôn bằng nhau.
+  const originalRootCategoryId = React.useMemo(() => {
+    return getRootCategoryIdFromList(product?.categoryId ?? null, categoriesList)
+  }, [product?.categoryId, categoriesList])
+
+  // Có đang đổi sang nhánh root khác không?
+  // Chỉ tính là true khi đã chọn category mới khác category gốc của SP.
+  const rootBranchChanged = React.useMemo(() => {
+    if (editCategoryId == null || product?.categoryId == null) return false
+    if (editCategoryId === product.categoryId) return false
+    const newRoot = getRootCategoryIdFromList(editCategoryId, categoriesList)
+    return (
+      originalRootCategoryId != null &&
+      newRoot != null &&
+      newRoot !== originalRootCategoryId
+    )
+  }, [editCategoryId, product?.categoryId, categoriesList, originalRootCategoryId])
+
+  // Chỉ cho seller chọn category **tier 2** (sub-category trực tiếp dưới root).
+  // Lý do: tier 1 quá rộng (Thời trang, Đồ điện tử…) làm SEO/discovery kém,
+  // tier 3+ quá hẹp gây phân mảnh dữ liệu. Tier 2 là sweet spot.
+  const pickableCategories = React.useMemo(
+    () => categoriesList.filter((c) => c.level === 2),
+    [categoriesList]
+  )
+
+  const [catSearch, setCatSearch] = React.useState("")
+
+  React.useEffect(() => {
+    if (!catDialogOpen) setCatSearch("")
+  }, [catDialogOpen])
+
+  const groupedPickableCategories = React.useMemo(() => {
+    const q = catSearch.trim().toLowerCase()
+    type Group = { parentId: number | null; parentName: string; items: typeof pickableCategories }
+    const groupMap = new Map<number, Group>()
+
+    for (const c of pickableCategories) {
+      const parent = c.parentId != null
+        ? categoriesList.find((p) => p.id === c.parentId)
+        : null
+      const parentName = parent?.name ?? "Khác"
+      const parentId = parent?.id ?? -1
+
+      if (q) {
+        const matchSelf = c.name.toLowerCase().includes(q)
+        const matchParent = parentName.toLowerCase().includes(q)
+        if (!matchSelf && !matchParent) continue
+      }
+
+      let group = groupMap.get(parentId)
+      if (!group) {
+        group = { parentId: parent?.id ?? null, parentName, items: [] }
+        groupMap.set(parentId, group)
+      }
+      group.items.push(c)
+    }
+
+    return Array.from(groupMap.values()).sort((a, b) =>
+      a.parentName.localeCompare(b.parentName, "vi")
+    )
+  }, [pickableCategories, categoriesList, catSearch])
 
   return (
     <>
@@ -1070,14 +1159,27 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                     isMultiPrice={!!(product && product.variants && product.variants.length > 0)}
                   />
 
-                  {/* Categorization block
+                  {/* Categorization block — Danh mục, Tags, Chất liệu (post-publish edit) */}
                   <div className="space-y-3 pt-2">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <IconBox className="size-3.5" /> Phân loại mở rộng
                     </Label>
-                    
+
+                    {rootBranchChanged && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                        <IconAlertTriangle className="size-3.5 mt-0.5 shrink-0" />
+                        <div className="space-y-0.5">
+                          <p className="font-semibold">Đã chọn nhánh danh mục khác</p>
+                          <p className="opacity-90">
+                            Sau khi lưu, sản phẩm sẽ chuyển về <span className="font-semibold">Chờ duyệt</span> để admin xem lại
+                            (chống gaming SEO khi seller đổi sang nhánh khác sau duyệt).
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid sm:grid-cols-3 gap-3">
-                      <div 
+                      <div
                         onClick={openCategoryPicker}
                         className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group"
                       >
@@ -1097,7 +1199,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         )}
                       </div>
 
-                      <div 
+                      <div
                         onClick={openTagPicker}
                         className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group sm:col-span-1"
                       >
@@ -1124,7 +1226,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         </div>
                       </div>
 
-                      <div 
+                      <div
                         onClick={openMatPicker}
                         className="rounded-xl border hover:border-primary/50 transition-colors p-3 bg-muted/10 cursor-pointer flex flex-col gap-1.5 group sm:col-span-1"
                       >
@@ -1151,7 +1253,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         </div>
                       </div>
                     </div>
-                  </div> */}
+                  </div>
 
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1643,37 +1745,79 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* === Category Picker Modal ===
+      {/* === Category Picker Modal — chỉ tier 2, group theo tier 1 cha === */}
       <Dialog open={catDialogOpen} onOpenChange={setCatDialogOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0">
-          <DialogHeader className="px-5 pt-5 pb-2">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b">
             <DialogTitle>Chọn danh mục</DialogTitle>
             <DialogDescription>
-              Chọn một danh mục phù hợp nhất cho sản phẩm.
+              Chỉ chọn được danh mục cấp 2. Đổi sang nhánh khác sẽ cần admin duyệt lại.
             </DialogDescription>
+            <div className="relative pt-2">
+              <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 mt-1 size-3.5 text-muted-foreground" />
+              <Input
+                value={catSearch}
+                onChange={(e) => setCatSearch(e.target.value)}
+                placeholder="Tìm danh mục..."
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
           </DialogHeader>
-          <div className="overflow-y-auto px-5 pb-5">
+          <div className="overflow-y-auto px-2 py-2">
             {attrLoading ? (
               <p className="text-sm text-muted-foreground p-4 text-center">Đang tải...</p>
+            ) : pickableCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">
+                Chưa có danh mục cấp 2. Vui lòng liên hệ admin.
+              </p>
+            ) : groupedPickableCategories.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4 text-center">
+                Không tìm thấy danh mục phù hợp.
+              </p>
             ) : (
-              <div className="space-y-1">
-                {categoriesList.map(c => {
-                   const active = editCategoryId === c.id
-                   return (
-                     <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => { setEditCategoryId(c.id); mark(); setCatDialogOpen(false) }}
-                        className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          active
-                            ? "bg-primary/10 text-primary font-semibold"
-                            : "hover:bg-muted font-medium text-foreground"
-                        }`}
-                      >
-                        {c.pathLabel || c.name}
-                      </button>
-                   )
-                })}
+              <div className="space-y-3">
+                {groupedPickableCategories.map((group) => (
+                  <div key={group.parentId ?? -1}>
+                    <h4 className="sticky top-[-14px] z-10 bg-background px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b">
+                      {group.parentName}
+                    </h4>
+                    <div className="pt-1.5 space-y-0.5">
+                      {group.items.map((c) => {
+                        const active = editCategoryId === c.id
+                        const wouldChangeRoot =
+                          originalRootCategoryId != null &&
+                          getRootCategoryIdFromList(c.id, categoriesList) !== originalRootCategoryId
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setEditCategoryId(c.id)
+                              mark()
+                              setCatDialogOpen(false)
+                            }}
+                            className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors flex items-center justify-between gap-2 ${
+                              active
+                                ? "bg-primary/10 text-primary font-semibold"
+                                : "hover:bg-muted font-medium text-foreground"
+                            }`}
+                          >
+                            <span className="truncate flex items-center gap-2">
+                              {active && <IconCheck className="size-3.5 text-primary shrink-0" />}
+                              {c.name}
+                            </span>
+                            {wouldChangeRoot && !active && (
+                              <span className="shrink-0 inline-flex items-center gap-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 text-[10px] font-semibold">
+                                <IconAlertTriangle className="size-3" />
+                                Cần duyệt lại
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1702,9 +1846,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         mark()
                      }}
                      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-all ${
-                       active 
+                       active
                         ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "bg-white text-muted-foreground hover:bg-muted"
+                        : "bg-background text-muted-foreground hover:bg-muted"
                      }`}
                    >
                      #{tag.name}
@@ -1739,9 +1883,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                         mark()
                      }}
                      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-all ${
-                       active 
+                       active
                         ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "bg-white text-muted-foreground hover:bg-muted"
+                        : "bg-background text-muted-foreground hover:bg-muted"
                      }`}
                    >
                      {m.name}
@@ -1752,7 +1896,7 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
              )}
           </div>
         </DialogContent>
-      </Dialog> */}
+      </Dialog>
 
       {/* === Description Sheet === */}
       <Sheet open={descSheetOpen} onOpenChange={setDescSheetOpen}>
