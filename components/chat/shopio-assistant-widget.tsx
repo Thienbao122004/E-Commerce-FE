@@ -26,11 +26,18 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
-import { aiChatService, type AiChatSendResponse, type AiSessionSummary } from "@/services/ai-chat"
+import {
+  aiChatService,
+  type AiChatSendResponse,
+  type AiSessionSummary,
+  type AiChatShopShippingOption,
+} from "@/services/ai-chat"
 import { cartService } from "@/services/cart"
 import { profileService } from "@/services/profile"
 import { paymentsService } from "@/services/payments"
 import { ordersService } from "@/services/orders"
+import { useGHNShippingFee } from "@/hooks/useGHNShippingFee"
+import type { Cart } from "@/types/cart"
 import type { AddressResponse, AddAddressRequest } from "@/types/profile"
 import {
   vietnamProvincesService,
@@ -594,6 +601,7 @@ export function ShopioAssistantWidget() {
   const [applyingSelectionMessageId, setApplyingSelectionMessageId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTargetState | null>(null)
   const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null)
+  const [currentCart, setCurrentCart] = useState<Cart | null>(null)
 
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -621,6 +629,66 @@ export function ShopioAssistantWidget() {
     () => addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress,
     [addresses, selectedAddressId, defaultAddress]
   )
+
+  // Gom item theo shop để tính phí GHN — phải trùng đúng cách trang checkout làm,
+  // nếu không Main API sẽ trả "Thiếu phí vận chuyển theo từng shop".
+  const cartShopGroups = useMemo(() => {
+    if (!currentCart?.items?.length) return [] as Array<{
+      key: string
+      shopId?: string
+      totalWeightGrams: number
+      totalValue: number
+      ghnShopId?: number | null
+      fromDistrictId?: number | null
+      fromWardCode?: string | null
+    }>
+    const map = new Map<string, {
+      key: string
+      shopId?: string
+      totalWeightGrams: number
+      totalValue: number
+      ghnShopId?: number | null
+      fromDistrictId?: number | null
+      fromWardCode?: string | null
+    }>()
+    currentCart.items.forEach((item, idx) => {
+      const normalizedShopName = item.shopName?.trim() || "Shop không xác định"
+      const key = item.shopId || normalizedShopName.toLowerCase() || `shop-${idx}`
+      const existing = map.get(key)
+      const weight = item.quantity * 500
+      if (existing) {
+        existing.totalWeightGrams += weight
+        existing.totalValue += item.lineTotal
+      } else {
+        map.set(key, {
+          key,
+          shopId: item.shopId ?? undefined,
+          totalWeightGrams: weight,
+          totalValue: item.lineTotal,
+          ghnShopId: item.ghnShopId ?? null,
+          fromDistrictId: item.fromDistrictId ?? null,
+          fromWardCode: item.fromWardCode ?? null,
+        })
+      }
+    })
+    return Array.from(map.values())
+  }, [currentCart])
+
+  const ghnShopInputs = useMemo(
+    () =>
+      cartShopGroups.map((g) => ({
+        key: g.key,
+        totalWeightGrams: g.totalWeightGrams,
+        totalValue: g.totalValue,
+        ghnShopId: g.ghnShopId,
+        fromDistrictId: g.fromDistrictId,
+        fromWardCode: g.fromWardCode,
+      })),
+    [cartShopGroups]
+  )
+
+  const { shopFees, isCalculating: ghnCalculating, hasBlockingError: ghnHasError } =
+    useGHNShippingFee(ghnShopInputs, effectiveAddress ?? undefined)
 
   const visibleSessions = useMemo(() => {
     const keyword = sessionSearch.trim().toLowerCase()
@@ -739,6 +807,31 @@ export function ShopioAssistantWidget() {
       JSON.stringify({ messages, confirmTarget, selectedAddressId, selectedProductsByMessageId })
     )
   }, [sessionId, messages, confirmTarget, selectedAddressId, selectedProductsByMessageId])
+
+  // Refresh giỏ hàng để feed `useGHNShippingFee` — phải có cart hiện tại mới
+  // tính được phí GHN (yêu cầu của Main API trước khi tạo đơn).
+  const refreshCurrentCart = useCallback(async () => {
+    try {
+      const cart = await cartService.getMyCart()
+      setCurrentCart(cart ?? null)
+    } catch {
+      setCurrentCart(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    void refreshCurrentCart()
+    const onCartUpdated = () => void refreshCurrentCart()
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated)
+    return () => window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated)
+  }, [open, refreshCurrentCart])
+
+  useEffect(() => {
+    if (!open) return
+    if (!confirmTarget?.cartId) return
+    void refreshCurrentCart()
+  }, [open, confirmTarget?.cartId, refreshCurrentCart])
 
   const buildConfirmFromCart = useCallback(async (messageId: string, preferredProductId?: string, quantity = 1) => {
     const cart = await cartService.getMyCart().catch(() => null)
@@ -1017,7 +1110,54 @@ export function ShopioAssistantWidget() {
       if (!cartId) { const c = await cartService.getMyCart().catch(() => null); cartId = c?.id }
       if (!cartId) { toast.message("Giỏ hàng đang trống."); return }
 
-      const res = await aiChatService.confirmOrder(sessionId, cartId, resolved.id)
+      // Đảm bảo dữ liệu cart đầy đủ trước khi build shippingOptions
+      let cartForShipping = currentCart
+      if (!cartForShipping || cartForShipping.id !== cartId) {
+        const fresh = await cartService.getMyCart().catch(() => null)
+        if (fresh) {
+          setCurrentCart(fresh)
+          cartForShipping = fresh
+        }
+      }
+      if (!cartForShipping?.items?.length) {
+        toast.error("Giỏ hàng trống, không thể tạo đơn.")
+        return
+      }
+
+      if (ghnCalculating) {
+        toast.message("Đang tính phí vận chuyển GHN, bạn đợi vài giây nhé.")
+        return
+      }
+      if (ghnHasError) {
+        toast.error("Chưa tính được phí giao hàng. Hãy đổi địa chỉ hoặc thử lại.")
+        return
+      }
+
+      const shippingOptions: AiChatShopShippingOption[] = []
+      for (const group of cartShopGroups) {
+        if (!group.shopId) continue
+        const sf = shopFees.get(group.key)
+        if (!sf || sf.fee == null) {
+          toast.error("Thiếu phí vận chuyển cho một shop trong giỏ. Tải lại hoặc đổi địa chỉ rồi thử lại.")
+          return
+        }
+        shippingOptions.push({
+          shopId: group.shopId,
+          shippingProvider: "GHN",
+          shippingServiceId: sf.ghnServiceId ?? "53320",
+          shippingFee: sf.fee,
+          estimatedDeliveryDate: sf.leadTime
+            ? new Date(sf.leadTime * 1000).toISOString()
+            : null,
+        })
+      }
+
+      if (shippingOptions.length === 0) {
+        toast.error("Không xác định được shop trong giỏ để tính phí vận chuyển.")
+        return
+      }
+
+      const res = await aiChatService.confirmOrder(sessionId, cartId, resolved.id, shippingOptions)
 
       if (res.success && res.orderId) {
         const providerLabel = paymentMethod === "momo" ? "MoMo" : "VNPay"
@@ -1058,7 +1198,18 @@ export function ShopioAssistantWidget() {
       setOrderLoading(false)
       if (didComplete) setConfirmTarget(null)
     }
-  }, [sessionId, confirmTarget, effectiveAddress, selectedAddressId, paymentMethod])
+  }, [
+    sessionId,
+    confirmTarget,
+    effectiveAddress,
+    selectedAddressId,
+    paymentMethod,
+    currentCart,
+    cartShopGroups,
+    shopFees,
+    ghnCalculating,
+    ghnHasError,
+  ])
 
   const handleRejectOrder = useCallback(async () => {
     setConfirmTarget(null)

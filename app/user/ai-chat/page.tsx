@@ -13,9 +13,15 @@ import {
   CircleCheck,
   Plus,
 } from 'lucide-react'
-import { aiChatService, type AiChatSendResponse } from '@/services/ai-chat'
+import {
+  aiChatService,
+  type AiChatSendResponse,
+  type AiChatShopShippingOption,
+} from '@/services/ai-chat'
 import { cartService } from '@/services/cart'
 import { profileService } from '@/services/profile'
+import { useGHNShippingFee } from '@/hooks/useGHNShippingFee'
+import type { Cart } from '@/types/cart'
 import { formatPriceVND as formatPrice, formatTimeVN as formatTime } from '@/lib/formatters'
 import { readAiChatUiCache, writeAiChatUiCache, removeAiChatUiCache } from '@/lib/ai-chat-ui-cache'
 import { dedupeMergedChatMessages } from '@/lib/ai-chat-merge-messages'
@@ -153,6 +159,7 @@ export default function UserAiChatPage() {
   >({})
   const [applyingSelectionMessageId, setApplyingSelectionMessageId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTargetState | null>(null)
+  const [currentCart, setCurrentCart] = useState<Cart | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -164,6 +171,87 @@ export default function UserAiChatPage() {
     () => addresses.find((a) => a.id === selectedAddressId) ?? defaultAddress,
     [addresses, selectedAddressId, defaultAddress]
   )
+
+  // Gom item trong giỏ theo shop để tính phí GHN — Main API yêu cầu shippingOptions
+  // theo từng shop trước khi cho phép tạo đơn.
+  const cartShopGroups = useMemo(() => {
+    if (!currentCart?.items?.length) return [] as Array<{
+      key: string
+      shopId?: string
+      totalWeightGrams: number
+      totalValue: number
+      ghnShopId?: number | null
+      fromDistrictId?: number | null
+      fromWardCode?: string | null
+    }>
+    const map = new Map<string, {
+      key: string
+      shopId?: string
+      totalWeightGrams: number
+      totalValue: number
+      ghnShopId?: number | null
+      fromDistrictId?: number | null
+      fromWardCode?: string | null
+    }>()
+    currentCart.items.forEach((item, idx) => {
+      const normalizedShopName = item.shopName?.trim() || 'Shop không xác định'
+      const key = item.shopId || normalizedShopName.toLowerCase() || `shop-${idx}`
+      const weight = item.quantity * 500
+      const existing = map.get(key)
+      if (existing) {
+        existing.totalWeightGrams += weight
+        existing.totalValue += item.lineTotal
+      } else {
+        map.set(key, {
+          key,
+          shopId: item.shopId ?? undefined,
+          totalWeightGrams: weight,
+          totalValue: item.lineTotal,
+          ghnShopId: item.ghnShopId ?? null,
+          fromDistrictId: item.fromDistrictId ?? null,
+          fromWardCode: item.fromWardCode ?? null,
+        })
+      }
+    })
+    return Array.from(map.values())
+  }, [currentCart])
+
+  const ghnShopInputs = useMemo(
+    () =>
+      cartShopGroups.map((g) => ({
+        key: g.key,
+        totalWeightGrams: g.totalWeightGrams,
+        totalValue: g.totalValue,
+        ghnShopId: g.ghnShopId,
+        fromDistrictId: g.fromDistrictId,
+        fromWardCode: g.fromWardCode,
+      })),
+    [cartShopGroups]
+  )
+
+  const { shopFees, isCalculating: ghnCalculating, hasBlockingError: ghnHasError } =
+    useGHNShippingFee(ghnShopInputs, effectiveAddress ?? undefined)
+
+  const refreshCurrentCart = useCallback(async () => {
+    try {
+      const cart = await cartService.getMyCart()
+      setCurrentCart(cart ?? null)
+    } catch {
+      setCurrentCart(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshCurrentCart()
+    const onCartUpdated = () => void refreshCurrentCart()
+    window.addEventListener(CART_UPDATED_EVENT, onCartUpdated)
+    return () => window.removeEventListener(CART_UPDATED_EVENT, onCartUpdated)
+  }, [refreshCurrentCart])
+
+  useEffect(() => {
+    if (!confirmTarget?.cartId) return
+    void refreshCurrentCart()
+  }, [confirmTarget?.cartId, refreshCurrentCart])
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -590,15 +678,63 @@ export default function UserAiChatPage() {
 
       let cartId = confirmTarget?.cartId
       if (!cartId) {
-        const currentCart = await cartService.getMyCart().catch(() => null)
-        cartId = currentCart?.id
+        const fresh = await cartService.getMyCart().catch(() => null)
+        cartId = fresh?.id
+        if (fresh) setCurrentCart(fresh)
       }
       if (!cartId) {
         toast.message('Giỏ hàng hiện đang trống. Bạn hãy thêm sản phẩm trước khi tạo đơn.')
         return
       }
 
-      const res = await aiChatService.confirmOrder(sessionId, cartId, resolvedAddress.id)
+      // Đảm bảo cart hiện hành đã đồng bộ với cartId trước khi build shippingOptions
+      let cartForShipping = currentCart
+      if (!cartForShipping || cartForShipping.id !== cartId) {
+        const fresh = await cartService.getMyCart().catch(() => null)
+        if (fresh) {
+          setCurrentCart(fresh)
+          cartForShipping = fresh
+        }
+      }
+      if (!cartForShipping?.items?.length) {
+        toast.error('Giỏ hàng trống, không thể tạo đơn.')
+        return
+      }
+
+      if (ghnCalculating) {
+        toast.message('Đang tính phí vận chuyển GHN, bạn đợi vài giây nhé.')
+        return
+      }
+      if (ghnHasError) {
+        toast.error('Chưa tính được phí giao hàng. Hãy đổi địa chỉ hoặc thử lại.')
+        return
+      }
+
+      const shippingOptions: AiChatShopShippingOption[] = []
+      for (const group of cartShopGroups) {
+        if (!group.shopId) continue
+        const sf = shopFees.get(group.key)
+        if (!sf || sf.fee == null) {
+          toast.error('Thiếu phí vận chuyển cho một shop trong giỏ. Tải lại hoặc đổi địa chỉ rồi thử lại.')
+          return
+        }
+        shippingOptions.push({
+          shopId: group.shopId,
+          shippingProvider: 'GHN',
+          shippingServiceId: sf.ghnServiceId ?? '53320',
+          shippingFee: sf.fee,
+          estimatedDeliveryDate: sf.leadTime
+            ? new Date(sf.leadTime * 1000).toISOString()
+            : null,
+        })
+      }
+
+      if (shippingOptions.length === 0) {
+        toast.error('Không xác định được shop trong giỏ để tính phí vận chuyển.')
+        return
+      }
+
+      const res = await aiChatService.confirmOrder(sessionId, cartId, resolvedAddress.id, shippingOptions)
       if (res.success) {
         setMessages((prev) => [
           ...prev,
@@ -619,7 +755,17 @@ export default function UserAiChatPage() {
       setOrderLoading(false)
       setConfirmTarget(null)
     }
-  }, [sessionId, confirmTarget, effectiveAddress, selectedAddressId])
+  }, [
+    sessionId,
+    confirmTarget,
+    effectiveAddress,
+    selectedAddressId,
+    currentCart,
+    cartShopGroups,
+    shopFees,
+    ghnCalculating,
+    ghnHasError,
+  ])
 
   const handleRejectOrder = useCallback(async () => {
     setConfirmTarget(null)
