@@ -115,7 +115,16 @@ export default function ProfilePage() {
           data: { avatar_storage_path: storagePath },
         })
         if (updateError) throw updateError
-        
+
+        // Báo BE xóa cache snapshot Supabase để các nơi khác (review, chat,
+        // ...) lấy đúng avatar mới thay vì path cũ.
+        try {
+          await profileService.refreshAuthCache()
+        } catch {
+          // không cần fail toàn bộ flow nếu refresh cache lỗi; cache sẽ tự
+          // expire sau 1 phút.
+        }
+
         setAvatarFile(null)
       }
 

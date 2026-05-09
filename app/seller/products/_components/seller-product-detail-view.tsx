@@ -324,8 +324,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         getCategoryTree().catch(
           (): StorefrontCategoryTreeResponse => ({ success: false, tree: [] })
         ),
-        fetchSellerTags(1, 100).catch(()=>({ success: false, tags: [], totalCount: 0, page: 1, pageSize: 100 })),
-        fetchSellerMaterials(1, 50).catch(()=>({ success: false, materials: [], totalCount: 0, page: 1, pageSize: 50 }))
+        fetchSellerTags(1, 500).catch(()=>({ success: false, tags: [], totalCount: 0, page: 1, pageSize: 500 })),
+        fetchSellerMaterials(1, 500).catch(()=>({ success: false, materials: [], totalCount: 0, page: 1, pageSize: 500 }))
       ])
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

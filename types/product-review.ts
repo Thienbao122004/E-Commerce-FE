@@ -36,6 +36,7 @@ export interface ProductReviewDto {
   productId: string
   userId: string
   userName?: string
+  userAvatarUrl?: string | null
   rating: number
   comment?: string
   createdAt: string

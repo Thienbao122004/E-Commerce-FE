@@ -62,23 +62,48 @@ function filterToQuery(f: StorefrontReviewFilter): {
   }
 }
 
-function ReviewerAvatar({ name }: { name: string }) {
+function ReviewerAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
   const colors = ["bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500", "bg-pink-500"]
   const safe = name.trim() || "?"
   const color = colors[safe.charCodeAt(0) % colors.length]
-  const initials = safe
-    .split(/\s+/)
+  const words = safe.split(/\s+/).filter((w) => /^\D/.test(w))
+  const initials = (words.length ? words : [safe])
     .slice(-2)
     .map((w) => w[0])
     .join("")
     .toUpperCase()
     .slice(0, 2)
-  return (
+
+  const fallback = (
     <div
       className={`size-10 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0 ${color}`}
     >
       {initials}
     </div>
+  )
+
+  if (!avatarUrl) return fallback
+
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="size-10 rounded-full object-cover shrink-0"
+        onError={(e) => {
+          e.currentTarget.style.display = "none"
+          const sib = e.currentTarget.nextElementSibling as HTMLElement | null
+          if (sib) sib.style.display = "flex"
+        }}
+      />
+      <div
+        className={`size-10 rounded-full items-center justify-center text-white text-sm font-semibold shrink-0 ${color}`}
+        style={{ display: "none" }}
+      >
+        {initials}
+      </div>
+    </>
   )
 }
 
@@ -327,7 +352,7 @@ export function ProductReviewsSection({ productId, averageRating, reviewCount }:
             const sellerReply = r.sellerReply?.trim()
             return (
               <li key={r.id} className="flex gap-3 py-5 border-b border-gray-100 last:border-0">
-                <ReviewerAvatar name={name} />
+                <ReviewerAvatar name={name} avatarUrl={r.userAvatarUrl} />
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-medium text-sm text-gray-900">{name}</span>

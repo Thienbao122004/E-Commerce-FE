@@ -1,12 +1,40 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 
 const MAX_FILES = 10
 const MAX_SIZE_MB = 20
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/quicktime"]
+const ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "video/mp4",
+  "video/quicktime",
+]
 const BUCKET = "product-images"
+
+/** Một số trình duyệt mobile để trống file.type — suy ra từ đuôi file. */
+function effectiveMime(file: File): string {
+  if (file.type && file.type !== "application/octet-stream") return file.type
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+  const map: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+  }
+  return map[ext] ?? file.type
+}
 
 interface UploadingItem {
   localId: string
@@ -23,12 +51,17 @@ interface EvidenceUploaderProps {
 }
 
 function isImageUrl(url: string) {
-  return /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(url)
+  return /\.(jpg|jpeg|png|gif|webp|heic|heif)(\?.*)?$/i.test(url)
 }
 
 async function uploadEvidenceFile(file: File): Promise<string> {
-  if (!ACCEPTED_TYPES.includes(file.type)) {
-    throw new Error(`Không hỗ trợ loại file: ${file.type}`)
+  const mime = effectiveMime(file)
+  if (!ACCEPTED_TYPES.includes(mime)) {
+    throw new Error(
+      mime
+        ? `Không hỗ trợ loại file: ${mime}. Dùng JPG, PNG, WEBP, HEIC hoặc MP4/MOV.`
+        : "Không nhận dạng được định dạng file. Đổi tên có đuôi (.jpg, .png…) hoặc chụp lại bằng định dạng được hỗ trợ.",
+    )
   }
   if (file.size > MAX_SIZE_MB * 1024 * 1024) {
     throw new Error(`File quá lớn (tối đa ${MAX_SIZE_MB}MB)`)
@@ -50,8 +83,13 @@ export function EvidenceUploader({
   maxFiles = MAX_FILES,
 }: EvidenceUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const urlsRef = useRef(urls)
   const [uploading, setUploading] = useState<UploadingItem[]>([])
   const [dragOver, setDragOver] = useState(false)
+
+  useEffect(() => {
+    urlsRef.current = urls
+  }, [urls])
 
   const remaining = maxFiles - urls.length
   const isMaxed = urls.length >= maxFiles
@@ -60,7 +98,7 @@ export function EvidenceUploader({
     const arr = Array.from(files)
     if (arr.length === 0) return
 
-    const slots = Math.min(arr.length, remaining)
+    const slots = Math.min(arr.length, maxFiles - urlsRef.current.length)
     const toUpload = arr.slice(0, slots)
 
     const drafts: UploadingItem[] = toUpload.map((f) => ({
@@ -84,8 +122,9 @@ export function EvidenceUploader({
       if (res.status === "fulfilled") {
         newUrls.push(res.value.url)
       } else {
-        errorMap[drafts[i].localId] =
-          res.reason instanceof Error ? res.reason.message : "Lỗi upload"
+        const msg = res.reason instanceof Error ? res.reason.message : "Lỗi upload"
+        errorMap[drafts[i].localId] = msg
+        toast.error(msg)
       }
     })
 
@@ -101,13 +140,16 @@ export function EvidenceUploader({
     )
 
     if (newUrls.length > 0) {
-      onChange([...urls, ...newUrls])
+      onChange([...urlsRef.current, ...newUrls])
     }
 
-    // Auto-clear done/error sau 2.5s
+    // Chỉ ẩn ô "đã xong" sau vài giây; giữ ô lỗi để mobile còn đọc được (toast đã báo thêm).
     setTimeout(() => {
-      setUploading((prev) => prev.filter((it) => it.progress === "uploading"))
-    }, 2500)
+      setUploading((prev) => prev.filter((it) => it.progress !== "done"))
+    }, 2800)
+    setTimeout(() => {
+      setUploading((prev) => prev.filter((it) => it.progress !== "error"))
+    }, 15000)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,15 +183,26 @@ export function EvidenceUploader({
               style={{ width: 80, height: 80 }}
             >
               {isImageUrl(url) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={url}
-                  alt={`Bằng chứng ${i + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    ;(e.target as HTMLImageElement).style.display = "none"
-                  }}
-                />
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Bằng chứng ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const el = e.target as HTMLImageElement
+                      el.style.display = "none"
+                      const wrap = el.nextElementSibling as HTMLElement | null
+                      if (wrap) wrap.classList.remove("hidden")
+                    }}
+                  />
+                  <div className="hidden absolute inset-0 z-0 flex flex-col items-center justify-center gap-0.5 bg-muted px-0.5">
+                    <span className="material-symbols-outlined text-2xl text-gray-400">broken_image</span>
+                    <span className="text-[10px] text-gray-500 text-center leading-tight">
+                      Không xem được ảnh — dùng nút mở link
+                    </span>
+                  </div>
+                </>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-1">
                   <span className="material-symbols-outlined text-2xl text-gray-400">videocam</span>
@@ -159,7 +212,7 @@ export function EvidenceUploader({
                 </div>
               )}
               {/* Overlay: view + delete */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+              <div className="absolute inset-0 z-10 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                 <a
                   href={url}
                   target="_blank"
@@ -260,7 +313,7 @@ export function EvidenceUploader({
               </span>
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Ảnh (JPG, PNG, GIF, WEBP) · Video (MP4) · Tối đa {MAX_SIZE_MB}MB/file
+              Ảnh (JPG, PNG, GIF, WEBP, HEIC) · Video (MP4/MOV) · Tối đa {MAX_SIZE_MB}MB/file
             </p>
             <p className="text-xs text-gray-400">
               {urls.length}/{maxFiles} · còn {remaining} chỗ
@@ -269,7 +322,7 @@ export function EvidenceUploader({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime"
+            accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime"
             multiple
             className="hidden"
             onChange={handleFileChange}
