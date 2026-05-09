@@ -25,6 +25,7 @@ import {
   IconStar,
   IconStarFilled,
   IconTag,
+  IconUser,
   IconUsers,
   IconUserSearch,
   IconWallet,
@@ -119,6 +120,12 @@ const ALL_NAV_ITEMS: NavItem[] = [
     title: "Khiếu nại",
     url: "/dashboard/disputes",
     icon: IconGavel,
+    roles: ['seller'],
+  },
+  {
+    title: "Hồ sơ tài khoản",
+    url: "/dashboard/account",
+    icon: IconUser,
     roles: ['seller'],
   },
   {

@@ -10,8 +10,14 @@ export type SellerShopInfo = {
   slug: string
   description: string | null
   logoUrl: string | null
-  /** Ảnh bìa cửa hàng (URL hoặc data URL) */
   coverUrl?: string | null
+  phone?: string | null
+  addressLine?: string | null
+  wardCode?: string | null
+  districtId?: number | null
+  provinceId?: number | null
+  city?: string | null
+  ghnShopId?: number | null
   status: number
   verificationStatus: number
   createdAt: string
@@ -28,6 +34,12 @@ export type UpdateShopPayload = {
   description?: string
   logoUrl?: string
   coverUrl?: string
+  phone?: string
+  addressLine?: string
+  wardCode?: string
+  districtId?: number
+  provinceId?: number
+  city?: string
 }
 
 // ====== Wallet ======
