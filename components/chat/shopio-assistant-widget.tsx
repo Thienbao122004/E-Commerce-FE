@@ -71,6 +71,7 @@ import {
   isOrderIntentUserMessage,
   findLastAssistantWithProducts,
   buildImplicitCartLinesFromLastCard,
+  resolveUnitPriceForProduct,
 } from "@/lib/ai-chat-order-intent"
 
 type PaymentMethod = "vnpay" | "momo"
@@ -903,8 +904,8 @@ export function ShopioAssistantWidget() {
       ])
       setConfirmTarget({
         cartId: cart.id, messageId: confirmMsgId,
-        preview: { id: first.id, name: first.name, imageUrl: first.imageUrl, basePrice: first.basePrice, quantity: first.quantity },
-        previews: selectedItems.map((item) => ({ id: item.id, name: item.name, imageUrl: item.imageUrl, basePrice: item.basePrice, quantity: item.quantity })),
+        preview: { id: first.id, name: first.name, imageUrl: first.imageUrl, basePrice: resolveUnitPriceForProduct(first, first.variantId), quantity: first.quantity },
+        previews: selectedItems.map((item) => ({ id: item.id, name: item.name, imageUrl: item.imageUrl, basePrice: resolveUnitPriceForProduct(item, item.variantId), quantity: item.quantity })),
       })
       toast.success(selectedItems.length === 1 ? "Đã thêm sản phẩm đã chọn vào giỏ" : `Đã thêm ${selectedItems.length} sản phẩm vào giỏ`)
     } catch (err) {
@@ -949,6 +950,7 @@ export function ShopioAssistantWidget() {
           if (cartWrap?.id) {
             didAutoAddToCart = true
             const pp = res.products?.find((x) => x.id === addPayload.productId)
+            const unitPrice = pp ? resolveUnitPriceForProduct(pp, addPayload.variantId) : 0
             setConfirmTarget({
               cartId: cartWrap.id,
               messageId: assistantId,
@@ -956,7 +958,7 @@ export function ShopioAssistantWidget() {
                 id: addPayload.productId,
                 name: pp?.name ?? "Sản phẩm",
                 imageUrl: pp?.imageUrl,
-                basePrice: pp?.basePrice ?? 0,
+                basePrice: unitPrice,
                 quantity: addPayload.quantity,
               },
               previews: [
@@ -964,7 +966,7 @@ export function ShopioAssistantWidget() {
                   id: addPayload.productId,
                   name: pp?.name ?? "Sản phẩm",
                   imageUrl: pp?.imageUrl,
-                  basePrice: pp?.basePrice ?? 0,
+                  basePrice: unitPrice,
                   quantity: addPayload.quantity,
                 },
               ],

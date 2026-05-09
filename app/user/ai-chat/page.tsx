@@ -32,6 +32,7 @@ import {
   isOrderIntentUserMessage,
   findLastAssistantWithProducts,
   buildImplicitCartLinesFromLastCard,
+  resolveUnitPriceForProduct,
 } from '@/lib/ai-chat-order-intent'
 import type { AddressResponse } from '@/types/profile'
 
@@ -449,14 +450,14 @@ export default function UserAiChatPage() {
             id: first.id,
             name: first.name,
             imageUrl: first.imageUrl,
-            basePrice: first.basePrice,
+            basePrice: resolveUnitPriceForProduct(first, first.variantId),
             quantity: first.quantity,
           },
           previews: selectedItems.map((item) => ({
             id: item.id,
             name: item.name,
             imageUrl: item.imageUrl,
-            basePrice: item.basePrice,
+            basePrice: resolveUnitPriceForProduct(item, item.variantId),
             quantity: item.quantity,
           })),
         })
@@ -515,6 +516,7 @@ export default function UserAiChatPage() {
           if (cartWrap?.id) {
             didAutoAddToCart = true
             const pp = res.products?.find((x) => x.id === addPayload.productId)
+            const unitPrice = pp ? resolveUnitPriceForProduct(pp, addPayload.variantId) : 0
             setConfirmTarget({
               cartId: cartWrap.id,
               messageId: assistantId,
@@ -522,7 +524,7 @@ export default function UserAiChatPage() {
                 id: addPayload.productId,
                 name: pp?.name ?? 'Sản phẩm',
                 imageUrl: pp?.imageUrl,
-                basePrice: pp?.basePrice ?? 0,
+                basePrice: unitPrice,
                 quantity: addPayload.quantity,
               },
               previews: [
@@ -530,7 +532,7 @@ export default function UserAiChatPage() {
                   id: addPayload.productId,
                   name: pp?.name ?? 'Sản phẩm',
                   imageUrl: pp?.imageUrl,
-                  basePrice: pp?.basePrice ?? 0,
+                  basePrice: unitPrice,
                   quantity: addPayload.quantity,
                 },
               ],
@@ -802,10 +804,11 @@ export default function UserAiChatPage() {
     const ownerMessage = messages.find((m) => m.id === confirmTarget.messageId)
     const products = ownerMessage?.responseMeta?.products ?? []
     if (!products.length) return
-    const selectedId = getSelectedProducts(confirmTarget.messageId, products)[0]?.id
-    if (!selectedId) return
-    const picked = products.find((p) => p.id === selectedId)
+    const pickedSelected = getSelectedProducts(confirmTarget.messageId, products)[0]
+    if (!pickedSelected) return
+    const picked = products.find((p) => p.id === pickedSelected.id)
     if (!picked) return
+    const pickedUnitPrice = resolveUnitPriceForProduct(picked, pickedSelected.variantId)
 
     setConfirmTarget((prev) => {
       if (!prev || prev.messageId !== confirmTarget.messageId) return prev
@@ -814,7 +817,7 @@ export default function UserAiChatPage() {
         prevPreview &&
         prevPreview.id === picked.id &&
         prevPreview.imageUrl === picked.imageUrl &&
-        prevPreview.basePrice === picked.basePrice &&
+        prevPreview.basePrice === pickedUnitPrice &&
         prevPreview.name === picked.name
       ) return prev
       return {
@@ -823,20 +826,16 @@ export default function UserAiChatPage() {
           id: picked.id,
           name: picked.name,
           imageUrl: picked.imageUrl,
-          basePrice: picked.basePrice,
-          quantity:
-            getSelectedProducts(confirmTarget.messageId, products).find((item) => item.id === picked.id)
-              ?.quantity ?? prev.preview?.quantity ?? 1,
+          basePrice: pickedUnitPrice,
+          quantity: pickedSelected.quantity ?? prev.preview?.quantity ?? 1,
         },
         previews: [
           {
             id: picked.id,
             name: picked.name,
             imageUrl: picked.imageUrl,
-            basePrice: picked.basePrice,
-            quantity:
-              getSelectedProducts(confirmTarget.messageId, products).find((item) => item.id === picked.id)
-                ?.quantity ?? prev.preview?.quantity ?? 1,
+            basePrice: pickedUnitPrice,
+            quantity: pickedSelected.quantity ?? prev.preview?.quantity ?? 1,
           },
         ],
       }
