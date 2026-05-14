@@ -93,19 +93,19 @@ export const aiChatService = {
     }),
 
   listSessions: (page = 1, pageSize = 20) =>
-    apiRequest<AiSessionsResponse>(`/api/ai/sessions?page=${page}&pageSize=${pageSize}`),
+    aiRequest<AiSessionsResponse>(`/api/ai/sessions?page=${page}&pageSize=${pageSize}`),
 
   getSessionMessages: (sessionId: string) =>
-    apiRequest<AiSessionMessagesResponse>(`/api/ai/sessions/${sessionId}/messages`),
+    aiRequest<AiSessionMessagesResponse>(`/api/ai/sessions/${sessionId}/messages`),
 
   markSessionRead: (sessionId: string) =>
-    apiRequest<{ success: boolean; sessionId: string; unreadCount: number }>(
+    aiRequest<{ success: boolean; sessionId: string; unreadCount: number }>(
       `/api/ai/sessions/${sessionId}/read`,
       { method: "POST" }
     ),
 
   setSessionMuted: (sessionId: string, isMuted: boolean) =>
-    apiRequest<{ success: boolean; sessionId: string; isMuted: boolean }>(
+    aiRequest<{ success: boolean; sessionId: string; isMuted: boolean }>(
       `/api/ai/sessions/${sessionId}/mute`,
       {
         method: "PATCH",
@@ -114,7 +114,7 @@ export const aiChatService = {
     ),
 
   deleteSession: (sessionId: string) =>
-    apiRequest<{ success: boolean; sessionId: string }>(`/api/ai/sessions/${sessionId}`, {
+    aiRequest<{ success: boolean; sessionId: string }>(`/api/ai/sessions/${sessionId}`, {
       method: "DELETE",
     }),
 }
