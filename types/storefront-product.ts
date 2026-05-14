@@ -27,6 +27,15 @@ export interface StorefrontProduct {
   reviewCount?: number
 }
 
+export interface ProductLocalMeta {
+  profileId: number
+  provinceName: string
+  archetypeName: string
+  displayNote: string | null
+  selectedTraits: string[]
+  expectedTraits: string[]
+}
+
 export interface StorefrontProductDetail extends StorefrontProduct {
   description: string | null
   averageRating: number
@@ -35,6 +44,7 @@ export interface StorefrontProductDetail extends StorefrontProduct {
   totalStock: number
   tags?: string[]
   materials?: string[]
+  localMeta?: ProductLocalMeta | null
 }
 
 export interface StorefrontProductsResponse {

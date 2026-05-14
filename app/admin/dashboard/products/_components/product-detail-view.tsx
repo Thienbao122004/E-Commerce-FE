@@ -348,6 +348,76 @@ export function ProductDetailView({
             </div>
           )}
 
+          {/* ── Local Brand block — hiển thị cho admin khi duyệt ── */}
+          {!detailLoading && product.localMeta && (
+            <div className="rounded-xl border p-4 flex flex-col gap-3"
+              style={{ borderColor: "#d4a96a", background: "linear-gradient(135deg,#fffbf2,#fef6e8)" }}>
+              {/* Header */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="material-symbols-outlined text-[18px]" style={{ color: "#b06017" }}>workspace_premium</span>
+                <span className="text-sm font-bold" style={{ color: "#7a4a1e" }}>Thông tin Local Brand</span>
+                <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                  style={{ background: "#fef9c3", color: "#854d0e", borderColor: "#fde047" }}>
+                  Chờ admin xác nhận
+                </span>
+              </div>
+
+              {/* Profile info */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Loại cà phê đặc sản</p>
+                  <p className="font-semibold" style={{ color: "#7a4a1e" }}>{product.localMeta.archetypeName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Vùng xuất xứ (chuẩn hóa)</p>
+                  <p className="font-semibold flex items-center gap-1" style={{ color: "#7a4a1e" }}>
+                    <span className="material-symbols-outlined text-[14px]">location_on</span>
+                    {product.localMeta.provinceName}
+                  </p>
+                </div>
+              </div>
+
+              {/* Traits comparison */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1.5">Đặc điểm seller khai báo vs. chuẩn hồ sơ</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.localMeta.expectedTraits.map((trait) => {
+                    const declared = product.localMeta!.selectedTraits.includes(trait)
+                    return (
+                      <span key={trait}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border"
+                        style={{
+                          background: declared ? "#fde8c8" : "#f3f4f6",
+                          color: declared ? "#7a4a1e" : "#9ca3af",
+                          borderColor: declared ? "#f0c890" : "#e5e7eb",
+                        }}>
+                        <span className="material-symbols-outlined text-[11px]">
+                          {declared ? "check_circle" : "radio_button_unchecked"}
+                        </span>
+                        {trait}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Mismatch warning nếu có */}
+              {product.localMeta.mismatchWarning && (
+                <div className="rounded-lg border px-3 py-2 flex items-start gap-2"
+                  style={{ borderColor: "#f0a030", background: "#fffbf0" }}>
+                  <span className="material-symbols-outlined text-[15px] mt-0.5 shrink-0" style={{ color: "#c07030" }}>warning</span>
+                  <p className="text-xs" style={{ color: "#8a4010" }}>{product.localMeta.mismatchWarning}</p>
+                </div>
+              )}
+
+              {product.localMeta.displayNote && (
+                <p className="text-xs italic" style={{ color: "#8a6030" }}>
+                  💡 {product.localMeta.displayNote}
+                </p>
+              )}
+            </div>
+          )}
+
           {!detailLoading && product.status === ProductStatus.PendingApproval ? (
             lastApprovedSnapshot ? (
               <ProductModerationDiff

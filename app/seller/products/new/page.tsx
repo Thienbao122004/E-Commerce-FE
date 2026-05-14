@@ -51,6 +51,10 @@ import {
   aiCommitProductTagSession,
 } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
+import {
+  getLocalSpecialtyProfiles,
+  type LocalSpecialtyProfile,
+} from "@/services/local-specialty"
 import { supabase } from "@/lib/supabase"
 import { groupMaterialsForPicker, groupTagsForPicker } from "@/lib/seller-picker-groups"
 import {
@@ -398,6 +402,11 @@ export default function CreateProductPage() {
   const [nameTouched, setNameTouched] = React.useState(false)
   const [priceTouched, setPriceTouched] = React.useState(false)
 
+  // Local Specialty
+  const [localProfiles, setLocalProfiles] = React.useState<LocalSpecialtyProfile[]>([])
+  const [selLocalProfileId, setSelLocalProfileId] = React.useState<number | null>(null)
+  const [selLocalTraits, setSelLocalTraits] = React.useState<string[]>([])
+
   const hasInput = name.trim().length > 0 || description.trim().length > 0
   const analysisReqRef = React.useRef(0)
 
@@ -480,6 +489,37 @@ export default function CreateProductPage() {
       mounted = false
     }
   }, [])
+
+  // Auto-lock category "Cà Phê Đặc Sản" (coffee-first platform)
+  React.useEffect(() => {
+    if (manualCategoryRows.length === 0 || selCategory) return
+    const coffeeCat = manualCategoryRows.find(
+      (r) =>
+        r.level === 2 &&
+        r.name.toLowerCase().includes("cà phê"),
+    )
+    if (coffeeCat) {
+      setSelCategory({
+        categoryId: coffeeCat.id,
+        categoryName: coffeeCat.name,
+        categoryPath: coffeeCat.pathLabel,
+        confidenceScore: 1,
+      })
+    }
+  }, [manualCategoryRows, selCategory])
+
+  // Tải danh sách local specialty profiles cho cà phê (chỉ 1 lần)
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const profiles = await getLocalSpecialtyProfiles("ca_phe")
+        if (mounted) setLocalProfiles(profiles)
+      } catch { /* ignore */ }
+    })()
+    return () => { mounted = false }
+  }, [])
+
 
   // Tải toàn bộ materials 1 lần (không search server) → filter client-side
   const loadPlatformMaterials = React.useCallback(async () => {
@@ -716,6 +756,9 @@ export default function CreateProductPage() {
         const ids = selMatIds.filter(isPersistableMaterialId)
         return ids.length > 0 ? ids : undefined
       })(),
+      localSpecialtyProfileId: selLocalProfileId ?? undefined,
+      selectedTraits: selLocalTraits.length > 0 ? selLocalTraits : undefined,
+      // Province lấy từ profile (hard mapping) — không cần gửi riêng
     }
 
     const createResult = useVariants
@@ -822,6 +865,86 @@ export default function CreateProductPage() {
 
   const mainImage = imageUrls[0]
   const hasMainPreview = Boolean(mainImage && !brokenUrls.has(mainImage))
+
+  // Nền tảng tập trung vào cà phê local brands — luôn hiển thị section này
+
+  const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
+
+  const MIN_TRAITS = 3
+
+  // Detect mismatch: tên/mô tả có nhắc keywords đặc trưng của loại cà phê KHÁC không?
+  const localMismatch = React.useMemo(() => {
+    if (!selLocalProfile) return null
+    const text = `${name} ${description}`.toLowerCase()
+    for (const p of localProfiles) {
+      if (p.id === selLocalProfileId) continue
+      const contradicts = p.keywords.filter(
+        (kw) => kw.length >= 5 && text.includes(kw.toLowerCase())
+      )
+      if (contradicts.length >= 2) {
+        return `Tên/mô tả có vẻ liên quan đến "${p.archetypeName}" (${p.provinceName}). Kiểm tra lại cho đúng loại cà phê đã chọn.`
+      }
+    }
+    return null
+  }, [selLocalProfile, selLocalProfileId, localProfiles, name, description])
+
+  // Từ khoá cà phê chung (luôn hợp lệ dù không có profile)
+  const COFFEE_KEYWORDS = [
+    "cà phê","cafe","coffee","robusta","arabica","rang","xay","hạt","vị","đắng","chua",
+    "thơm","hương","caffeine","espresso","phin","nguyên chất","blend","mộc","đặc sản",
+    "buôn ma thuột","cầu đất","sơn la","khe sanh","pleiku","tây nguyên","quảng trị",
+  ]
+
+  // Mô tả có nội dung thực + liên quan đến cà phê / profile đã chọn
+  const isMeaningfulDescription = React.useMemo(() => {
+    const text = description.trim().toLowerCase()
+    if (text.length < 30) return false
+
+    // 1. Không spam ký tự lặp
+    const charCount: Record<string, number> = {}
+    for (const ch of text) charCount[ch] = (charCount[ch] ?? 0) + 1
+    const maxFreq = Math.max(...Object.values(charCount))
+    if (maxFreq / text.length > 0.5) return false
+
+    // 2. Ít nhất 4 từ
+    const words = text.split(/\s+/).filter(Boolean)
+    if (words.length < 4) return false
+
+    // 3. Phải chứa ít nhất 1 từ khoá cà phê chung
+    //    HOẶC 1 keyword từ profile đang chọn
+    const profileKws = selLocalProfile?.keywords ?? []
+    const allRelevantKws = [...COFFEE_KEYWORDS, ...profileKws]
+    const hasRelevantContent = allRelevantKws.some((kw) => text.includes(kw.toLowerCase()))
+    if (!hasRelevantContent) return false
+
+    return true
+  }, [description, selLocalProfile])
+
+  // Điểm xác thực Local Brand (0–100%)
+  // Vùng miền được tính auto khi chọn loại (hard mapping)
+  const verificationScore = React.useMemo(() => {
+    let score = 0
+    if (selLocalProfile) score += 25   // chọn loại cà phê
+    if (selLocalProfile) score += 25   // vùng miền tự động xác định (hard mapping)
+    if (selLocalTraits.length >= MIN_TRAITS) score += 25  // đủ đặc điểm
+    if (isMeaningfulDescription) score += 25              // mô tả có nội dung thực
+    return score
+  }, [selLocalProfile, selLocalTraits, isMeaningfulDescription])
+
+  const scoreColor =
+    verificationScore >= 75 ? "#3a6b30" :
+    verificationScore >= 50 ? "#b06017" : "#c0392b"
+
+  const scoreLabel =
+    verificationScore >= 100 ? "Verified Local Brand" :
+    verificationScore >= 75  ? "Gần đạt chuẩn" :
+    verificationScore >= 50  ? "Đang xác thực" : "Chưa đủ điều kiện"
+
+  const toggleLocalTrait = (trait: string) => {
+    setSelLocalTraits((prev) =>
+      prev.includes(trait) ? prev.filter((t) => t !== trait) : [...prev, trait]
+    )
+  }
   const extraSlots = Array.from({ length: 5 })
   const variantRowsValid = React.useMemo(() => {
     if (!useVariants) return true
@@ -883,7 +1006,7 @@ export default function CreateProductPage() {
                   </Label>
                   <Input
                     id="name"
-                    placeholder="Ví dụ: Áo sơ mi nam vải kate cao cấp – màu trắng"
+                    placeholder="Ví dụ: Cà phê Robusta Buôn Ma Thuột rang mộc 500g"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onBlur={() => setNameTouched(true)}
@@ -1301,129 +1424,31 @@ export default function CreateProductPage() {
                     Danh mục
                   </SectionLabel>
 
-                  {catLoading ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-[#cfd8c7] bg-white p-3 text-[11px] text-[#6d7f62]">
-                      <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
-                      Đang phân tích danh mục...
+                  {/* Category cố định — platform chỉ hỗ trợ cà phê đặc sản */}
+                  {selCategory ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#9db183] bg-white px-3 py-2.5">
+                      <IconCheck className="size-3.5 text-[#5f7a49] shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#2d3a25]">{selCategory.categoryName}</p>
+                        <p className="truncate text-xs text-[#7f8f74]">{selCategory.categoryPath}</p>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#e9f0e2] text-[#46573b]">
+                        Mặc định
+                      </span>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2">
-                      {catError && (
-                        <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
-                          <IconAlertCircle className="size-3.5 shrink-0" />
-                          <span>
-                            Không thể kết nối AI. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
-                          </span>
-                        </div>
-                      )}
-
-                      {!catError && catSuggestions.length > 0 && (
-                        <>
-                          {catSuggestions.map((cat, idx) => {
-                            const active = selCategory?.categoryId === cat.categoryId
-                            return (
-                              <button
-                                key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
-                                type="button"
-                                onClick={() => handleSelectCategory(cat)}
-                                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
-                                  active
-                                    ? "border-[#9db183] bg-white"
-                                    : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
-                                }`}
-                              >
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
-                                  <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <ConfidenceDot score={cat.confidenceScore} />
-                                  {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
-                                </div>
-                              </button>
-                            )
-                          })}
-
-                          {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
-                            <div
-                              key={`empty-cat-${idx}`}
-                              className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
-                            >
-                              <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-
-                      {!catError && catSuggestions.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] text-[#7c8f72]">
-                          Chưa phân tích AI — bấm &quot;Bắt đầu phân tích&quot; hoặc chọn danh mục thủ công bên dưới.
-                        </div>
-                      )}
-
-                      <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
-                        <p className="mb-2 text-[11px] text-[#6d7f62]">
-                          {catSuggestions.length > 0
-                            ? "Không đúng gợi ý? Chọn danh mục thủ công:"
-                            : "Chọn danh mục thủ công:"}
-                        </p>
-                        <div className="relative">
-                          <Input
-                            value={manualCatQuery}
-                            onChange={(e) => setManualCatQuery(e.target.value)}
-                            placeholder="Tìm danh mục..."
-                            className="h-8 text-xs bg-white pr-7"
-                          />
-                          {manualCatQuery !== debouncedManualCatQuery && (
-                            <IconLoader2 className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 animate-spin text-[#8a9a80]" />
-                          )}
-                        </div>
-                        <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
-                          {manualCategoryOptions.map((c, idx) => {
-                            const active = selCategory?.categoryId === c.id
-                            return (
-                              <button
-                                key={`cat-manual-${idx}-${String(c.id)}-${c.name ?? ""}`}
-                                type="button"
-                                onClick={() =>
-                                  handleSelectCategory({
-                                    categoryId: c.id,
-                                    categoryName: c.name,
-                                    categoryPath: c.pathLabel,
-                                    confidenceScore: 1,
-                                  })
-                                }
-                                className={`w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
-                                  active
-                                    ? "bg-[#e9f0e2] text-[#2f3f27] font-medium"
-                                    : "hover:bg-[#f2f6ee] text-[#5f7253]"
-                                }`}
-                              >
-                                <span className="block line-clamp-2 break-words">{c.pathLabel}</span>
-                                {c.level > 1 && (
-                                  <span className="mt-0.5 block text-[10px] font-normal text-[#8a9a80]">
-                                    Cấp {c.level}
-                                  </span>
-                                )}
-                              </button>
-                            )
-                          })}
-                          {manualCategoryOptions.length === 0 && (
-                            <p className="px-2 py-1 text-[11px] italic text-[#8a9a80]">
-                              Không tìm thấy danh mục phù hợp
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-2 rounded-xl border border-[#cfd8c7] bg-white p-3 text-[11px] text-[#6d7f62]">
+                      <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
+                      Đang tải danh mục...
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <SectionLabel icon={IconPalette}>Chất liệu phát hiện</SectionLabel>
+                  <SectionLabel icon={IconPalette}>Đặc tính cà phê</SectionLabel>
                   {!selCategory ? (
                     <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fafcf8] p-3 text-[11px] text-[#7c8f72]">
-                      Chọn danh mục ở trên để thêm chất liệu (gợi ý AI hoặc nút + chọn từ nền tảng).
+                      Chọn danh mục để gắn đặc tính (rang mộc, rang đậm, nguyên chất, hữu cơ…).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1577,10 +1602,10 @@ export default function CreateProductPage() {
                 </div>
 
                 <div className="border-t border-[#dce3d5] pt-3">
-                  <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
+                  <SectionLabel icon={IconTag}>Đặc tính sản phẩm</SectionLabel>
                   {!selCategory ? (
                     <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fffdfb] p-3 text-[11px] text-[#7c8f72]">
-                      Chọn danh mục ở trên để thêm thẻ (gợi ý AI hoặc nút + chọn từ nền tảng).
+                      Chọn danh mục để thêm thẻ đặc tính (Arabica, Robusta, Đặc sản vùng miền, Rang xay…).
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1733,9 +1758,10 @@ export default function CreateProductPage() {
 
                 {selCategory && (
                   <div className="rounded-xl border border-[#d4deca] bg-white p-3 text-[11px] text-[#627458]">
-                    Đã chọn: <span className="font-semibold text-[#46573b]">{selCategory.categoryName}</span>
-                    {selTagIds.length > 0 && ` · ${selTagIds.length} tag`}
-                    {selMatIds.length > 0 && ` · ${selMatIds.length} chất liệu`}
+                    {selTagIds.length > 0 && `${selTagIds.length} tag được chọn`}
+                    {selTagIds.length > 0 && selMatIds.length > 0 && ` · `}
+                    {selMatIds.length > 0 && `${selMatIds.length} đặc tính cà phê`}
+                    {selTagIds.length === 0 && selMatIds.length === 0 && "Chưa chọn tag / đặc tính"}
                   </div>
                 )}
 
@@ -1746,6 +1772,277 @@ export default function CreateProductPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* ══ LOCAL BRAND CARD ══ */}
+            {localProfiles.length > 0 && (
+              <Card className="border-[#c8a56d]" style={{ background: "linear-gradient(145deg,#fffbf2 0%,#fef6e8 100%)" }}>
+                <CardHeader className="pb-2 pt-4 px-4">
+                  {/* Title row */}
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]" style={{ color: "#b06017" }}>workspace_premium</span>
+                    <CardTitle className="text-sm font-bold" style={{ color: "#7a4a1e" }}>
+                      Xác thực Local Brand
+                    </CardTitle>
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                      style={{ background: "#fde8c8", color: "#b06017", borderColor: "#f0c890" }}>
+                      Bắt buộc
+                    </span>
+                  </div>
+                  <p className="text-[11px] mt-1" style={{ color: "#8a6030" }}>
+                    Chọn <strong>loại cà phê</strong> và <strong>vùng miền xuất xứ</strong> — hệ thống sẽ gắn nhãn
+                    phân biệt sản phẩm của bạn với các địa phương khác.
+                  </p>
+                </CardHeader>
+
+                <CardContent className="px-4 pb-4 flex flex-col gap-4">
+
+                  {/* ── BƯỚC 1: Chọn loại cà phê ── */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#b06017" }}>1</span>
+                      <Label className="text-xs font-semibold" style={{ color: "#7a4a1e" }}>
+                        Loại cà phê đặc sản <span className="text-red-500">*</span>
+                      </Label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {localProfiles.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => { setSelLocalProfileId(p.id); setSelLocalTraits([]) }}
+                          className={`flex flex-col items-start px-3 py-2 rounded-xl border text-left text-xs transition-all ${
+                            selLocalProfileId === p.id
+                              ? "border-[#b06017] bg-[#fde8c8] text-[#7a3a0e] shadow-sm"
+                              : "border-[#e8d5b4] bg-white text-[#8a6030] hover:border-[#c8a56d] hover:bg-[#fdf5eb]"
+                          }`}
+                        >
+                          <span className="font-bold text-[12px]">{p.archetypeName}</span>
+                          <span className="text-[10px] mt-0.5 flex items-center gap-0.5 opacity-80">
+                            <span className="material-symbols-outlined text-[10px]">location_on</span>
+                            {p.provinceName}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── BƯỚC 2: Vùng miền xuất xứ (hard mapping — khóa theo loại) ── */}
+                  {selLocalProfile && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#b06017" }}>2</span>
+                        <Label className="text-xs font-semibold" style={{ color: "#7a4a1e" }}>Vùng miền xuất xứ</Label>
+                        <span
+                          title="Được chuẩn hóa theo vùng địa phương đặc trưng nhất của loại cà phê này. Giúp đảm bảo tính xác thực của Local Brand."
+                          className="material-symbols-outlined text-[14px] cursor-help"
+                          style={{ color: "#c8a56d" }}>
+                          info
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 rounded-xl border px-3 py-2.5"
+                        style={{ borderColor: "#d4a96a", background: "#fff7ed" }}>
+                        <span className="material-symbols-outlined text-[20px]" style={{ color: "#b06017" }}>location_on</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold" style={{ color: "#7a4a1e" }}>{selLocalProfile.provinceName}</p>
+                          <p className="text-[10px]" style={{ color: "#a07040" }}>Được chuẩn hóa theo vùng đặc trưng nhất</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border"
+                          style={{ background: "#fde8c8", color: "#b06017", borderColor: "#f0c890" }}>
+                          <span className="material-symbols-outlined text-[12px]">lock</span>
+                          Không thể thay đổi
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── BƯỚC 3: Đặc điểm nổi bật vùng miền ── */}
+                  {selLocalProfile && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#b06017" }}>3</span>
+                        <Label className="text-xs font-semibold" style={{ color: "#7a4a1e" }}>
+                          Đặc điểm nổi bật vùng miền
+                        </Label>
+                        <span title="Giúp phân biệt sản phẩm địa phương với sản phẩm thông thường và tăng độ tin cậy của Local Brand. Chọn tối thiểu 3 đặc điểm để xác thực."
+                          className="material-symbols-outlined text-[14px] cursor-help" style={{ color: "#c8a56d" }}>
+                          info
+                        </span>
+                      </div>
+                      {selLocalProfile.displayNote && (
+                        <p className="text-[11px] italic px-1 rounded-lg py-1.5 border"
+                          style={{ color: "#8a6030", background: "#fffdf5", borderColor: "#f0e0c0" }}>
+                          💡 {selLocalProfile.displayNote}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {selLocalProfile.expectedTraits.map((trait) => {
+                          const active = selLocalTraits.includes(trait)
+                          return (
+                            <button
+                              key={trait}
+                              type="button"
+                              onClick={() => toggleLocalTrait(trait)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                                active
+                                  ? "border-[#b06017] bg-[#fde8c8] text-[#7a3a0e] shadow-sm"
+                                  : "border-[#e8d5b4] bg-white text-[#8a6030] hover:border-[#c8a56d]"
+                              }`}
+                            >
+                              {active
+                                ? <span className="material-symbols-outlined text-[13px]" style={{ color: "#b06017" }}>check_circle</span>
+                                : <span className="material-symbols-outlined text-[13px] opacity-30">radio_button_unchecked</span>
+                              }
+                              {trait}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p className="text-[10px] px-1" style={{ color: selLocalTraits.length >= MIN_TRAITS ? "#3a6b30" : "#c07030" }}>
+                        {selLocalTraits.length >= MIN_TRAITS
+                          ? `✓ Đã chọn ${selLocalTraits.length} đặc điểm — đủ điều kiện xác thực`
+                          : `Chọn tối thiểu ${MIN_TRAITS} đặc điểm để xác thực Local Brand (hiện: ${selLocalTraits.length}/${MIN_TRAITS})`}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* ── Mismatch warning (real-time từ mô tả/tên) ── */}
+                  {localMismatch && (
+                    <div className="rounded-xl border px-3 py-2.5 flex items-start gap-2"
+                      style={{ borderColor: "#f0a030", background: "#fffbf0" }}>
+                      <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5" style={{ color: "#c07030" }}>warning</span>
+                      <div>
+                        <p className="text-[11px] font-semibold" style={{ color: "#8a4010" }}>Phát hiện mâu thuẫn thông tin</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: "#a05020" }}>{localMismatch}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── BƯỚC 4: Badge preview ── */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#b06017" }}>4</span>
+                      <Label className="text-xs font-semibold" style={{ color: "#7a4a1e" }}>Nhãn sản phẩm sẽ hiển thị</Label>
+                    </div>
+                    {selLocalProfile ? (
+                      <div className="rounded-2xl border p-4 flex flex-col gap-3"
+                        style={{ borderColor: "#d4a96a", background: "linear-gradient(135deg,#fffbf2 0%,#fef0d0 100%)" }}>
+                        {/* Badge header — Pending state (chưa admin duyệt) */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="rounded-xl px-3 py-1.5 flex items-center gap-1.5 border shadow-sm"
+                            style={{ background: "#fef9c3", borderColor: "#fde047" }}>
+                            <span className="material-symbols-outlined text-[15px]" style={{ color: "#a16207" }}>schedule</span>
+                            <span className="text-[12px] font-bold tracking-wide" style={{ color: "#854d0e" }}>Local Brand · Chờ duyệt</span>
+                          </div>
+                          <span className="text-[10px]" style={{ color: "#92400e" }}>
+                            Sẽ hiển thị sau khi admin xác nhận
+                          </span>
+                        </div>
+                        {/* Product info mock */}
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-bold" style={{ color: "#7a4a1e" }}>{selLocalProfile.archetypeName}</p>
+                          <p className="text-[12px] flex items-center gap-1" style={{ color: "#a07040" }}>
+                            <span className="material-symbols-outlined text-[13px]">location_on</span>
+                            {selLocalProfile.provinceName}
+                          </p>
+                        </div>
+                        {/* Traits */}
+                        {selLocalTraits.length > 0 && (
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#a07040" }}>Đặc điểm nổi bật</p>
+                            <div className="flex flex-col gap-0.5">
+                              {selLocalTraits.map(t => (
+                                <span key={t} className="text-[11px] flex items-center gap-1.5" style={{ color: "#7a4a1e" }}>
+                                  <span style={{ color: "#b06017" }}>•</span> {t}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed px-3 py-4 text-center text-[11px] italic"
+                        style={{ borderColor: "#d4a96a", color: "#a07040" }}>
+                        Chọn loại cà phê để xem trước nhãn Local Brand
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── BƯỚC 5: Mức độ xác thực ── */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white" style={{ background: "#b06017" }}>5</span>
+                      <Label className="text-xs font-semibold" style={{ color: "#7a4a1e" }}>Mức độ xác thực Local Brand</Label>
+                    </div>
+                    <div className="rounded-xl border p-3 flex flex-col gap-2.5"
+                      style={{ borderColor: "#d4a96a", background: "#fffdf8" }}>
+                      {/* Score bar */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "#f0e0c0" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${verificationScore}%`, background: scoreColor }}
+                          />
+                        </div>
+                        <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: scoreColor }}>
+                          {verificationScore}%
+                        </span>
+                        <span className="text-[10px] font-semibold shrink-0" style={{ color: scoreColor }}>
+                          {scoreLabel}
+                        </span>
+                      </div>
+                      {/* Score breakdown */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        {[
+                          { label: "Chọn loại cà phê đặc sản", done: !!selLocalProfile },
+                          { label: "Vùng miền xác định (tự động)", done: !!selLocalProfile },
+                          { label: `Đủ ${MIN_TRAITS} đặc điểm nổi bật`, done: selLocalTraits.length >= MIN_TRAITS },
+                          { label: "Mô tả có nội dung thực (≥30 ký tự, ≥4 từ)", done: isMeaningfulDescription },
+                        ].map(({ label, done }) => (
+                          <span key={label} className="text-[10px] flex items-center gap-1"
+                            style={{ color: done ? "#3a6b30" : "#a07040" }}>
+                            <span className="material-symbols-outlined text-[12px]">
+                              {done ? "check_circle" : "radio_button_unchecked"}
+                            </span>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Box "Vì sao Local Brand" ── */}
+                  {selLocalProfile && verificationScore >= 50 && (
+                    <div className="rounded-xl border px-3 py-3 flex flex-col gap-2"
+                      style={{ borderColor: "#a5c89a", background: "#f2faf0" }}>
+                      <p className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: "#3a6b30" }}>
+                        <span className="material-symbols-outlined text-[14px]">info</span>
+                        Vì sao sản phẩm này được xác thực Local Brand?
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] flex items-center gap-1.5" style={{ color: "#3a6b30" }}>
+                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                          Thuộc nhóm cà phê đặc sản vùng miền của nền tảng
+                        </span>
+                        <span className="text-[11px] flex items-center gap-1.5" style={{ color: "#3a6b30" }}>
+                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                          Vùng xuất xứ chuẩn hóa: <strong>{selLocalProfile.provinceName}</strong>
+                        </span>
+                        {selLocalTraits.length >= MIN_TRAITS && (
+                          <span className="text-[11px] flex items-center gap-1.5" style={{ color: "#3a6b30" }}>
+                            <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                            Có đặc điểm đặc trưng của <strong>{selLocalProfile.archetypeName}</strong>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] pt-1 border-t" style={{ color: "#6a8060", borderColor: "#c5e0be" }}>
+                        Lưu ý: Nhãn Local Brand sẽ được admin xem xét trước khi hiển thị chính thức. Điểm xác thực này là tự đánh giá ban đầu của hệ thống.
+                      </p>
+                    </div>
+                  )}
+
+                </CardContent>
+              </Card>
+            )}
 
           </div>
         </div>
