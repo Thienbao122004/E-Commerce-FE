@@ -24,6 +24,13 @@ import {
   IconAlertTriangle,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HttpTransportType,
+  LogLevel,
+} from "@microsoft/signalr"
+import { useAuth } from "@/contexts/auth-context"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -295,6 +302,7 @@ type Props = { orderId: string }
 
 export function OrderDetailView({ orderId }: Props) {
   const router = useRouter()
+  const { session } = useAuth()
 
   const [order, setOrder] = React.useState<SellerOrderDetail | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -328,6 +336,32 @@ export function OrderDetailView({ orderId }: Props) {
   React.useEffect(() => {
     load()
   }, [load])
+
+  React.useEffect(() => {
+    if (!session?.access_token || !orderId) return
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "")
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/order-tracking`, {
+        accessTokenFactory: () => session.access_token!,
+        transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.None)
+      .build()
+
+    connection.on("OrderStatusUpdated", (data: any) => {
+      if (data.orderId === orderId) {
+        load()
+      }
+    })
+
+    connection.start().catch(err => console.warn("SignalR Connection Error (Seller):", err))
+
+    return () => {
+      connection.stop()
+    }
+  }, [session?.access_token, orderId, load])
 
   const transitions = order ? (validTransitions[order.status] ?? []) : []
   const canUpdate = transitions.length > 0
