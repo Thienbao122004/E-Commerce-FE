@@ -789,6 +789,52 @@ export default function ProductDetailPage() {
                   )}
                 </div>
 
+                {/* ══ Local Specialty Badge ══ */}
+                {product.localMeta && (
+                  <div className="py-4 border-t border-gray-100">
+                    <div className="rounded-2xl border border-[#d4a96a] bg-gradient-to-br from-[#fffbf2] to-[#fef3dc] p-4 flex flex-col gap-3">
+                      {/* Header */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="material-symbols-outlined text-[18px]" style={{ color: "#b06017" }}>eco</span>
+                        <span className="text-sm font-bold" style={{ color: "#7a4a1e" }}>
+                          {product.localMeta.archetypeName}
+                        </span>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold border" style={{ background: "#fde8c8", color: "#b06017", borderColor: "#f0c890" }}>
+                          Local Brand · {product.localMeta.provinceName}
+                        </span>
+                      </div>
+
+                      {/* Đặc điểm nổi bật */}
+                      {product.localMeta.selectedTraits.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {product.localMeta.selectedTraits.map((trait) => (
+                            <span
+                              key={trait}
+                              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border font-medium"
+                              style={{ background: "#fff7ed", color: "#92400e", borderColor: "#fcd38d" }}
+                            >
+                              <span className="material-symbols-outlined text-[12px]" style={{ color: "#b45309" }}>check_circle</span>
+                              {trait}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Display note */}
+                      {product.localMeta.displayNote && (
+                        <p className="text-[12px] leading-relaxed" style={{ color: "#78480f" }}>
+                          {product.localMeta.displayNote}
+                        </p>
+                      )}
+
+                      {/* Footer note */}
+                      <p className="text-[10px]" style={{ color: "#a07040" }}>
+                        Thông tin đặc sản được xác nhận theo hồ sơ chuẩn của nền tảng.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tags & Materials */}
                 {(product.tags?.length || product.materials?.length) ? (
                   <div className="flex flex-col gap-3 py-4 border-t border-gray-100">

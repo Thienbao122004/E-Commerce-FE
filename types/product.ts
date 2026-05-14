@@ -23,6 +23,16 @@ export type ProductModerationVariantRow = {
   attributes?: string | null
 }
 
+export type ProductLocalMetaModeration = {
+  profileId: number
+  provinceName: string
+  archetypeName: string
+  displayNote: string | null
+  selectedTraits: string[]
+  expectedTraits: string[]
+  mismatchWarning?: string | null
+}
+
 export type ProductModeration = {
   id: string
   productCode: string
@@ -44,6 +54,8 @@ export type ProductModeration = {
   materialNames?: string[]
   baseInventoryQuantity?: number | null
   variants?: ProductModerationVariantRow[]
+  /** Thông tin Local Brand — hiển thị cho admin khi duyệt */
+  localMeta?: ProductLocalMetaModeration | null
 }
 
 export type ProductListResponse = {

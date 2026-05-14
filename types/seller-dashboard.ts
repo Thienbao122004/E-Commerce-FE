@@ -283,6 +283,10 @@ export type CreateSellerProductPayload = {
   imageUrls?: string[]
   tagIds?: number[]
   materialIds?: string[]
+  /** ID hồ sơ đặc sản địa phương (nếu sản phẩm thuộc danh mục có local specialty). */
+  localSpecialtyProfileId?: number
+  /** Các đặc điểm seller đã tick chọn. */
+  selectedTraits?: string[]
 }
 
 export type AddProductVariantResponse = {
