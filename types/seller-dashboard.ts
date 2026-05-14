@@ -130,6 +130,8 @@ export type SellerOrder = {
   trackingCode: string | null
   estimatedDeliveryDate: string | null
   actualDeliveryDate: string | null
+  /** URL ảnh bằng chứng giao hàng từ shipper */
+  deliveryProofUrls?: string[] | null
   createdAt: string
   updatedAt?: string
   statusTimeline?: OrderStatusStep[] | null

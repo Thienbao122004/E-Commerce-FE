@@ -54,6 +54,8 @@ export interface OrderDetail extends OrderSummary {
   actualDeliveryDate?: string | null
   trackingCode?: string | null
   shippingProvider?: string | null
+  /** URL ảnh bằng chứng giao hàng từ shipper */
+  deliveryProofUrls?: string[] | null
   /** Null = không có yêu cầu hủy đang chờ. Có giá trị = đơn đang chờ shop duyệt hủy. */
   cancelRequestedAt?: string | null
   /** Hạn shop phải phản hồi (= cancelRequestedAt + 24h). Quá hạn → tự động hủy. */

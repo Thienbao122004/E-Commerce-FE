@@ -824,6 +824,28 @@ export function OrderDetailView({ orderId }: Props) {
                         </div>
                       </div>
                     )}
+                    {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-[11px] text-muted-foreground mb-2">Bằng chứng giao hàng</p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {order.deliveryProofUrls.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="relative size-16 shrink-0 rounded border overflow-hidden hover:opacity-90 transition-opacity"
+                            >
+                              <img
+                                src={url}
+                                alt={`Bằng chứng ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
