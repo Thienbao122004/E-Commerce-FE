@@ -34,6 +34,10 @@ import {
 import { NavSellers } from "@/components/nav-sellers"
 import { NavMain } from "@/components/nav-main"
 import { useAdminPendingProductCount } from "@/hooks/use-admin-pending-product-count"
+import { useSellerPendingDisputeCount } from "@/hooks/use-seller-pending-dispute-count"
+import { useSellerPendingOrderCount } from "@/hooks/use-seller-pending-order-count"
+import { useSellerUnreadChatCount } from "@/hooks/use-seller-unread-chat-count"
+import { useSellerPendingWithdrawalCount } from "@/hooks/use-seller-pending-withdrawal-count"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import { SellerPlatformFeeFooter } from "@/components/seller/seller-platform-fee-footer"
@@ -181,6 +185,10 @@ const NAV_SECONDARY = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role } = useAuth()
   const { count: pendingApprovalCount } = useAdminPendingProductCount(role === "admin")
+  const { count: sellerDisputeCount } = useSellerPendingDisputeCount(role === "seller")
+  const { count: sellerOrderCount } = useSellerPendingOrderCount(role === "seller")
+  const { count: unreadChatCount } = useSellerUnreadChatCount(role === "seller")
+  const { count: pendingWithdrawalCount } = useSellerPendingWithdrawalCount(role === "seller")
 
   const prefixUrl = (url: string, basePath: string) => {
     if (url.startsWith('/dashboard') || url.startsWith('/profile')) {
@@ -233,7 +241,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={visibleNavItems} pendingApprovalCount={pendingApprovalCount} />
+        <NavMain 
+          items={visibleNavItems} 
+          pendingApprovalCount={pendingApprovalCount} 
+          sellerDisputeCount={sellerDisputeCount}
+          sellerOrderCount={sellerOrderCount}
+          unreadChatCount={unreadChatCount}
+          pendingWithdrawalCount={pendingWithdrawalCount}
+        />
         {showSellers && <NavSellers items={SELLERS_ITEMS} />}
         <NavSecondary items={secondaryNavItems} className="mt-auto" />
       </SidebarContent>

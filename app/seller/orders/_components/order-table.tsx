@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { IconExternalLink, IconShoppingCart } from "@tabler/icons-react"
+import { IconExternalLink, IconShoppingCart, IconAlertTriangle } from "@tabler/icons-react"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import type { SellerOrder } from "@/types/seller-dashboard"
 import { SortableTableHead } from "@/components/common/table-sorting"
@@ -33,7 +33,7 @@ function TableSkeleton() {
       {Array.from({ length: 8 }).map((_, i) => (
         <TableRow key={i}>
           {Array.from({ length: 8 }).map((__, j) => (
-            <TableCell key={j}><Skeleton className="h-4 w-full max-w-[80px]" /></TableCell>
+            <TableCell key={j}><Skeleton className="h-4 w-full max-w-20" /></TableCell>
           ))}
         </TableRow>
       ))}
@@ -49,11 +49,11 @@ type Props = {
   page: number
   pageSize: number
   sort: SortConfig | null
-  onSort: (key: string) => void
+  onSortAction: (key: string) => void
   actionLoading: boolean
-  onUpdateStatus: (orderId: string, newStatus: number) => void | Promise<void>
-  onPageChange: (p: number) => void
-  onPageSizeChange?: (size: number) => void
+  onUpdateStatusAction: (orderId: string, newStatus: number) => void | Promise<void>
+  onPageChangeAction: (p: number) => void
+  onPageSizeChangeAction?: (size: number) => void
 }
 
 export function OrderTable({
@@ -64,11 +64,11 @@ export function OrderTable({
   page,
   pageSize,
   sort,
-  onSort,
+  onSortAction,
   actionLoading,
-  onUpdateStatus,
-  onPageChange,
-  onPageSizeChange,
+  onUpdateStatusAction,
+  onPageChangeAction,
+  onPageSizeChangeAction,
 }: Props) {
   const router = useRouter()
 
@@ -80,11 +80,11 @@ export function OrderTable({
             <TableRow>
               <TableHead className="w-12 text-center">STT</TableHead>
               <TableHead>Mã đơn hàng</TableHead>
-              <SortableTableHead sortKey="customerName" currentSort={sort} onSort={onSort}>Khách hàng</SortableTableHead>
-              <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={onSort}>Ngày đặt</SortableTableHead>
-              <SortableTableHead sortKey="status" currentSort={sort} onSort={onSort}>Trạng thái</SortableTableHead>
-              <SortableTableHead sortKey="totalAmount" currentSort={sort} onSort={onSort}>Tổng tiền</SortableTableHead>
-              <TableHead className="hidden lg:table-cell max-w-[220px]">Địa chỉ</TableHead>
+              <SortableTableHead sortKey="customerName" currentSort={sort} onSort={onSortAction}>Khách hàng</SortableTableHead>
+              <SortableTableHead sortKey="createdAt" currentSort={sort} onSort={onSortAction}>Ngày đặt</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSort={sort} onSort={onSortAction}>Trạng thái</SortableTableHead>
+              <SortableTableHead sortKey="totalAmount" currentSort={sort} onSort={onSortAction}>Tổng tiền</SortableTableHead>
+              <TableHead className="hidden lg:table-cell max-w-55">Địa chỉ</TableHead>
               <TableHead
                 className="w-[1%] whitespace-nowrap text-center"
                 title="Xem chi tiết đơn"
@@ -121,13 +121,21 @@ export function OrderTable({
                     <TableCell className="text-center text-sm text-muted-foreground tabular-nums">
                       {(page - 1) * pageSize + idx + 1}
                     </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/seller/orders/${order.id}`}
-                        className="font-mono text-sm text-primary hover:underline"
-                      >
-                        #{order.orderCode}
-                      </Link>
+                    <TableCell className="font-mono text-sm">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/seller/orders/${order.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          #{order.orderCode}
+                        </Link>
+                        {order.hasActiveDispute && (
+                          <Badge variant="destructive" className="h-5 px-1.5 text-[10px] gap-1">
+                            <IconAlertTriangle className="size-3" />
+                            Khiếu nại
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div>
@@ -191,11 +199,11 @@ export function OrderTable({
           currentPage={page}
           totalPages={totalPages}
           totalItems={totalCount}
-          onPageChange={onPageChange}
+          onPageChange={onPageChangeAction}
           itemLabel="đơn hàng"
           pageSize={pageSize}
-          onPageSizeChange={onPageSizeChange}
-          pageSizeOptions={onPageSizeChange ? [10, 20, 50] : undefined}
+          onPageSizeChange={onPageSizeChangeAction}
+          pageSizeOptions={onPageSizeChangeAction ? [10, 20, 50] : undefined}
         />
       )}
     </div>

@@ -21,7 +21,8 @@ function normalizeCustomerDispute(
     const t = raw.trim()
     if (t.length > 0) adminNote = t
   }
-  return { ...d, adminNote }
+  const orderStatus = d.orderStatus ?? (d as any).OrderStatus
+  return { ...d, adminNote, orderStatus }
 }
 
 function normalizeCustomerDisputeResponse(
@@ -56,7 +57,8 @@ function normalizeSellerDispute(
     const t = raw.trim()
     if (t.length > 0) adminNote = t
   }
-  return { ...d, adminNote }
+  const orderStatus = d.orderStatus ?? (d as any).OrderStatus
+  return { ...d, adminNote, orderStatus }
 }
 
 function normalizeSellerDisputeResponse(res: SellerDisputeResponse): SellerDisputeResponse {
@@ -177,6 +179,39 @@ export async function respondToSellerDispute(
   return normalizeSellerDisputeResponse(res)
 }
 
+export async function approveReturn(disputeId: string): Promise<SellerDisputeResponse> {
+  const res = await api.post<SellerDisputeResponse>(`/api/seller/disputes/${disputeId}/approve-return`)
+  return normalizeSellerDisputeResponse(res)
+}
+
+export async function confirmReturnReceipt(
+  disputeId: string,
+  evidenceUrls?: string[]
+): Promise<SellerDisputeResponse> {
+  const res = await api.post<SellerDisputeResponse>(
+    `/api/seller/disputes/${disputeId}/confirm-receipt`,
+    { evidenceUrls }
+  )
+  return normalizeSellerDisputeResponse(res)
+}
+
+export async function approveRefundSeller(disputeId: string): Promise<SellerDisputeResponse> {
+  const res = await api.post<SellerDisputeResponse>(`/api/seller/disputes/${disputeId}/approve-refund`)
+  return normalizeSellerDisputeResponse(res)
+}
+
+export async function rejectSellerDispute(
+  disputeId: string,
+  response: string,
+  evidenceUrls?: string[]
+): Promise<SellerDisputeResponse> {
+  const res = await api.post<SellerDisputeResponse>(
+    `/api/seller/disputes/${disputeId}/reject`,
+    { response, evidenceUrls }
+  )
+  return normalizeSellerDisputeResponse(res)
+}
+
 // ---------- Customer Dispute APIs ----------
 
 export async function fetchMyDisputes(
@@ -214,5 +249,13 @@ export async function updateDisputeEvidence(
 
 export async function cancelMyDispute(disputeId: string): Promise<CustomerDisputeResponse> {
   const res = await api.post<CustomerDisputeResponse>(`/api/disputes/${disputeId}/cancel`)
+  return normalizeCustomerDisputeResponse(res)
+}
+
+export async function sendReturnShipping(disputeId: string, trackingCode: string): Promise<CustomerDisputeResponse> {
+  const res = await api.post<CustomerDisputeResponse>(
+    `/api/disputes/${disputeId}/send-return`,
+    trackingCode
+  )
   return normalizeCustomerDisputeResponse(res)
 }

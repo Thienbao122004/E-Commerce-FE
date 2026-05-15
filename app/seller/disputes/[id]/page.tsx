@@ -3,8 +3,8 @@
 import * as React from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  IconArrowLeft, IconUser, IconBuildingStore, IconReceipt,
-  IconMessageCircle, IconClock, IconNote, IconPhoto,
+  IconArrowLeft, IconUser, IconReceipt,
+  IconMessageCircle, IconNote, IconPhoto,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -16,20 +16,25 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency } from "@/lib/formatters"
-import { fetchSellerDisputeById, respondToSellerDispute } from "@/services/disputes"
-import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
+import { fetchSellerDisputeById, respondToSellerDispute, approveReturn, confirmReturnReceipt, approveRefundSeller, rejectSellerDispute } from "@/services/disputes"
+import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels, DisputeType } from "@/types/dispute"
 import type { SellerDispute } from "@/types/dispute"
+import { OrderStatus } from "@/types/seller-dashboard"
 import { EvidenceUploader } from "@/components/common/evidence-uploader"
+import { useAuth } from "@/contexts/auth-context"
+import { HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr"
 
 export default function SellerDisputeDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { session } = useAuth()
   const [dispute, setDispute] = React.useState<SellerDispute | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [dlgOpen, setDlgOpen] = React.useState(false)
   const [respondText, setRespondText] = React.useState("")
   const [respondEvidenceUrls, setRespondEvidenceUrls] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState(false)
+  const [rejectDlgOpen, setRejectDlgOpen] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -42,6 +47,43 @@ export default function SellerDisputeDetailPage() {
   }, [id])
 
   React.useEffect(() => { load() }, [load])
+
+  React.useEffect(() => {
+    if (!session?.access_token || !id) return
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "")
+    if (!apiUrl) return
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/order-tracking`, {
+        accessTokenFactory: () => session.access_token!,
+        transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.None)
+      .build()
+
+    connection.on("DisputeUpdated", (data: { disputeId?: string }) => {
+      if (data.disputeId === id) load()
+    })
+
+    connection.on("OrderStatusUpdated", (data: { orderId?: string }) => {
+      if (data.orderId && dispute?.orderId === data.orderId) load()
+    })
+
+    connection.start().catch(err => console.warn("SignalR Connection Error (Seller Dispute):", err))
+
+    return () => {
+      connection.stop()
+    }
+  }, [session?.access_token, id, dispute?.orderId, load])
+
+  const finalStatuses = new Set<number>([
+    DisputeStatus.Resolved,
+    DisputeStatus.Rejected,
+    DisputeStatus.Refunded,
+    DisputeStatus.Cancelled,
+  ])
+  const isFinal = dispute ? finalStatuses.has(dispute.status) : false
 
   const openRespond = () => {
     setRespondText(dispute?.sellerResponse ?? "")
@@ -66,6 +108,65 @@ export default function SellerDisputeDetailPage() {
     finally { setBusy(false) }
   }
 
+  const handleReject = async () => {
+    if (!dispute || respondText.trim().length < 10) return
+    setBusy(true)
+    try {
+      const r = await rejectSellerDispute(
+        dispute.id, respondText.trim(),
+        respondEvidenceUrls.length > 0 ? respondEvidenceUrls : undefined
+      )
+      if (r.success) {
+        toast.success("Đã từ chối khiếu nại. Admin sẽ vào phân xử.")
+        setRejectDlgOpen(false)
+        load()
+      } else toast.error(r.message ?? "Lỗi từ chối khiếu nại")
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
+    finally { setBusy(false) }
+  }
+
+  const handleApproveReturn = async () => {
+    if (!dispute) return
+    if (!confirm("Bạn có chắc chắn muốn chấp nhận yêu cầu trả hàng này?")) return
+    setBusy(true)
+    try {
+      const r = await approveReturn(dispute.id)
+      if (r.success) {
+        toast.success("Đã chấp nhận trả hàng")
+        load()
+      } else toast.error(r.message ?? "Lỗi")
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
+    finally { setBusy(false) }
+  }
+
+  const handleConfirmReceipt = async () => {
+    if (!dispute) return
+    if (!confirm("Bạn xác nhận đã nhận được hàng trả về từ đơn vị vận chuyển? Tiền sẽ được hoàn cho khách hàng ngay lập tức.")) return
+    setBusy(true)
+    try {
+      const r = await confirmReturnReceipt(dispute.id)
+      if (r.success) {
+        toast.success("Đã xác nhận nhận hàng trả & Hoàn tiền")
+        load()
+      } else toast.error(r.message ?? "Lỗi")
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
+    finally { setBusy(false) }
+  }
+
+  const handleApproveRefund = async () => {
+    if (!dispute) return
+    if (!confirm("Bạn có chắc chắn muốn CHẤP NHẬN hoàn tiền ngay cho khách? Tiền sẽ được hoàn ngay lập tức.")) return
+    setBusy(true)
+    try {
+      const r = await approveRefundSeller(dispute.id)
+      if (r.success) {
+        toast.success("Đã hoàn tiền cho khách")
+        load()
+      } else toast.error(r.message ?? "Lỗi hoàn tiền")
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
+    finally { setBusy(false) }
+  }
+
   return (
     <>
       <div className="flex flex-1 flex-col">
@@ -84,8 +185,8 @@ export default function SellerDisputeDetailPage() {
 
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2">
-              <Skeleton className="h-[300px] rounded-lg" />
-              <Skeleton className="h-[300px] rounded-lg" />
+              <Skeleton className="h-75 rounded-lg" />
+              <Skeleton className="h-75 rounded-lg" />
             </div>
           ) : !dispute ? (
             <Card>
@@ -136,7 +237,7 @@ export default function SellerDisputeDetailPage() {
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Tiêu đề</span>
-                    <span className="text-sm font-medium text-right max-w-[200px]">{dispute.title}</span>
+                    <span className="text-sm font-medium text-right max-w-50">{dispute.title}</span>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
@@ -285,15 +386,152 @@ export default function SellerDisputeDetailPage() {
                   {dispute.canRespond && (
                     <>
                       <Separator />
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Khi admin yêu cầu phản hồi, bạn trả lời tại đây: nội dung lưu vào hồ sơ khiếu nại để{' '}
-                        <strong className="font-medium text-foreground">bộ phận hỗ trợ xem xét</strong>
-                        . Khách hàng cũng xem được phản hồi của shop (mục «Phản hồi từ người bán»).
-                      </p>
                       <Button className="w-full gap-2" onClick={openRespond}>
                         <IconMessageCircle className="size-4" />
                         {dispute.sellerResponse ? "Cập nhật phản hồi" : "Gửi phản hồi"}
                       </Button>
+
+                      {dispute.type === DisputeType.Return && !isFinal && (
+                        <div className="pt-2 flex flex-col gap-2">
+                          <Separator />
+                          <p className="text-xs font-semibold text-muted-foreground">Thao tác trả hàng</p>
+
+                          {(dispute.orderStatus === OrderStatus.Delivered ||
+                            dispute.orderStatus === OrderStatus.Completed) && (
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                variant="outline"
+                                className="w-full border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                                onClick={handleApproveReturn}
+                                disabled={busy}
+                              >
+                                Chấp nhận trả hàng
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full border-red-500 text-red-600 hover:bg-red-50"
+                                onClick={() => {
+                                  setRespondText(dispute.sellerResponse ?? "");
+                                  setRespondEvidenceUrls(dispute.sellerEvidenceUrls ?? []);
+                                  setRejectDlgOpen(true);
+                                }}
+                                disabled={busy}
+                              >
+                                Từ chối khiếu nại
+                              </Button>
+                            </div>
+                          )}
+
+                          {dispute.orderStatus === OrderStatus.Returning && (
+                            <div className="flex flex-col gap-2">
+                              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 mb-1">
+                                <p className="text-[11px] text-blue-700 flex items-center gap-1.5 font-medium">
+                                  <span className="material-symbols-outlined text-sm">local_shipping</span>
+                                  Đang chờ GHN giao hàng trả về kho của bạn...
+                                </p>
+                                <p className="text-[10px] text-blue-600 mt-1">
+                                  Hệ thống sẽ tự động thông báo khi hàng về đến nơi. Sau đó bạn mới có thể xác nhận nhận hàng.
+                                </p>
+                                {dispute.returnTrackingCode && (
+                                  <p className="text-[10px] font-mono mt-1 text-blue-800 bg-white/50 px-1.5 py-0.5 rounded w-fit">
+                                    Mã vận đơn: {dispute.returnTrackingCode}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="secondary"
+                                className="w-full opacity-50 cursor-not-allowed"
+                                disabled={true}
+                              >
+                                Xác nhận đã nhận hàng trả
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                onClick={openRespond}
+                                disabled={busy}
+                              >
+                                {dispute.sellerResponse ? "Cập nhật khiếu nại" : "Khiếu nại người mua (hàng lỗi)"}
+                              </Button>
+                            </div>
+                          )}
+
+                          {dispute.orderStatus === OrderStatus.Returned && (
+                            <div className="flex flex-col gap-2">
+                              <div className="rounded-md bg-emerald-50 border border-emerald-100 p-3 mb-1">
+                                <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
+                                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                                  Hàng trả đã về kho!
+                                </p>
+                                <p className="text-[10px] text-emerald-600 mt-1">
+                                  Vui lòng kiểm tra kỹ sản phẩm trước khi bấm xác nhận. Sau khi xác nhận, tiền sẽ được hoàn cho khách.
+                                </p>
+                              </div>
+                              <Button
+                                variant="secondary"
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={handleConfirmReceipt}
+                                disabled={busy}
+                              >
+                                {busy ? "Đang xử lý..." : "Xác nhận nhận hàng & hoàn tiền"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                onClick={openRespond}
+                                disabled={busy}
+                              >
+                                {dispute.sellerResponse ? "Khiếu nại hàng lỗi (Admin xử lý)" : "Khiếu nại người mua (hàng lỗi)"}
+                              </Button>
+
+                              {dispute.returnShipmentEvidenceUrls && dispute.returnShipmentEvidenceUrls.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                                    <IconPhoto className="size-3" />
+                                    Bằng chứng từ Shipper:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {dispute.returnShipmentEvidenceUrls.map((url, i) => (
+                                      <a 
+                                        key={i} 
+                                        href={url} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="relative size-16 rounded-md overflow-hidden border border-emerald-200 hover:border-emerald-400 transition-colors"
+                                      >
+                                        <img src={url} alt={`Shipper evidence ${i+1}`} className="size-full object-cover" />
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {dispute.type !== DisputeType.Return && !isFinal && (
+                        <div className="pt-2 flex flex-col gap-2">
+                          <Separator />
+                          <p className="text-xs font-semibold text-muted-foreground">Thao tác xử lý</p>
+                          <Button
+                            variant="default"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700"
+                            onClick={handleApproveRefund}
+                            disabled={busy}
+                          >
+                            Chấp nhận hoàn tiền ngay
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                            onClick={openRespond}
+                            disabled={busy}
+                          >
+                            {dispute.sellerResponse ? "Cập nhật phản đối" : "Từ chối hoàn tiền (Gửi lên Admin)"}
+                          </Button>
+                        </div>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -327,7 +565,7 @@ export default function SellerDisputeDetailPage() {
                 placeholder="Mô tả rõ tình trạng đơn hàng, lý do từ phía cửa hàng... (tối thiểu 10 ký tự)"
                 value={respondText}
                 onChange={(e) => setRespondText(e.target.value)}
-                className="min-h-[120px]"
+                className="min-h-30"
                 disabled={busy}
               />
               <p className="text-xs text-muted-foreground mt-1">{respondText.length}/2000 ký tự</p>
@@ -348,6 +586,49 @@ export default function SellerDisputeDetailPage() {
             <Button variant="outline" onClick={() => setDlgOpen(false)} disabled={busy}>Hủy</Button>
             <Button onClick={handleRespond} disabled={busy || respondText.trim().length < 10}>
               {busy ? "Đang gửi..." : "Gửi phản hồi"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Từ chối khiếu nại */}
+      <Dialog open={rejectDlgOpen} onOpenChange={setRejectDlgOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Từ chối khiếu nại này?</DialogTitle>
+            <DialogDescription>
+              Khi bạn từ chối, yêu cầu sẽ được chuyển cho bộ phận hỗ trợ của sàn để phân xử. 
+              Vui lòng cung cấp lý do chi tiết và bằng chứng để bảo vệ quyền lợi của Shop.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Lý do từ chối *</label>
+              <Textarea
+                placeholder="Giải thích lý do bạn không đồng ý với khiếu nại của khách... (tối thiểu 10 ký tự)"
+                value={respondText}
+                onChange={(e) => setRespondText(e.target.value)}
+                className="min-h-32"
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Bằng chứng đối soát (Ảnh/Video)</label>
+              <EvidenceUploader
+                urls={respondEvidenceUrls}
+                onChange={setRespondEvidenceUrls}
+                disabled={busy}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDlgOpen(false)} disabled={busy}>Hủy</Button>
+            <Button 
+              onClick={handleReject} 
+              disabled={busy || respondText.trim().length < 10}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {busy ? "Đang xử lý..." : "Xác nhận Từ chối"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -162,6 +162,9 @@ export type SellerDispute = {
   customerNote: string | null
   adminNote: string | null
   affectedItems?: DisputeAffectedItem[]
+  orderStatus?: number
+  returnTrackingCode?: string | null
+  returnShipmentEvidenceUrls?: string[]
 }
 
 export type SellerDisputeListResponse = {
@@ -204,6 +207,12 @@ export type CustomerDispute = {
   customerNote: string | null
   adminNote?: string | null
   affectedItems?: DisputeAffectedItem[]
+  orderStatus?: number
+  /** Mã vận đơn GHN của đơn gốc (hiển thị tham khảo cho khách khi gửi trả) */
+  orderTrackingCode?: string | null
+  /** Mã vận đơn trả hàng (nếu khách đã điền) */
+  returnTrackingCode?: string | null
+  returnShipmentEvidenceUrls?: string[]
 }
 
 export type CustomerDisputeListResponse = {
