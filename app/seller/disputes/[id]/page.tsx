@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import {
   IconArrowLeft, IconUser, IconReceipt,
   IconMessageCircle, IconNote, IconPhoto,
+  IconClock,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -141,12 +142,12 @@ export default function SellerDisputeDetailPage() {
 
   const handleConfirmReceipt = async () => {
     if (!dispute) return
-    if (!confirm("Bạn xác nhận đã nhận được hàng trả về từ đơn vị vận chuyển? Tiền sẽ được hoàn cho khách hàng ngay lập tức.")) return
+    if (!confirm("Bạn xác nhận đã nhận được hàng trả về từ đơn vị vận chuyển? Yêu cầu sẽ được chuyển cho Admin duyệt hoàn tiền cho khách hàng.")) return
     setBusy(true)
     try {
       const r = await confirmReturnReceipt(dispute.id)
       if (r.success) {
-        toast.success("Đã xác nhận nhận hàng trả & Hoàn tiền")
+        toast.success("Đã xác nhận nhận hàng. Vui lòng đợi Admin duyệt hoàn tiền.")
         load()
       } else toast.error(r.message ?? "Lỗi")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -155,12 +156,12 @@ export default function SellerDisputeDetailPage() {
 
   const handleApproveRefund = async () => {
     if (!dispute) return
-    if (!confirm("Bạn có chắc chắn muốn CHẤP NHẬN hoàn tiền ngay cho khách? Tiền sẽ được hoàn ngay lập tức.")) return
+    if (!confirm("Bạn có chắc chắn đồng ý hoàn tiền cho khách? Yêu cầu sẽ được chuyển cho Admin duyệt để thực hiện hoàn tiền.")) return
     setBusy(true)
     try {
       const r = await approveRefundSeller(dispute.id)
       if (r.success) {
-        toast.success("Đã hoàn tiền cho khách")
+        toast.success("Đã gửi xác nhận đồng ý hoàn tiền. Vui lòng đợi Admin duyệt.")
         load()
       } else toast.error(r.message ?? "Lỗi hoàn tiền")
     } catch (e) { toast.error(e instanceof Error ? e.message : "Lỗi") }
@@ -383,6 +384,24 @@ export default function SellerDisputeDetailPage() {
                     </div>
                   )}
 
+                  {/* Banner chờ Admin duyệt - hiện luôn khi UnderReview bất kể canRespond */}
+                  {dispute.status === DisputeStatus.UnderReview && (
+                    <div className="rounded-md bg-blue-50 border border-blue-200 p-4 text-center mt-2">
+                      <p className="text-sm font-bold text-blue-700 flex items-center justify-center gap-2">
+                        <IconClock className="size-5" />
+                        Chờ Admin duyệt
+                      </p>
+                      <p className="text-xs text-blue-600 mt-2">
+                        Bạn đã thực hiện xong các bước cần thiết. Vui lòng đợi Admin kiểm tra và thực hiện hoàn tiền cho khách hàng.
+                      </p>
+                      {dispute.adminNote && (
+                        <p className="text-[11px] text-blue-500 mt-2 italic border-t border-blue-100 pt-2">
+                          Ghi chú: {dispute.adminNote}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {dispute.canRespond && (
                     <>
                       <Separator />
@@ -391,145 +410,149 @@ export default function SellerDisputeDetailPage() {
                         {dispute.sellerResponse ? "Cập nhật phản hồi" : "Gửi phản hồi"}
                       </Button>
 
-                      {dispute.type === DisputeType.Return && !isFinal && (
-                        <div className="pt-2 flex flex-col gap-2">
-                          <Separator />
-                          <p className="text-xs font-semibold text-muted-foreground">Thao tác trả hàng</p>
-
-                          {(dispute.orderStatus === OrderStatus.Delivered ||
-                            dispute.orderStatus === OrderStatus.Completed) && (
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                variant="outline"
-                                className="w-full border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                                onClick={handleApproveReturn}
-                                disabled={busy}
-                              >
-                                Chấp nhận trả hàng
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full border-red-500 text-red-600 hover:bg-red-50"
-                                onClick={() => {
-                                  setRespondText(dispute.sellerResponse ?? "");
-                                  setRespondEvidenceUrls(dispute.sellerEvidenceUrls ?? []);
-                                  setRejectDlgOpen(true);
-                                }}
-                                disabled={busy}
-                              >
-                                Từ chối khiếu nại
-                              </Button>
-                            </div>
-                          )}
-
-                          {dispute.orderStatus === OrderStatus.Returning && (
-                            <div className="flex flex-col gap-2">
-                              <div className="rounded-md bg-blue-50 border border-blue-100 p-3 mb-1">
-                                <p className="text-[11px] text-blue-700 flex items-center gap-1.5 font-medium">
-                                  <span className="material-symbols-outlined text-sm">local_shipping</span>
-                                  Đang chờ GHN giao hàng trả về kho của bạn...
-                                </p>
-                                <p className="text-[10px] text-blue-600 mt-1">
-                                  Hệ thống sẽ tự động thông báo khi hàng về đến nơi. Sau đó bạn mới có thể xác nhận nhận hàng.
-                                </p>
-                                {dispute.returnTrackingCode && (
-                                  <p className="text-[10px] font-mono mt-1 text-blue-800 bg-white/50 px-1.5 py-0.5 rounded w-fit">
-                                    Mã vận đơn: {dispute.returnTrackingCode}
-                                  </p>
-                                )}
-                              </div>
-                              <Button
-                                variant="secondary"
-                                className="w-full opacity-50 cursor-not-allowed"
-                                disabled={true}
-                              >
-                                Xác nhận đã nhận hàng trả
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                                onClick={openRespond}
-                                disabled={busy}
-                              >
-                                {dispute.sellerResponse ? "Cập nhật khiếu nại" : "Khiếu nại người mua (hàng lỗi)"}
-                              </Button>
-                            </div>
-                          )}
-
-                          {dispute.orderStatus === OrderStatus.Returned && (
-                            <div className="flex flex-col gap-2">
-                              <div className="rounded-md bg-emerald-50 border border-emerald-100 p-3 mb-1">
-                                <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
-                                  <span className="material-symbols-outlined text-sm">check_circle</span>
-                                  Hàng trả đã về kho!
-                                </p>
-                                <p className="text-[10px] text-emerald-600 mt-1">
-                                  Vui lòng kiểm tra kỹ sản phẩm trước khi bấm xác nhận. Sau khi xác nhận, tiền sẽ được hoàn cho khách.
-                                </p>
-                              </div>
-                              <Button
-                                variant="secondary"
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                onClick={handleConfirmReceipt}
-                                disabled={busy}
-                              >
-                                {busy ? "Đang xử lý..." : "Xác nhận nhận hàng & hoàn tiền"}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                                onClick={openRespond}
-                                disabled={busy}
-                              >
-                                {dispute.sellerResponse ? "Khiếu nại hàng lỗi (Admin xử lý)" : "Khiếu nại người mua (hàng lỗi)"}
-                              </Button>
-
-                              {dispute.returnShipmentEvidenceUrls && dispute.returnShipmentEvidenceUrls.length > 0 && (
-                                <div className="mt-4 space-y-2">
-                                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                                    <IconPhoto className="size-3" />
-                                    Bằng chứng từ Shipper:
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {dispute.returnShipmentEvidenceUrls.map((url, i) => (
-                                      <a 
-                                        key={i} 
-                                        href={url} 
-                                        target="_blank" 
-                                        rel="noreferrer"
-                                        className="relative size-16 rounded-md overflow-hidden border border-emerald-200 hover:border-emerald-400 transition-colors"
-                                      >
-                                        <img src={url} alt={`Shipper evidence ${i+1}`} className="size-full object-cover" />
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                      {!isFinal && dispute.status !== DisputeStatus.UnderReview && (
+                        <>
+                          <Separator className="my-2" />
+                          <p className="text-xs font-semibold text-muted-foreground">Thao tác xử lý</p>
+                        </> 
                       )}
 
-                      {dispute.type !== DisputeType.Return && !isFinal && (
+                      {!isFinal && dispute.status !== DisputeStatus.UnderReview && (
                         <div className="pt-2 flex flex-col gap-2">
-                          <Separator />
-                          <p className="text-xs font-semibold text-muted-foreground">Thao tác xử lý</p>
-                          <Button
-                            variant="default"
-                            className="w-full bg-emerald-600 hover:bg-emerald-700"
-                            onClick={handleApproveRefund}
-                            disabled={busy}
-                          >
-                            Chấp nhận hoàn tiền ngay
-                          </Button>
-                          <Button
-                            variant="outline"
-                            className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
-                            onClick={openRespond}
-                            disabled={busy}
-                          >
-                            {dispute.sellerResponse ? "Cập nhật phản đối" : "Từ chối hoàn tiền (Gửi lên Admin)"}
-                          </Button>
+                          {dispute.type === DisputeType.Return ? (
+                            <>
+                              {(dispute.orderStatus === OrderStatus.Delivered ||
+                                dispute.orderStatus === OrderStatus.Completed) && (
+                                <div className="flex flex-col gap-2">
+                                  <Button
+                                    variant="outline"
+                                    className="w-full border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                                    onClick={handleApproveReturn}
+                                    disabled={busy}
+                                  >
+                                    Chấp nhận trả hàng
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full border-red-500 text-red-600 hover:bg-red-50"
+                                    onClick={() => {
+                                      setRespondText(dispute.sellerResponse ?? "");
+                                      setRespondEvidenceUrls(dispute.sellerEvidenceUrls ?? []);
+                                      setRejectDlgOpen(true);
+                                    }}
+                                    disabled={busy}
+                                  >
+                                    Từ chối khiếu nại
+                                  </Button>
+                                </div>
+                              )}
+
+                              {dispute.orderStatus === OrderStatus.Returning && (
+                                <div className="flex flex-col gap-2">
+                                  <div className="rounded-md bg-blue-50 border border-blue-100 p-3 mb-1">
+                                    <p className="text-[11px] text-blue-700 flex items-center gap-1.5 font-medium">
+                                      <span className="material-symbols-outlined text-sm">local_shipping</span>
+                                      Đang chờ GHN giao hàng trả về kho của bạn...
+                                    </p>
+                                    <p className="text-[10px] text-blue-600 mt-1">
+                                      Hệ thống sẽ tự động thông báo khi hàng về đến nơi. Sau đó bạn mới có thể xác nhận nhận hàng.
+                                    </p>
+                                    {dispute.returnTrackingCode && (
+                                      <p className="text-[10px] font-mono mt-1 text-blue-800 bg-white/50 px-1.5 py-0.5 rounded w-fit">
+                                        Mã vận đơn: {dispute.returnTrackingCode}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="secondary"
+                                    className="w-full opacity-50 cursor-not-allowed"
+                                    disabled={true}
+                                  >
+                                    Xác nhận đã nhận hàng trả
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                    onClick={openRespond}
+                                    disabled={busy}
+                                  >
+                                    {dispute.sellerResponse ? "Cập nhật khiếu nại" : "Khiếu nại người mua (hàng lỗi)"}
+                                  </Button>
+                                </div>
+                              )}
+
+                              {dispute.orderStatus === OrderStatus.Returned && (
+                                <div className="flex flex-col gap-2">
+                                  <div className="rounded-md bg-emerald-50 border border-emerald-100 p-3 mb-1">
+                                    <p className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
+                                      <span className="material-symbols-outlined text-sm">check_circle</span>
+                                      Hàng trả đã về kho!
+                                    </p>
+                                    <p className="text-[10px] text-emerald-600 mt-1">
+                                      Vui lòng kiểm tra kỹ sản phẩm trước khi bấm xác nhận. Sau khi xác nhận, Admin sẽ tiến hành duyệt và hoàn tiền cho khách.
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="secondary"
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleConfirmReceipt}
+                                    disabled={busy}
+                                  >
+                                    {busy ? "Đang xử lý..." : "Xác nhận đã nhận hàng"}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                    onClick={openRespond}
+                                    disabled={busy}
+                                  >
+                                    {dispute.sellerResponse ? "Khiếu nại hàng lỗi (Admin xử lý)" : "Khiếu nại người mua (hàng lỗi)"}
+                                  </Button>
+
+                                  {dispute.returnShipmentEvidenceUrls && dispute.returnShipmentEvidenceUrls.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                      <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                                        <IconPhoto className="size-3" />
+                                        Bằng chứng từ Shipper:
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {dispute.returnShipmentEvidenceUrls.map((url, i) => (
+                                          <a 
+                                            key={i} 
+                                            href={url} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            className="relative size-16 rounded-md overflow-hidden border border-emerald-200 hover:border-emerald-400 transition-colors"
+                                          >
+                                            <img src={url} alt={`Shipper evidence ${i+1}`} className="size-full object-cover" />
+                                          </a>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                variant="default"
+                                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                                onClick={handleApproveRefund}
+                                disabled={busy}
+                              >
+                                {busy ? "Đang xử lý..." : "Đồng ý hoàn tiền"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                                onClick={openRespond}
+                                disabled={busy}
+                              >
+                                {dispute.sellerResponse ? "Cập nhật phản đối" : "Từ chối hoàn tiền (Gửi lên Admin)"}
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>

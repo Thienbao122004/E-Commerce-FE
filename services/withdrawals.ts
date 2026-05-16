@@ -17,6 +17,21 @@ export function fetchWithdrawals(
   return api.get<WithdrawListResponse>(`/api/admin/withdrawals?${params}`)
 }
 
+export function fetchCustomerWithdrawals(
+  page = 1,
+  pageSize = 10,
+  status?: number | null
+): Promise<WithdrawListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  })
+  if (status !== null && status !== undefined)
+    params.set("status", String(status))
+
+  return api.get<WithdrawListResponse>(`/api/admin/customer-withdrawals?${params}`)
+}
+
 // ---------- Approve ----------
 export function approveWithdrawal(
   requestId: string,

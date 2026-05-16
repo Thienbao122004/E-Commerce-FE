@@ -28,6 +28,7 @@ export function NavMain({
   sellerOrderCount = 0,
   unreadChatCount = 0,
   pendingWithdrawalCount = 0,
+  adminPendingDisputeCount = 0,
 }: {
   items: {
     title: string
@@ -45,6 +46,7 @@ export function NavMain({
   sellerOrderCount?: number
   unreadChatCount?: number
   pendingWithdrawalCount?: number
+  adminPendingDisputeCount?: number
 }) {
   const pathname = usePathname()
 
@@ -79,6 +81,13 @@ export function NavMain({
                           className="h-2 w-2 shrink-0 rounded-full"
                           style={{ backgroundColor: "var(--color-primary)" }}
                           title={`${pendingApprovalCount} sản phẩm cần duyệt`}
+                        />
+                      ) : null}
+                      {adminPendingDisputeCount > 0 && (item.url.includes("disputes") || item.items?.some(s => s.url.includes("disputes"))) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: "var(--color-primary)" }}
+                          title={`${adminPendingDisputeCount} tranh chấp cần xử lý`}
                         />
                       ) : null}
                       {sellerDisputeCount > 0 && (item.url.includes("disputes") || item.items?.some(s => s.url.includes("disputes"))) ? (
@@ -128,6 +137,14 @@ export function NavMain({
                                   style={{ backgroundColor: "var(--color-primary)" }}
                                 >
                                   {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
+                                </span>
+                              ) : null}
+                              {adminPendingDisputeCount > 0 && subItem.url.includes("disputes") ? (
+                                <span
+                                  className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums"
+                                  style={{ backgroundColor: "var(--color-primary)" }}
+                                >
+                                  {adminPendingDisputeCount > 99 ? "99+" : adminPendingDisputeCount}
                                 </span>
                               ) : null}
                             </Link>

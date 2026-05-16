@@ -246,6 +246,10 @@ export default function CartPage() {
                 <div className="min-w-0">
                   <Link href={`/products/${item.productId}`} className="text-sm font-medium line-clamp-2 hover:text-[var(--color-primary)] transition-colors" style={{ color: 'var(--color-text-main)' }}>{item.productName}</Link>
                   {item.variantName && <p className="text-xs text-muted-foreground mt-0.5">Phân loại: {item.variantName}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">inventory_2</span>
+                    Còn {item.stockAvailable} sản phẩm
+                  </p>
                 </div>
               </div>
               <div className="text-center text-sm" style={{ color: 'var(--color-text-main)' }}>{formatPrice(item.unitPrice)}</div>
@@ -281,6 +285,10 @@ export default function CartPage() {
               <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                 <Link href={`/products/${item.productId}`} className="text-sm font-medium line-clamp-2 leading-snug hover:text-[var(--color-primary)]" style={{ color: 'var(--color-text-main)' }}>{item.productName}</Link>
                 {item.variantName && <p className="text-xs text-muted-foreground">Phân loại: {item.variantName}</p>}
+                <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                  <span className="material-symbols-outlined text-[12px]">inventory_2</span>
+                  Còn {item.stockAvailable}
+                </p>
                 <p className="text-xs text-muted-foreground">Đơn giá: {formatPrice(item.unitPrice)}</p>
                 <div className="flex items-center justify-between mt-1">
                   <div className="flex items-center border rounded" style={{ borderColor: '#d1c9c0' }}>

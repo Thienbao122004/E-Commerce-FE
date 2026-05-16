@@ -742,7 +742,14 @@ export default function ProductDetailPage() {
                     </button>
                   </div>
                   <span className="text-xs text-gray-400">
-                    {currentStock <= 0 ? "Hết hàng" : ""}
+                    {currentStock <= 0 ? (
+                      <span className="text-red-500 font-medium">Hết hàng</span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium text-gray-600">{currentStock}</span>
+                        sản phẩm có sẵn
+                      </span>
+                    )}
                   </span>
                 </div>
 
