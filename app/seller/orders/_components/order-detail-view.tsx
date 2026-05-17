@@ -24,6 +24,13 @@ import {
   IconAlertTriangle,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HttpTransportType,
+  LogLevel,
+} from "@microsoft/signalr"
+import { useAuth } from "@/contexts/auth-context"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -63,6 +70,7 @@ import {
   rejectCancelRequest,
 } from "@/services/seller-dashboard"
 import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
+import { DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels } from "@/types/dispute"
 import type { OrderStatusStep } from "@/types/customer-order"
 import type { SellerOrderDetail } from "@/types/seller-dashboard"
 import { validTransitions } from "./order-status-dialog"
@@ -295,6 +303,7 @@ type Props = { orderId: string }
 
 export function OrderDetailView({ orderId }: Props) {
   const router = useRouter()
+  const { session } = useAuth()
 
   const [order, setOrder] = React.useState<SellerOrderDetail | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -328,6 +337,38 @@ export function OrderDetailView({ orderId }: Props) {
   React.useEffect(() => {
     load()
   }, [load])
+
+  React.useEffect(() => {
+    if (!session?.access_token || !orderId) return
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "")
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/order-tracking`, {
+        accessTokenFactory: () => session.access_token!,
+        transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.None)
+      .build()
+
+    connection.on("OrderStatusUpdated", (data: any) => {
+      if (data.orderId === orderId) {
+        load()
+      }
+    })
+
+    connection.on("DisputeUpdated", (data: any) => {
+      if (data.orderId === orderId) {
+        load()
+      }
+    })
+
+    connection.start().catch(err => console.warn("SignalR Connection Error (Seller):", err))
+
+    return () => {
+      connection.stop()
+    }
+  }, [session?.access_token, orderId, load])
 
   const transitions = order ? (validTransitions[order.status] ?? []) : []
   const canUpdate = transitions.length > 0
@@ -468,6 +509,16 @@ export function OrderDetailView({ orderId }: Props) {
   const isEndedOrder =
     order?.status === OrderStatus.Cancelled || order?.status === OrderStatus.Refunded
   const hasPendingCancelRequest = !!(order?.cancelRequestedAt && order.status === OrderStatus.Processing)
+  const hasActiveDispute = !!(order?.hasActiveDispute || order?.activeDisputeId)
+  const disputeTypeLabel = order?.activeDisputeType != null
+    ? DisputeTypeLabels[order.activeDisputeType] ?? "Khiếu nại"
+    : "Khiếu nại"
+  const disputeStatusLabel = order?.activeDisputeStatus != null
+    ? DisputeStatusLabels[order.activeDisputeStatus] ?? "Đang xử lý"
+    : "Đang xử lý"
+  const disputeStatusColor = order?.activeDisputeStatus != null
+    ? DisputeStatusColors[order.activeDisputeStatus] ?? ""
+    : ""
 
   return (
     <>
@@ -527,6 +578,46 @@ export function OrderDetailView({ orderId }: Props) {
                     cancelReason={order.cancelReason}
                     statusTimeline={order.statusTimeline}
                   />
+                </CardContent>
+              </Card>
+            )}
+
+            {hasActiveDispute && (
+              <Card className="rounded shadow-sm overflow-hidden border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="size-9 rounded-lg bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center shrink-0">
+                      <IconAlertTriangle className="size-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                        Đơn hàng có khiếu nại đang xử lý
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {disputeTypeLabel}
+                        </Badge>
+                        <Badge variant="secondary" className={`text-xs ${disputeStatusColor}`}>
+                          {disputeStatusLabel}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {order.activeDisputeId ? (
+                      <Link href={`/seller/disputes/${order.activeDisputeId}`}>
+                        <Button size="sm" variant="outline" className="text-xs">
+                          Xem khiếu nại
+                        </Button>
+                      </Link>
+                    ) : (
+                      <Link href="/seller/disputes">
+                        <Button size="sm" variant="outline" className="text-xs">
+                          Mở danh sách khiếu nại
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -821,6 +912,28 @@ export function OrderDetailView({ orderId }: Props) {
                         <div>
                           <p className="text-[11px] text-muted-foreground">Giao thành công lúc</p>
                           <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{fmtDate(order.actualDeliveryDate)}</p>
+                        </div>
+                      </div>
+                    )}
+                    {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (
+                      <div className="pt-2 border-t">
+                        <p className="text-[11px] text-muted-foreground mb-2">Bằng chứng giao hàng</p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {order.deliveryProofUrls.map((url, i) => (
+                            <a
+                              key={i}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="relative size-16 shrink-0 rounded border overflow-hidden hover:opacity-90 transition-opacity"
+                            >
+                              <img
+                                src={url}
+                                alt={`Bằng chứng ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                          ))}
                         </div>
                       </div>
                     )}

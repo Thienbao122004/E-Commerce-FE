@@ -5,6 +5,7 @@ import {
   IconAlertCircle,
   IconTruckDelivery,
   IconCurrencyDollar,
+  IconAlertTriangle,
 } from "@tabler/icons-react"
 import { OrderStatus } from "@/types/seller-dashboard"
 import type { SellerOrder } from "@/types/seller-dashboard"
@@ -28,6 +29,7 @@ export function OrderStats({ orders, totalCount, loading }: Props) {
   const totalRevenue = orders
     .filter((o) => o.status === OrderStatus.Completed)
     .reduce((sum, o) => sum + o.totalAmount, 0)
+  const disputeCount = orders.filter((o) => o.hasActiveDispute).length
 
   const cards = [
     {
@@ -54,6 +56,14 @@ export function OrderStats({ orders, totalCount, loading }: Props) {
       valueColor: "text-blue-600 dark:text-blue-400",
     },
     {
+      label: "Khiếu nại",
+      value: disputeCount,
+      icon: <IconAlertTriangle />,
+      iconBg: "bg-red-100 dark:bg-red-900/30",
+      iconColor: "text-red-600 dark:text-red-400",
+      valueColor: "text-red-600 dark:text-red-400",
+    },
+    {
       label: "Doanh thu (đã giao)",
       value: currency(totalRevenue),
       icon: <IconCurrencyDollar />,
@@ -61,6 +71,7 @@ export function OrderStats({ orders, totalCount, loading }: Props) {
       iconColor: "text-green-600 dark:text-green-400",
       valueColor: "text-green-600 dark:text-green-400",
     },
+    
   ]
 
   return (

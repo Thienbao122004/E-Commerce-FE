@@ -4,12 +4,15 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import {
   IconRefresh, IconCheck, IconX, IconScale, IconEye,
+  IconTruckReturn, IconCash, IconAlertTriangle, IconPackageOff,
+  IconSwitchHorizontal, IconStarHalf
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 import dynamic from "next/dynamic"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchDisputes, approveRefund, rejectDispute } from "@/services/disputes"
@@ -30,10 +33,13 @@ import { useDebounce } from "@/hooks/use-debounce"
 import { useTableData } from "@/hooks/use-table-data"
 import { SetHeaderActions } from "@/hooks/use-header-actions"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
+import { fetchStats } from "@/services/dashboard"
+import type { DashboardStats } from "@/types/dashboard"
 
 export default function DisputesPage() {
   const router = useRouter()
   const [disputes, setDisputes] = React.useState<AdminDispute[]>([])
+  const [dashboardStats, setDashboardStats] = React.useState<DashboardStats | null>(null)
   const [totalCount, setTotalCount] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [actionLoading, setActionLoading] = React.useState(false)
@@ -56,8 +62,14 @@ export default function DisputesPage() {
     try {
       const statusVal = statusFilter === "all" ? null : Number(statusFilter)
       const typeVal = typeFilter === "all" ? null : Number(typeFilter)
-      const res = await fetchDisputes(pg, ps, statusVal, typeVal)
+      
+      const [res, statsRes] = await Promise.all([
+        fetchDisputes(pg, ps, statusVal, typeVal),
+        fetchStats()
+      ])
+      
       if (res.success) { setDisputes(res.disputes); setTotalCount(res.totalCount) }
+      if (statsRes.success && statsRes.stats) { setDashboardStats(statsRes.stats) }
     } catch (err) { toast.error(err instanceof Error ? err.message : "Lỗi") }
     finally { setLoading(false) }
   }, [pg, statusFilter, typeFilter])
@@ -191,6 +203,33 @@ export default function DisputesPage() {
 
       <div className="flex flex-1 flex-col">
         <div className="flex flex-col gap-4 p-4">
+          
+          {/* Dashboard Stats Cards */}
+          <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs">
+            {[
+              { label: "Trả hàng", icon: IconTruckReturn, count: dashboardStats?.disputes.typeReturn ?? 0, color: "text-blue-600", bg: "bg-blue-100" },
+              { label: "Hoàn tiền", icon: IconCash, count: dashboardStats?.disputes.typeRefund ?? 0, color: "text-emerald-600", bg: "bg-emerald-100" },
+              { label: "Hư hỏng", icon: IconAlertTriangle, count: dashboardStats?.disputes.typeDamaged ?? 0, color: "text-orange-600", bg: "bg-orange-100" },
+              { label: "Không nhận", icon: IconPackageOff, count: dashboardStats?.disputes.typeNotReceived ?? 0, color: "text-red-600", bg: "bg-red-100" },
+              { label: "Sai hàng", icon: IconSwitchHorizontal, count: dashboardStats?.disputes.typeWrongItem ?? 0, color: "text-purple-600", bg: "bg-purple-100" },
+              { label: "Chất lượng", icon: IconStarHalf, count: dashboardStats?.disputes.typeQualityIssue ?? 0, color: "text-amber-600", bg: "bg-amber-100" },
+            ].map((stat, i) => (
+              <Card key={i} data-slot="card" className="@container/card border-muted/50 hover:border-primary/20 transition-colors">
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-3">
+                  <div className={`p-2.5 rounded-full ${stat.bg} ${stat.color} shadow-sm`}>
+                    <stat.icon className="size-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xl font-bold tabular-nums leading-none">
+                      {loading && !dashboardStats ? "-" : stat.count}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{stat.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
           <FilterBar
             searchPlaceholder="Tìm khách hàng, cửa hàng, mã tranh chấp..."
             searchValue={searchInput}

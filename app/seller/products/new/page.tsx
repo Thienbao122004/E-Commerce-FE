@@ -1637,7 +1637,7 @@ export default function CreateProductPage() {
                         )
                       })}
 
-                      {/* Chip cho tag được chọn từ platform (không có trong AI suggestions) */}
+                      {/* chip cho tag được chọn từ platform (không có trong AI suggestions) */}
                       {platformTags
                         .filter(
                           (t) =>
