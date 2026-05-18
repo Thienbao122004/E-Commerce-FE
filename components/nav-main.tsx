@@ -24,6 +24,11 @@ import {
 export function NavMain({
   items,
   pendingApprovalCount = 0,
+  sellerDisputeCount = 0,
+  sellerOrderCount = 0,
+  unreadChatCount = 0,
+  pendingWithdrawalCount = 0,
+  adminPendingDisputeCount = 0,
 }: {
   items: {
     title: string
@@ -37,6 +42,11 @@ export function NavMain({
     }[]
   }[]
   pendingApprovalCount?: number
+  sellerDisputeCount?: number
+  sellerOrderCount?: number
+  unreadChatCount?: number
+  pendingWithdrawalCount?: number
+  adminPendingDisputeCount?: number
 }) {
   const pathname = usePathname()
 
@@ -73,6 +83,37 @@ export function NavMain({
                           title={`${pendingApprovalCount} sản phẩm cần duyệt`}
                         />
                       ) : null}
+                      {adminPendingDisputeCount > 0 && (item.url.includes("disputes") || item.items?.some(s => s.url.includes("disputes"))) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: "var(--color-primary)" }}
+                          title={`${adminPendingDisputeCount} tranh chấp cần xử lý`}
+                        />
+                      ) : null}
+                      {sellerDisputeCount > 0 && (item.url.includes("disputes") || item.items?.some(s => s.url.includes("disputes"))) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-orange-500"
+                          title={`${sellerDisputeCount} khiếu nại cần xử lý`}
+                        />
+                      ) : null}
+                      {sellerOrderCount > 0 && (item.url.includes("orders") || item.items?.some(s => s.url.includes("orders"))) ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-blue-500"
+                          title={`${sellerOrderCount} đơn hàng cần xác nhận`}
+                        />
+                      ) : null}
+                      {unreadChatCount > 0 && item.url.includes("chat") ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-red-500"
+                          title={`${unreadChatCount} tin nhắn mới`}
+                        />
+                      ) : null}
+                      {pendingWithdrawalCount > 0 && item.url.includes("wallet") ? (
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                          title={`${pendingWithdrawalCount} yêu cầu rút tiền đang chờ`}
+                        />
+                      ) : null}
                       <IconChevronRight className="shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -98,6 +139,14 @@ export function NavMain({
                                   {pendingApprovalCount > 99 ? "99+" : pendingApprovalCount}
                                 </span>
                               ) : null}
+                              {adminPendingDisputeCount > 0 && subItem.url.includes("disputes") ? (
+                                <span
+                                  className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums"
+                                  style={{ backgroundColor: "var(--color-primary)" }}
+                                >
+                                  {adminPendingDisputeCount > 99 ? "99+" : adminPendingDisputeCount}
+                                </span>
+                              ) : null}
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
@@ -112,6 +161,34 @@ export function NavMain({
                   <Link href={item.url}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
+                    {sellerDisputeCount > 0 && item.url.includes("disputes") ? (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums bg-orange-500"
+                      >
+                        {sellerDisputeCount > 99 ? "99+" : sellerDisputeCount}
+                      </span>
+                    ) : null}
+                    {sellerOrderCount > 0 && item.url.includes("orders") ? (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums bg-blue-500"
+                      >
+                        {sellerOrderCount > 99 ? "99+" : sellerOrderCount}
+                      </span>
+                    ) : null}
+                    {unreadChatCount > 0 && item.url.includes("chat") ? (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums bg-red-500"
+                      >
+                        {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                      </span>
+                    ) : null}
+                    {pendingWithdrawalCount > 0 && item.url.includes("wallet") ? (
+                      <span
+                        className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white tabular-nums bg-emerald-500"
+                      >
+                        {pendingWithdrawalCount > 99 ? "99+" : pendingWithdrawalCount}
+                      </span>
+                    ) : null}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

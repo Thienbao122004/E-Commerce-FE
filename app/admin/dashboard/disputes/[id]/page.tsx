@@ -6,6 +6,8 @@ import {
   IconArrowLeft, IconUser, IconBuildingStore, IconReceipt,
   IconCheck, IconX, IconClock, IconNote, IconPhoto,
   IconMessageCircle, IconUserQuestion,
+  IconTruckReturn, IconCash, IconAlertTriangle, IconPackageOff,
+  IconSwitchHorizontal, IconStarHalf, IconQuestionMark,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -18,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { fetchDisputeById, approveRefund, rejectDispute, requestSellerResponse, requestCustomerResponse } from "@/services/disputes"
-import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels, disputeRefundCeiling } from "@/types/dispute"
+import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeType, DisputeTypeLabels, disputeRefundCeiling } from "@/types/dispute"
 import type { AdminDispute } from "@/types/dispute"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
 
@@ -129,7 +131,31 @@ export default function DisputeDetailPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 {/* Info */}
                 <Card>
-                  <CardHeader><CardTitle className="flex items-center gap-2 text-base"><IconReceipt className="size-5 text-primary" />Thông tin tranh chấp</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <IconReceipt className="size-5 text-primary" />
+                      Thông tin tranh chấp
+                    </CardTitle>
+                    {dispute.status === DisputeStatus.UnderReview && dispute.adminNote?.includes("[Hệ thống]") && (
+                      <div className="mt-2 rounded-md bg-emerald-50 border border-emerald-200 p-3">
+                        <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                          <span className="relative flex size-2">
+                            <span className="animate-ping absolute inline-flex size-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+                          </span>
+                          SẴN SÀNG HOÀN TIỀN
+                        </p>
+                        <p className="text-[11px] text-emerald-600 mt-1">
+                          Người bán đã xác nhận nhận hàng hoặc đồng ý hoàn tiền. Admin có thể thực hiện &quot;Duyệt hoàn tiền&quot; ngay.
+                        </p>
+                        {dispute.adminNote && (
+                          <p className="text-[10px] text-emerald-500 mt-1.5 border-t border-emerald-100 pt-1.5 italic">
+                            {dispute.adminNote}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Trạng thái</span>
@@ -221,7 +247,7 @@ export default function DisputeDetailPage() {
                         <div><p className="text-xs text-muted-foreground mb-1">Kết luận</p><p className="text-sm font-medium">{dispute.resolution}</p></div>
                       </>
                     )}
-                    {dispute.adminNote && (
+                    {dispute.adminNote && !(dispute.status === DisputeStatus.UnderReview && dispute.adminNote.includes("[Hệ thống]")) && (
                       <div><p className="text-xs text-muted-foreground mb-1">Ghi chú admin</p><p className="text-sm italic">{dispute.adminNote}</p></div>
                     )}
                     {canAct && (
@@ -260,6 +286,150 @@ export default function DisputeDetailPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Type-specific guidance card */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    {dispute.type === DisputeType.Return && <><IconTruckReturn className="size-5 text-blue-500" />Hướng dẫn xử lý: Trả hàng</>}
+                    {dispute.type === DisputeType.Refund && <><IconCash className="size-5 text-emerald-500" />Hướng dẫn xử lý: Hoàn tiền</>}
+                    {dispute.type === DisputeType.Damaged && <><IconAlertTriangle className="size-5 text-orange-500" />Hướng dẫn xử lý: Hư hỏng</>}
+                    {dispute.type === DisputeType.NotReceived && <><IconPackageOff className="size-5 text-red-500" />Hướng dẫn xử lý: Không nhận được</>}
+                    {dispute.type === DisputeType.WrongItem && <><IconSwitchHorizontal className="size-5 text-purple-500" />Hướng dẫn xử lý: Sai hàng</>}
+                    {dispute.type === DisputeType.QualityIssue && <><IconStarHalf className="size-5 text-amber-500" />Hướng dẫn xử lý: Chất lượng</>}
+                    {dispute.type === DisputeType.Other && <><IconQuestionMark className="size-5 text-gray-500" />Hướng dẫn xử lý: Khác</>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {dispute.type === DisputeType.Return && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Kiểm tra <span className="font-medium text-foreground">bằng chứng</span> khách hàng (ảnh/video sản phẩm lỗi)</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Xác minh <span className="font-medium text-foreground">phản hồi của Seller</span> và lý do chấp nhận/từ chối</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-blue-100 text-blue-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Khi Seller đã nhận hàng trả → Xem ghi chú hệ thống → <span className="font-medium text-foreground">Duyệt hoàn tiền</span></p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.Refund && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Xác minh <span className="font-medium text-foreground">lý do hoàn tiền</span> và bằng chứng từ khách</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Kiểm tra <span className="font-medium text-foreground">phản hồi của Seller</span> (đồng ý hay phản đối)</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Nhập <span className="font-medium text-foreground">số tiền duyệt</span> (có thể thấp hơn yêu cầu) → Bấm duyệt</p>
+                      </div>
+                      <div className="rounded-md bg-emerald-50 border border-emerald-100 p-2 mt-1">
+                        <p className="text-[11px] text-emerald-600"><span className="font-semibold">Không cần trả hàng.</span> Khách giữ hàng, Admin quyết định số tiền hoàn trực tiếp.</p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.Damaged && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Kiểm tra <span className="font-medium text-foreground">ảnh/video hư hỏng</span> từ khách hàng</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Xác định <span className="font-medium text-foreground">nguyên nhân hư hỏng</span>: lỗi đóng gói, vận chuyển, hay sản xuất?</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Quyết định <span className="font-medium text-foreground">hoàn tiền một phần/toàn bộ</span> hoặc yêu cầu trả hàng</p>
+                      </div>
+                      <div className="rounded-md bg-orange-50 border border-orange-100 p-2 mt-1">
+                        <p className="text-[11px] text-orange-600"><span className="font-semibold">Lưu ý:</span> Cần so sánh bằng chứng 2 bên. Yêu cầu Seller cung cấp ảnh đóng gói nếu cần.</p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.NotReceived && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Kiểm tra <span className="font-medium text-foreground">trạng thái vận chuyển GHN</span> của đơn hàng</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Xác minh <span className="font-medium text-foreground">bằng chứng giao hàng</span> từ shipper (ảnh, chữ ký)</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-red-100 text-red-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Nếu đơn thất lạc → <span className="font-medium text-foreground">Hoàn tiền toàn bộ</span> cho khách</p>
+                      </div>
+                      <div className="rounded-md bg-red-50 border border-red-100 p-2 mt-1">
+                        <p className="text-[11px] text-red-600"><span className="font-semibold">Quan trọng:</span> Liên hệ GHN xác nhận tình trạng đơn trước khi quyết định.</p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.WrongItem && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">So sánh <span className="font-medium text-foreground">sản phẩm đặt vs sản phẩm nhận</span> qua ảnh bằng chứng</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Yêu cầu Seller <span className="font-medium text-foreground">xác nhận đã gửi nhầm</span> hay khách nhầm lẫn</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Quyết định <span className="font-medium text-foreground">trả hàng + hoàn tiền</span> hoặc đổi hàng</p>
+                      </div>
+                      <div className="rounded-md bg-purple-50 border border-purple-100 p-2 mt-1">
+                        <p className="text-[11px] text-purple-600"><span className="font-semibold">Lưu ý:</span> Khách phải trả lại hàng sai trước khi nhận hoàn tiền.</p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.QualityIssue && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Kiểm tra <span className="font-medium text-foreground">mô tả sản phẩm gốc</span> vs chất lượng thực tế từ ảnh khách</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Yêu cầu Seller <span className="font-medium text-foreground">giải trình về chất lượng</span> sản phẩm</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-amber-100 text-amber-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Quyết định <span className="font-medium text-foreground">hoàn tiền một phần</span> nếu chất lượng không đạt</p>
+                      </div>
+                      <div className="rounded-md bg-amber-50 border border-amber-100 p-2 mt-1">
+                        <p className="text-[11px] text-amber-600"><span className="font-semibold">Lưu ý:</span> Tham khảo mô tả sản phẩm, đánh giá của khách khác để đánh giá khách quan.</p>
+                      </div>
+                    </div>
+                  )}
+                  {dispute.type === DisputeType.Other && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                        <p className="text-xs text-muted-foreground">Đọc kỹ <span className="font-medium text-foreground">lý do khiếu nại</span> và bằng chứng đính kèm</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                        <p className="text-xs text-muted-foreground">Liên hệ <span className="font-medium text-foreground">cả hai bên</span> để thu thập thêm thông tin</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="flex items-center justify-center size-5 rounded-full bg-gray-100 text-gray-600 text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                        <p className="text-xs text-muted-foreground">Đưa ra <span className="font-medium text-foreground">quyết định phù hợp</span> dựa trên bằng chứng</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Evidence section */}
               {(dispute.evidenceUrls?.length > 0 || dispute.sellerEvidenceUrls?.length > 0) && (

@@ -58,6 +58,13 @@ export type DashboardStats = {
     underReview: number
     resolved: number
     refunded: number
+    typeReturn: number
+    typeRefund: number
+    typeDamaged: number
+    typeNotReceived: number
+    typeWrongItem: number
+    typeQualityIssue: number
+    typeOther: number
   }
   /** Phí sàn từ đơn đã quyết toán ví (API có thể chưa gửi — dùng mặc định 0) */
   platformFees?: {

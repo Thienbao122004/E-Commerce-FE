@@ -1,6 +1,8 @@
 "use client"
 
+import * as React from "react"
 import { useState, useEffect, useCallback } from "react"
+import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -14,12 +16,14 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { fetchMyDisputeById, cancelMyDispute, updateDisputeEvidence } from "@/services/disputes"
+import { fetchMyDisputeById, cancelMyDispute, updateDisputeEvidence, sendReturnShipping } from "@/services/disputes"
 import {
-  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels,
+  DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLabels, DisputeType,
 } from "@/types/dispute"
 import type { CustomerDispute } from "@/types/dispute"
+import { OrderStatus, OrderStatusLabels } from "@/types/seller-dashboard"
 import { EvidenceUploader } from "@/components/common/evidence-uploader"
+import { HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr"
 
 // Trạng thái customer được phép hủy (đồng bộ BE CustomerCancellableStatuses)
 const CANCELLABLE_DISPUTE_STATUSES = new Set<number>([
@@ -56,6 +60,10 @@ export default function CustomerDisputeDetailPage() {
   const [customerNote, setCustomerNote] = useState("")
   const [updatingEvidence, setUpdatingEvidence] = useState(false)
 
+  // Return shipping
+  const [trackingCode, setTrackingCode] = useState("")
+  const [sendingReturn, setSendingReturn] = useState(false)
+
   useEffect(() => {
     if (authLoading) return
     if (!session) router.push("/login")
@@ -66,16 +74,50 @@ export default function CustomerDisputeDetailPage() {
     setLoading(true)
     try {
       const res = await fetchMyDisputeById(id)
-      if (res.success && res.dispute) setDispute(res.dispute)
+      if (res.success && res.dispute) {
+        setDispute(res.dispute)
+        // Auto-fill tracking: uu tien return tracking code da gui, fallback sang GHN goc
+        const prefill = res.dispute.returnTrackingCode || res.dispute.orderTrackingCode || ""
+        setTrackingCode(prefill)
+      }
       else toast.error(res.message ?? "Không tìm thấy khiếu nại")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Lỗi tải khiếu nại")
     } finally {
       setLoading(false)
     }
-  }, [session?.access_token, id])
+  }, [id])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!session?.access_token || !id) return
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "")
+    if (!apiUrl) return
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/order-tracking`, {
+        accessTokenFactory: () => session.access_token!,
+        transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling,
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.None)
+      .build()
+
+    connection.on("DisputeUpdated", (data: { disputeId?: string }) => {
+      if (data.disputeId === id) load()
+    })
+
+    connection.on("OrderStatusUpdated", (data: { orderId?: string }) => {
+      if (data.orderId && dispute?.orderId === data.orderId) load()
+    })
+
+    connection.start().catch(err => console.warn("SignalR Connection Error (Customer Dispute):", err))
+
+    return () => {
+      connection.stop()
+    }
+  }, [session?.access_token, id, dispute?.orderId, load])
 
   const handleCancel = async () => {
     if (!dispute) return
@@ -129,26 +171,90 @@ export default function CustomerDisputeDetailPage() {
   }
 
   const canCancel = dispute !== null && CANCELLABLE_DISPUTE_STATUSES.has(dispute.status)
+  
+  const returnTerminalStatuses = new Set<number>([
+    DisputeStatus.Refunded,
+    DisputeStatus.Rejected,
+    DisputeStatus.Cancelled,
+  ])
+  
+  const isFinal = returnTerminalStatuses.has(dispute?.status ?? -1)
+  
+  const showConfirmSentSection = 
+    !isFinal && 
+    dispute?.type === DisputeType.Return && 
+    dispute.status === DisputeStatus.WaitingCustomer;
+
+  const returnTimelineSteps = [
+    OrderStatus.Returning,
+    OrderStatus.Returned,
+    OrderStatus.Refunded,
+  ]
+
+  const returnStepState = (step: number) => {
+    if (!dispute?.orderStatus) return "upcoming"
+    
+    const current = dispute.orderStatus
+    
+    // Nếu đơn hàng đã hoàn tiền thì tất cả các bước trả hàng đều coi là completed
+    if (current === OrderStatus.Refunded) return "completed"
+    
+    if (current === step) return "current"
+
+    // Định nghĩa thứ tự ưu tiên của luồng trả hàng: Returning (9) < Returned (10) < Refunded (8)
+    const getPriority = (s: number) => {
+      if (s === OrderStatus.Returning) return 1
+      if (s === OrderStatus.Returned) return 2
+      if (s === OrderStatus.Refunded) return 3
+      return 0
+    }
+
+    const currentPrio = getPriority(current)
+    const stepPrio = getPriority(step)
+
+    if (currentPrio > stepPrio) return "completed"
+    
+    return "upcoming"
+  }
+
+  const handleSendReturn = async () => {
+    if (!dispute) return
+    setSendingReturn(true)
+    try {
+      // Gửi trackingCode hiện tại (hoặc rỗng để dung mã RTN- tự động)
+      const res = await sendReturnShipping(dispute.id, trackingCode.trim() || "")
+      if (res.success) {
+        toast.success("Đã xác nhận gửi hàng trả")
+        load()
+      } else {
+        toast.error(res.message ?? "Lỗi xác nhận")
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Lỗi")
+    } finally {
+      setSendingReturn(false)
+    }
+  }
 
   if (authLoading || !session) return null
 
   return (
-    <div className="w-full max-w-[860px] mx-auto">
+    <div className="w-full max-w-215 mx-auto">
       <div className="py-2 md:py-0">
         <div className="flex items-center gap-2 mb-6">
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[var(--color-primary)] transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-(--color-primary) transition-colors"
           >
             <span className="material-symbols-outlined text-base">home</span>
             Trang chủ
           </Link>
           <span className="text-gray-300">/</span>
-          <Link href="/user/disputes" className="text-sm text-gray-500 hover:text-[var(--color-primary)]">
+          <Link href="/user/disputes" className="text-sm text-gray-500 hover:text-(--color-primary)">
             Khiếu nại của tôi
           </Link>
           <span className="text-gray-300">/</span>
-          <span className="text-sm text-gray-700 font-medium truncate max-w-[200px]">
+          <span className="text-sm text-gray-700 font-medium truncate max-w-50">
             {loading ? "Đang tải..." : dispute?.title}
           </span>
         </div>
@@ -258,14 +364,13 @@ export default function CustomerDisputeDetailPage() {
               )}
 
               {dispute.status === DisputeStatus.WaitingCustomer && (
-                <div className="mb-4 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
-                  <span className="material-symbols-outlined text-indigo-500 text-base mt-0.5 shrink-0">info</span>
-                  <div>
-                    <p className="text-sm font-medium text-indigo-800">Cần bạn phản hồi thêm</p>
-                    <p className="text-xs text-indigo-700/90 mt-0.5">
-                      Bộ phận hỗ trợ đang chờ thêm thông tin từ bạn. Vui lòng dùng nút &ldquo;Gửi phản hồi&rdquo; ở trên để gửi giải thích hoặc bằng chứng bổ sung.
-                    </p>
-                  </div>
+                <div className="mb-4 rounded-lg border border-indigo-100 bg-indigo-50/80 px-4 py-3">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1.5">
+                    Cần phản hồi thêm
+                  </p>
+                  <p className="text-sm text-indigo-950 leading-relaxed">
+                    Admin cần bạn bổ sung thông tin cho khiếu nại này. Vui lòng gửi phản hồi hoặc bằng chứng.
+                  </p>
                 </div>
               )}
 
@@ -293,7 +398,6 @@ export default function CustomerDisputeDetailPage() {
                 </div>
               )}
 
-              {/* Phản hồi bổ sung đã gửi */}
               {dispute.customerNote && (
                 <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
@@ -315,7 +419,7 @@ export default function CustomerDisputeDetailPage() {
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs px-3 py-1.5 rounded-lg border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[rgba(236,127,19,0.08)] transition-colors"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-(--color-primary) text-(--color-primary) hover:bg-[rgba(236,127,19,0.08)] transition-colors"
                       >
                         Bằng chứng {i + 1}
                       </a>
@@ -324,6 +428,142 @@ export default function CustomerDisputeDetailPage() {
                 </div>
               )}
             </div>
+
+            {dispute.returnTrackingCode && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-1">Mã vận đơn trả hàng</p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-sm font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded">
+                      {dispute.returnTrackingCode}
+                    </code>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(dispute.returnTrackingCode!);
+                        toast.success("Đã sao chép mã");
+                      }}
+                      className="size-6 flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm text-gray-400">content_copy</span>
+                    </button>
+                  </div>
+                </div>
+
+                {dispute.returnShipmentEvidenceUrls && dispute.returnShipmentEvidenceUrls.length > 0 && (
+                  <div className="flex flex-col items-end gap-1">
+                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Ảnh Shipper chụp</p>
+                    <div className="flex gap-1">
+                      {dispute.returnShipmentEvidenceUrls.map((url, i) => (
+                        <a 
+                          key={i} 
+                          href={url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="size-10 rounded border border-gray-200 overflow-hidden hover:border-orange-500 transition-colors"
+                        >
+                          <img src={url} alt={`Shipper proof ${i+1}`} className="size-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-right">
+                  <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider mb-1">Đơn vị vận chuyển</p>
+                  <p className="text-xs font-bold text-gray-700">GHN</p>
+                </div>
+              </div>
+            )}
+
+            {showConfirmSentSection && (
+              <div className="bg-white rounded-xl border border-orange-200 p-5 space-y-3">
+                <h2 className="font-semibold text-sm" style={{ color: "var(--color-text-main)" }}>
+                  Xác nhận gửi hàng trả
+                </h2>
+
+                {dispute.returnTrackingCode && (
+                  <div className="rounded-lg bg-orange-50 border border-orange-200 px-4 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-orange-600 font-medium mb-0.5">Mã vận đơn trả hàng</p>
+                      <p className="text-base font-bold tracking-widest text-orange-800 font-mono">{dispute.returnTrackingCode}</p>
+                    </div>
+                    <span className="material-symbols-outlined text-orange-400 text-2xl">local_shipping</span>
+                  </div>
+                )}
+
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Shop đã tạo mã vận đơn trả hàng cho bạn. Hãy đóng gói hàng rồi bấm xác nhận gửi.
+                </p>
+
+                <Button
+                  onClick={handleSendReturn}
+                  disabled={sendingReturn}
+                  className="w-full"
+                >
+                  {sendingReturn ? "Đang xử lý..." : "✓ Xác nhận đã gửi hàng"}
+                </Button>
+                <p className="text-xs text-gray-400">
+                  Sau khi shop nhận được hàng, hệ thống sẽ tự động hoàn tiền cho bạn.
+                </p>
+              </div>
+            )}
+
+            {dispute.type === DisputeType.Return && (
+              <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <h2 className="font-semibold text-sm mb-6" style={{ color: "var(--color-text-main)" }}>
+                  Timeline trả hàng
+                </h2>
+                <div className="flex items-center justify-between px-2">
+                  {returnTimelineSteps.map((step, idx) => {
+                    const state = returnStepState(step)
+                    const isLast = idx === returnTimelineSteps.length - 1
+                    const isDone = state === "completed"
+                    const isCurrent = state === "current"
+                    
+                    return (
+                      <React.Fragment key={step}>
+                        <div className="flex flex-col items-center gap-2 group relative z-10">
+                          <div className={cn(
+                            "size-9 rounded-full border-2 flex items-center justify-center transition-all duration-500",
+                            isDone 
+                              ? "bg-emerald-500 border-emerald-500 text-white" 
+                              : isCurrent 
+                                ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-200" 
+                                : "bg-white border-gray-200 text-gray-400"
+                          )}>
+                            {isDone ? (
+                              <span className="material-symbols-outlined text-sm">check</span>
+                            ) : (
+                              <span className="text-xs font-bold">{idx + 1}</span>
+                            )}
+                          </div>
+                          <span className={cn(
+                            "text-[10px] font-bold tracking-tight whitespace-nowrap",
+                            isDone ? "text-emerald-600" : isCurrent ? "text-orange-600" : "text-gray-400"
+                          )}>
+                            {idx === 0 ? "Đang trả hàng" : idx === 1 ? "Shop đã nhận" : "Hoàn tiền"}
+                          </span>
+                        </div>
+                        
+                        {!isLast && (
+                          <div className="flex-1 h-0.5 mx-2 -mt-6 bg-gray-100 relative overflow-hidden">
+                            <div 
+                              className={cn(
+                                "absolute inset-0 bg-emerald-400 transition-all duration-700 origin-left",
+                                isDone ? "scale-x-100" : "scale-x-0"
+                              )} 
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Trạng thái hiện tại: {dispute.orderStatus !== undefined ? (OrderStatusLabels[dispute.orderStatus] ?? "—") : "—"}
+                </p>
+              </div>
+            )}
 
             {/* Seller response */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">

@@ -573,6 +573,10 @@ export default function CheckoutPage() {
                         {item.variantName && (
                           <p className="text-xs text-muted-foreground">Phân loại: {item.variantName}</p>
                         )}
+                        <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[12px]">inventory_2</span>
+                          Kho còn: {item.stockAvailable}
+                        </p>
                       </div>
                     </div>
 

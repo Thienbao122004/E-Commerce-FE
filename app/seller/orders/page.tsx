@@ -105,11 +105,11 @@ export default function SellerOrdersPage() {
         page={params.page}
         pageSize={params.pageSize}
         sort={sort}
-        onSort={(key) => setSort(getNextSort(sort, key))}
+        onSortAction={(key) => setSort(getNextSort(sort, key))}
         actionLoading={actionLoading}
-        onUpdateStatus={handleInlineStatusUpdate}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onUpdateStatusAction={handleInlineStatusUpdate}
+        onPageChangeAction={setPage}
+        onPageSizeChangeAction={setPageSize}
       />
     </div>
   )

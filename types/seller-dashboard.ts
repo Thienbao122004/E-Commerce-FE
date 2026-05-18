@@ -130,6 +130,8 @@ export type SellerOrder = {
   trackingCode: string | null
   estimatedDeliveryDate: string | null
   actualDeliveryDate: string | null
+  /** URL ảnh bằng chứng giao hàng từ shipper */
+  deliveryProofUrls?: string[] | null
   createdAt: string
   updatedAt?: string
   statusTimeline?: OrderStatusStep[] | null
@@ -148,6 +150,10 @@ export type SellerOrder = {
   platformFeeSettled?: boolean
   platformFeeAmount?: number
   netToSellerAfterPlatformFee?: number
+  hasActiveDispute?: boolean
+  activeDisputeId?: string | null
+  activeDisputeStatus?: number | null
+  activeDisputeType?: number | null
 }
 
 export type SellerOrdersResponse = {
@@ -176,6 +182,8 @@ export const OrderStatus = {
   Completed: 6,
   Cancelled: 7,
   Refunded: 8,
+  Returning: 9,
+  Returned: 10,
 } as const
 
 export const OrderStatusLabels: Record<number, string> = {
@@ -188,6 +196,8 @@ export const OrderStatusLabels: Record<number, string> = {
   [OrderStatus.Completed]: "Hoàn thành",
   [OrderStatus.Cancelled]: "Đã hủy",
   [OrderStatus.Refunded]: "Đã hoàn tiền",
+  [OrderStatus.Returning]: "Đang trả hàng",
+  [OrderStatus.Returned]: "Đã nhận hàng trả",
 }
 
 // ====== Product Status ======
