@@ -490,23 +490,6 @@ export default function CreateProductPage() {
     }
   }, [])
 
-  // Auto-lock category "Cà Phê Đặc Sản" (coffee-first platform)
-  React.useEffect(() => {
-    if (manualCategoryRows.length === 0 || selCategory) return
-    const coffeeCat = manualCategoryRows.find(
-      (r) =>
-        r.level === 2 &&
-        r.name.toLowerCase().includes("cà phê"),
-    )
-    if (coffeeCat) {
-      setSelCategory({
-        categoryId: coffeeCat.id,
-        categoryName: coffeeCat.name,
-        categoryPath: coffeeCat.pathLabel,
-        confidenceScore: 1,
-      })
-    }
-  }, [manualCategoryRows, selCategory])
 
   // Tải danh sách local specialty profiles cho cà phê (chỉ 1 lần)
   React.useEffect(() => {
@@ -1424,31 +1407,129 @@ export default function CreateProductPage() {
                     Danh mục
                   </SectionLabel>
 
-                  {/* Category cố định — platform chỉ hỗ trợ cà phê đặc sản */}
-                  {selCategory ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-[#9db183] bg-white px-3 py-2.5">
-                      <IconCheck className="size-3.5 text-[#5f7a49] shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-[#2d3a25]">{selCategory.categoryName}</p>
-                        <p className="truncate text-xs text-[#7f8f74]">{selCategory.categoryPath}</p>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#e9f0e2] text-[#46573b]">
-                        Mặc định
-                      </span>
-                    </div>
-                  ) : (
+                  {catLoading ? (
                     <div className="flex items-center gap-2 rounded-xl border border-[#cfd8c7] bg-white p-3 text-[11px] text-[#6d7f62]">
                       <IconLoader2 className="size-3 animate-spin text-[#70885a]" />
-                      Đang tải danh mục...
+                      Đang phân tích danh mục...
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {catError && (
+                        <div className="flex items-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50 p-3 text-[11px] text-red-500">
+                          <IconAlertCircle className="size-3.5 shrink-0" />
+                          <span>
+                            Không thể kết nối AI. Bạn vẫn có thể chọn danh mục thủ công bên dưới.
+                          </span>
+                        </div>
+                      )}
+
+                      {!catError && catSuggestions.length > 0 && (
+                        <>
+                          {catSuggestions.map((cat, idx) => {
+                            const active = selCategory?.categoryId === cat.categoryId
+                            return (
+                              <button
+                                key={`${cat.categoryId}-${cat.categoryName}-${idx}`}
+                                type="button"
+                                onClick={() => handleSelectCategory(cat)}
+                                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${
+                                  active
+                                    ? "border-[#9db183] bg-white"
+                                    : "border-[#d7dfcf] bg-white hover:border-[#a9bc95]"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-[#2d3a25]">{cat.categoryName}</p>
+                                  <p className="truncate text-xs text-[#7f8f74]">{cat.categoryPath}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <ConfidenceDot score={cat.confidenceScore} />
+                                  {active && <IconCheck className="size-3.5 text-[#5f7a49]" />}
+                                </div>
+                              </button>
+                            )
+                          })}
+
+                          {Array.from({ length: Math.max(0, 3 - catSuggestions.length) }).map((_, idx) => (
+                            <div
+                              key={`empty-cat-${idx}`}
+                              className="flex w-full items-center justify-center rounded-xl border border-dashed border-[#d7dfcf] bg-[#fafcf8] px-3 py-3 text-left opacity-60"
+                            >
+                              <span className="text-xs italic text-[#8a9a80]">--- AI không có thêm gợi ý ---</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {!catError && catSuggestions.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-white p-3 text-center text-[11px] text-[#7c8f72]">
+                          Chưa phân tích AI — bấm &quot;Bắt đầu phân tích&quot; hoặc chọn danh mục thủ công bên dưới.
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-dashed border-[#c9d3bf] bg-[#fafcf8] p-2.5">
+                        <p className="mb-2 text-[11px] text-[#6d7f62]">
+                          {catSuggestions.length > 0
+                            ? "Không đúng gợi ý? Chọn danh mục thủ công:"
+                            : "Chọn danh mục thủ công:"}
+                        </p>
+                        <div className="relative">
+                          <Input
+                            value={manualCatQuery}
+                            onChange={(e) => setManualCatQuery(e.target.value)}
+                            placeholder="Tìm danh mục..."
+                            className="h-8 text-xs bg-white pr-7"
+                          />
+                          {manualCatQuery !== debouncedManualCatQuery && (
+                            <IconLoader2 className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 animate-spin text-[#8a9a80]" />
+                          )}
+                        </div>
+                        <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                          {manualCategoryOptions.map((c, idx) => {
+                            const active = selCategory?.categoryId === c.id
+                            return (
+                              <button
+                                key={`cat-manual-${idx}-${String(c.id)}-${c.name ?? ""}`}
+                                type="button"
+                                onClick={() =>
+                                  handleSelectCategory({
+                                    categoryId: c.id,
+                                    categoryName: c.name,
+                                    categoryPath: c.pathLabel,
+                                    confidenceScore: 1,
+                                  })
+                                }
+                                className={`w-full rounded-md px-2.5 py-1.5 text-left text-xs transition-colors ${
+                                  active
+                                    ? "bg-[#e9f0e2] text-[#2f3f27] font-medium"
+                                    : "hover:bg-[#f2f6ee] text-[#5f7253]"
+                                }`}
+                              >
+                                <span className="block line-clamp-2 break-words">{c.pathLabel}</span>
+                                {c.level > 1 && (
+                                  <span className="mt-0.5 block text-[10px] font-normal text-[#8a9a80]">
+                                    Cấp {c.level}
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          })}
+                          {manualCategoryOptions.length === 0 && (
+                            <p className="px-2 py-1 text-[11px] italic text-[#8a9a80]">
+                              Không tìm thấy danh mục phù hợp
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <SectionLabel icon={IconPalette}>Đặc tính cà phê</SectionLabel>
+                  <SectionLabel icon={IconPalette}>Chất liệu gợi ý</SectionLabel>
                   {!selCategory ? (
                     <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fafcf8] p-3 text-[11px] text-[#7c8f72]">
-                      Chọn danh mục để gắn đặc tính (rang mộc, rang đậm, nguyên chất, hữu cơ…).
+                      Chọn danh mục để thêm chất liệu .
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1602,10 +1683,10 @@ export default function CreateProductPage() {
                 </div>
 
                 <div className="border-t border-[#dce3d5] pt-3">
-                  <SectionLabel icon={IconTag}>Đặc tính sản phẩm</SectionLabel>
+                  <SectionLabel icon={IconTag}>Thẻ gợi ý</SectionLabel>
                   {!selCategory ? (
                     <div className="rounded-xl border border-dashed border-[#c6d1bc] bg-[#fffdfb] p-3 text-[11px] text-[#7c8f72]">
-                      Chọn danh mục để thêm thẻ đặc tính (Arabica, Robusta, Đặc sản vùng miền, Rang xay…).
+                      Chọn danh mục để thêm thẻ gợi ý.
                     </div>
                   ) : tagLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-[#728568]">
@@ -1758,10 +1839,9 @@ export default function CreateProductPage() {
 
                 {selCategory && (
                   <div className="rounded-xl border border-[#d4deca] bg-white p-3 text-[11px] text-[#627458]">
-                    {selTagIds.length > 0 && `${selTagIds.length} tag được chọn`}
-                    {selTagIds.length > 0 && selMatIds.length > 0 && ` · `}
-                    {selMatIds.length > 0 && `${selMatIds.length} đặc tính cà phê`}
-                    {selTagIds.length === 0 && selMatIds.length === 0 && "Chưa chọn tag / đặc tính"}
+                    Đã chọn: <span className="font-semibold text-[#46573b]">{selCategory.categoryName}</span>
+                    {selTagIds.length > 0 && ` · ${selTagIds.length} tag`}
+                    {selMatIds.length > 0 && ` · ${selMatIds.length} đặc tính`}
                   </div>
                 )}
 
