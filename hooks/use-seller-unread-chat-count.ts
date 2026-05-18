@@ -3,7 +3,7 @@ import { api } from "@/lib/api-client"
 
 export function useSellerUnreadChatCount(enabled: boolean = true) {
   const { data, error, mutate } = useSWR(
-    enabled ? "/api/chat/unread-count" : null,
+    enabled ? "/api/conversations/unread-count" : null,
     async (url) => {
       const res = await api.get<{ count: number }>(url)
       return res.count

@@ -5,13 +5,15 @@ import type { TagListResponse, TagResponse } from "@/types/tag"
 export function fetchTags(
   page = 1,
   pageSize = 20,
-  search?: string | null
+  search?: string | null,
+  isActive?: boolean
 ): Promise<TagListResponse> {
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
   })
   if (search) params.set("search", search)
+  if (isActive !== undefined) params.set("isActive", String(isActive))
   return api.get<TagListResponse>(`/api/admin/tags?${params}`)
 }
 
@@ -26,8 +28,12 @@ export function createTag(name: string): Promise<TagResponse> {
 }
 
 // ---------- Update ----------
-export function updateTag(id: number, name: string): Promise<TagResponse> {
-  return api.put<TagResponse>(`/api/admin/tags/${id}`, { name })
+export function updateTag(id: number, name: string, isActive?: boolean): Promise<TagResponse> {
+  return api.put<TagResponse>(`/api/admin/tags/${id}`, { name, ...(isActive !== undefined && { isActive }) })
+}
+
+export function toggleTagActive(id: number, isActive: boolean): Promise<TagResponse> {
+  return api.put<TagResponse>(`/api/admin/tags/${id}`, { isActive })
 }
 
 // ---------- Delete ----------
