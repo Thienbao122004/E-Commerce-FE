@@ -3,6 +3,7 @@ export type Tag = {
   id: number
   name: string
   slug: string
+  isActive: boolean
   createdAt: string
   productCount: number
 }
