@@ -356,10 +356,22 @@ export function ProductDetailView({
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="material-symbols-outlined text-[18px]" style={{ color: "#b06017" }}>workspace_premium</span>
                 <span className="text-sm font-bold" style={{ color: "#7a4a1e" }}>Thông tin Local Brand</span>
-                <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
-                  style={{ background: "#fef9c3", color: "#854d0e", borderColor: "#fde047" }}>
-                  Chờ admin xác nhận
-                </span>
+                {product.status === ProductStatus.PendingApproval ? (
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                    style={{ background: "#fef9c3", color: "#854d0e", borderColor: "#fde047" }}>
+                    Chờ admin xác nhận
+                  </span>
+                ) : product.status === ProductStatus.Draft ? (
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                    style={{ background: "#f3f4f6", color: "#374151", borderColor: "#e5e7eb" }}>
+                    Chưa xác nhận
+                  </span>
+                ) : (
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                    style={{ background: "#dcfce7", color: "#166534", borderColor: "#bbf7d0" }}>
+                    Đã xác nhận
+                  </span>
+                )}
               </div>
 
               {/* Profile info */}
