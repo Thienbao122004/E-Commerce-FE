@@ -24,12 +24,29 @@ import {
 } from "@/types/product"
 import type { ProductModeration } from "@/types/product"
 import { formatDateTimeVN, formatPriceVND } from "@/lib/formatters"
+import { resolveMinVariantPrice } from "@/lib/product-pricing"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ActionDialog } from "./action-dialog"
 import {
   ProductModerationDiff,
   tryParseProductSnapshotJson,
 } from "./product-moderation-diff"
+
+function parseVariantAttributes(raw?: string | null): Record<string, string> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.entries(parsed).reduce<Record<string, string>>((acc, [k, v]) => {
+        if (typeof v === "string" || typeof v === "number") acc[k] = String(v)
+        return acc
+      }, {})
+    }
+  } catch {
+    // fall back to raw below
+  }
+  return { "Thuộc tính": raw }
+}
 
 type Props = {
   product: ProductModeration
@@ -67,6 +84,11 @@ export function ProductDetailView({
   const [dialogState, setDialogState] = React.useState<{
     type: "hide" | "remove" | "unhide" | "reject" | null
   }>({ type: null })
+
+  const minVariantPrice = React.useMemo(
+    () => resolveMinVariantPrice(product.basePrice, product.variants),
+    [product.basePrice, product.variants]
+  )
 
   const lastApprovedSnapshot = React.useMemo(
     () => tryParseProductSnapshotJson(product.lastApprovedSnapshotJson),
@@ -183,114 +205,86 @@ export function ProductDetailView({
           </div>
 
           {detailLoading ? (
-            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-[360px_1fr]">
               <div className="flex flex-col gap-4">
-                <Skeleton className="aspect-square max-h-[500px] w-full rounded-xl" />
-                <div className="flex gap-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton key={i} className="size-16 shrink-0 rounded-lg" />
-                  ))}
+                <div className="rounded-lg border p-4 space-y-4">
+                  <Skeleton className="aspect-square max-h-[300px] w-full rounded-xl" />
+                  <div className="flex gap-2 justify-center">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="size-12 shrink-0 rounded-lg" />
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4 space-y-3">
+                  <Skeleton className="h-4 w-1/3 mb-2" />
+                  <Skeleton className="h-9 w-full" />
                 </div>
               </div>
               <div className="flex flex-col gap-4">
-                <div className="rounded-lg border p-4">
-                  <Skeleton className="h-6 w-20 rounded-full mb-3" />
-                  <Skeleton className="h-7 w-full mb-2" />
-                  <Skeleton className="h-5 w-32 mb-2" />
-                  <Skeleton className="h-4 w-40 mb-2" />
-                  <Skeleton className="h-4 w-36" />
+                <div className="rounded-lg border p-4 space-y-4">
+                  <div className="flex gap-2">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <Skeleton className="h-6 w-24 rounded" />
+                  </div>
+                  <Skeleton className="h-7 w-2/3" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                  </div>
+                  <Skeleton className="h-8 w-full" />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-              {/* Left: Images */}
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-[360px_1fr]">
+              {/* Left Column: Gallery & Moderation Actions */}
               <div className="flex flex-col gap-4">
-                <div className="relative aspect-square max-h-[500px] overflow-hidden rounded-xl border bg-muted">
-                  {product.imageUrls.length > 0 ? (
-                    <Image
-                      src={product.imageUrls[selectedImage] ?? product.imageUrls[0]}
-                      alt={product.name}
-                      fill
-                      className="object-contain"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-muted-foreground">
-                      <div className="text-center">
-                        <IconPackage className="size-12 mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Không có hình ảnh</p>
+                {/* Product Gallery */}
+                <div className="rounded-lg border p-4 bg-card space-y-4">
+                  <div className="relative aspect-square max-h-[300px] overflow-hidden rounded-xl border bg-muted mx-auto">
+                    {product.imageUrls.length > 0 ? (
+                      <Image
+                        src={product.imageUrls[selectedImage] ?? product.imageUrls[0]}
+                        alt={product.name}
+                        fill
+                        className="object-contain"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center text-muted-foreground">
+                        <div className="text-center">
+                          <IconPackage className="size-12 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">Không có hình ảnh</p>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  {product.imageUrls.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto pb-1 justify-center">
+                      {product.imageUrls.map((url, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedImage(i)}
+                          className={`relative shrink-0 size-12 rounded-lg border-2 overflow-hidden transition-all ${
+                            selectedImage === i
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-muted-foreground/30"
+                          }`}
+                        >
+                          <Image src={url} alt="" fill className="object-cover" />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-                {product.imageUrls.length > 1 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {product.imageUrls.map((url, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setSelectedImage(i)}
-                        className={`relative shrink-0 size-16 rounded-lg border-2 overflow-hidden transition-all ${selectedImage === i
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "border-transparent hover:border-muted-foreground/30"
-                          }`}
-                      >
-                        <Image src={url} alt="" fill className="object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              {/* Right: Info */}
-              <div className="flex flex-col gap-4">
-                <div className="rounded-lg border p-4 space-y-3">
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thông tin sản phẩm</h3>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className={ProductStatusColors[product.status] ?? ""}>
-                      {ProductStatusLabels[product.status] ?? product.statusName}
-                    </Badge>
-                    <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                      {product.productCode}
-                    </span>
+                {/* Moderation Actions Card */}
+                <div className="rounded-lg border p-4 bg-card space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Thao tác kiểm duyệt</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Quản lý trạng thái hiển thị trên hệ thống</p>
                   </div>
-                  <p className="font-semibold text-lg leading-tight">{product.name}</p>
-                  {product.description ? (
-                    <div className="pt-0.5">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Mô tả</p>
-                      <p className="text-sm text-foreground whitespace-pre-wrap break-words mt-1 max-h-48 overflow-y-auto">
-                        {product.description}
-                      </p>
-                    </div>
-                  ) : null}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <IconCurrencyDollar className="size-4 text-green-600" />
-                      <span className="font-semibold text-lg text-foreground">{formatPriceVND(product.basePrice)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <IconBuildingStore className="size-4 text-muted-foreground" />
-                      <span>{product.shopName}</span>
-                    </div>
-                    {product.categoryName && (
-                      <div className="flex items-center gap-2">
-                        <IconTag className="size-4 text-muted-foreground" />
-                        <span>{product.categoryName}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <IconCalendar className="size-4 text-muted-foreground" />
-                      <span>Tạo: {formatDateTimeVN(product.createdAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <IconCalendar className="size-4 text-muted-foreground" />
-                      <span>Cập nhật: {formatDateTimeVN(product.updatedAt)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border p-4 space-y-3">
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Thao tác kiểm duyệt</h3>
-                  <p className="text-sm text-muted-foreground">Quản lý trạng thái hiển thị sản phẩm trên hệ thống</p>
                   <div className="flex flex-col gap-2 pt-1">
                     {product.status === ProductStatus.PendingApproval && onApprove ? (
                       <Button
@@ -316,34 +310,141 @@ export function ProductDetailView({
                     {product.status === ProductStatus.Hidden ? (
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-green-600 hover:text-green-700"
+                        className="w-full justify-start text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-905/10"
                         onClick={() => setDialogState({ type: "unhide" })}
                         disabled={actionLoading}
                       >
-                        <IconEye className="mr-2 size-4" />Hiển thị lại sản phẩm
+                        <IconEye className="mr-2 size-4" />
+                        Hiển thị lại sản phẩm
                       </Button>
                     ) : product.status !== ProductStatus.Removed ? (
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-yellow-600 hover:text-yellow-700"
+                        className="w-full justify-start text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-905/10"
                         onClick={() => setDialogState({ type: "hide" })}
                         disabled={actionLoading}
                       >
-                        <IconEyeOff className="mr-2 size-4" />Ẩn sản phẩm
+                        <IconEyeOff className="mr-2 size-4" />
+                        Ẩn sản phẩm
                       </Button>
                     ) : null}
                     {product.status !== ProductStatus.Removed && (
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-red-600 hover:text-red-700"
+                        className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-905/10"
                         onClick={() => setDialogState({ type: "remove" })}
                         disabled={actionLoading}
                       >
-                        <IconTrash className="mr-2 size-4" />Gỡ sản phẩm vĩnh viễn
+                        <IconTrash className="mr-2 size-4" />
+                        Gỡ sản phẩm vĩnh viễn
                       </Button>
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Right Column: Info, Local Brand, Description, and Variants */}
+              <div className="flex flex-col gap-4">
+                {/* General Info Card */}
+                <div className="rounded-lg border p-4 bg-card space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className={`text-xs font-semibold px-2.5 py-0.5 ${ProductStatusColors[product.status] ?? ""}`}>
+                        {ProductStatusLabels[product.status] ?? product.statusName}
+                      </Badge>
+                      <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded border">
+                        {product.productCode}
+                      </span>
+                    </div>
+                    <h2 className="font-bold text-xl leading-snug text-foreground">{product.name}</h2>
+                  </div>
+
+                  {/* Info Grid 2x2 */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-muted/30 p-2.5 border border-border/40">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Cửa hàng</span>
+                      <span className="text-sm font-semibold text-foreground flex items-center gap-1.5 mt-1">
+                        <IconBuildingStore className="size-4 text-primary shrink-0" />
+                        <span className="truncate">{product.shopName}</span>
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 p-2.5 border border-border/40">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Danh mục</span>
+                      <span className="text-sm font-semibold text-foreground flex items-center gap-1.5 mt-1">
+                        <IconTag className="size-4 text-blue-500 shrink-0" />
+                        <span className="truncate">{product.categoryName || "Chưa phân loại"}</span>
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 p-2.5 border border-border/40">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Ngày tạo</span>
+                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5 mt-1">
+                        <IconCalendar className="size-4 text-muted-foreground shrink-0" />
+                        <span>{formatDateTimeVN(product.createdAt)}</span>
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 p-2.5 border border-border/40">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Cập nhật</span>
+                      <span className="text-xs font-medium text-foreground flex items-center gap-1.5 mt-1">
+                        <IconCalendar className="size-4 text-muted-foreground shrink-0" />
+                        <span>{formatDateTimeVN(product.updatedAt)}</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Base Price */}
+                  <div className="flex items-center justify-between border-t border-border/60 pt-3">
+                    <span className="text-sm font-medium text-muted-foreground">Giá bán cơ bản</span>
+                    <span className="text-2xl font-extrabold text-green-600 dark:text-green-400">
+                      {formatPriceVND(minVariantPrice)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description Card */}
+                {product.description ? (
+                  <div className="rounded-lg border p-4 bg-card space-y-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">Mô tả sản phẩm</h3>
+                    <div className="text-sm text-foreground/90 whitespace-pre-wrap break-words max-h-32 overflow-y-auto pr-1 leading-relaxed">
+                      {product.description}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Variants Card */}
+                {(product.variants?.length ?? 0) > 0 && (
+                  <div className="rounded-lg border p-4 bg-card space-y-3">
+                    <h3 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                      Danh sách biến thể
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {product.variants?.map((v, idx) => (
+                        <div key={`${v.variantName}-${idx}`} className="rounded-lg border p-2.5 bg-background">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold">
+                              {v.variantName || `Biến thể ${idx + 1}`}
+                            </p>
+                            <span className="text-xs font-semibold text-foreground">
+                              {formatPriceVND(v.price ?? minVariantPrice)}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>SKU: {v.sku ?? "—"}</span>
+                            <span>Tồn: {v.stock}</span>
+                          </div>
+                          {v.attributes && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {Object.entries(parseVariantAttributes(v.attributes)).map(([k, val]) => (
+                                <Badge key={k} variant="outline" className="text-[9px] px-1.5 py-0">
+                                  {k}: {val}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

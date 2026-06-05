@@ -13,10 +13,13 @@ interface ProductBasicInfoProps {
   nameTouched: boolean
   onNameBlur: () => void
   price: string
+  priceDisplayValue?: string
   priceRaw: number
   onPriceChange: (formatted: string, raw: number) => void
   priceTouched: boolean
   onPriceBlur: () => void
+  priceDisabled?: boolean
+  priceHint?: string | null
   commissionPercent: number | null
   platformFeeLoading: boolean
   useVariants: boolean
@@ -31,10 +34,13 @@ export function ProductBasicInfo({
   nameTouched,
   onNameBlur,
   price,
+  priceDisplayValue,
   priceRaw,
   onPriceChange,
   priceTouched,
   onPriceBlur,
+  priceDisabled = false,
+  priceHint = null,
   commissionPercent,
   platformFeeLoading,
   useVariants,
@@ -74,18 +80,23 @@ export function ProductBasicInfo({
               id="price"
               inputMode="numeric"
               placeholder="299,000"
-              value={price}
+              value={priceDisabled ? (priceDisplayValue ?? "") : price}
               onChange={(e) => {
+                if (priceDisabled) return
                 const digits = e.target.value.replace(/[^0-9]/g, "")
                 const num = digits === "" ? 0 : Number(digits)
                 onPriceChange(digits === "" ? "" : num.toLocaleString("vi-VN"), num)
               }}
               onBlur={onPriceBlur}
-              className={`h-9 pl-7 text-sm ${priceTouched && priceRaw <= 0 ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+              disabled={priceDisabled}
+              className={`h-9 pl-7 text-sm ${priceTouched && !priceDisabled && priceRaw <= 0 ? "border-red-400 focus-visible:ring-red-400" : ""}`}
             />
           </div>
-          {priceTouched && priceRaw <= 0 && (
+          {priceTouched && !priceDisabled && priceRaw <= 0 && (
             <p className="text-[11px] text-red-500">Giá bán phải lớn hơn 0</p>
+          )}
+          {priceDisabled && priceHint && (
+            <p className="text-[11px] text-muted-foreground">Giá theo biến thể: {priceHint}</p>
           )}
           <SellerPlatformFeeHint
             commissionPercent={commissionPercent}

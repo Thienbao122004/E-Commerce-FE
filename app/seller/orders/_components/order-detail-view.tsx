@@ -885,7 +885,7 @@ export function OrderDetailView({ orderId }: Props) {
                 </CardContent>
               </Card>
 
-              {(order.trackingCode || order.shippingProvider || order.estimatedDeliveryDate || order.actualDeliveryDate) && (
+              {(order.trackingCode || order.shippingProvider || order.estimatedDeliveryDate || order.actualDeliveryDate || (order.deliveryProofUrls && order.deliveryProofUrls.length > 0)) && (
                 <Card className="rounded shadow-sm overflow-hidden">
                   <CardHeader className="py-3 px-5 bg-muted/20 border-b">
                     <CardTitle className="text-medium font-semibold flex items-center gap-2">

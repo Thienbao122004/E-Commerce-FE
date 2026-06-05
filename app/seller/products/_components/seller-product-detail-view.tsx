@@ -91,6 +91,7 @@ import type { MaterialDto } from "@/types/material"
 import type { Tag } from "@/types/tag"
 import { supabase } from "@/lib/supabase"
 import { formatDateTimeVN as fmtDate, formatPriceVND as currency, formatNumberVN } from "@/lib/formatters"
+import { resolveMinVariantPrice } from "@/lib/product-pricing"
 import { useSellerPlatformFee } from "@/hooks/use-seller-platform-fee"
 import { SellerPlatformFeeHint } from "@/components/seller/seller-platform-fee-hint"
 
@@ -315,6 +316,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [evAttrs, setEvAttrs] = React.useState("")
   const [evActive, setEvActive] = React.useState(true)
   const [savingVariant, setSavingVariant] = React.useState(false)
+
+  const minVariantPrice = product ? resolveMinVariantPrice(product.basePrice, product.variants) : 0
+  const displayPriceLabel = (product?.variants?.length ?? 0) > 0 ? "Giá thấp nhất" : "Giá gốc"
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -1019,8 +1023,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                   icon={<IconClipboard className="size-4" />}
                 />
                 <StatCard
-                  label="Giá gốc"
-                  value={currency(product.basePrice)}
+                  label={displayPriceLabel}
+                  value={currency(minVariantPrice)}
                   color="purple"
                   icon={<IconReceipt2 className="size-4" />}
                   small

@@ -25,8 +25,8 @@ function formatVariants(
   if (!list?.length) return "—"
   return list
     .map(
-      (v) =>
-        `${v.variantName}${v.sku ? ` (${v.sku})` : ""}: ${
+      (v, idx) =>
+        `${idx + 1}. ${v.variantName}${v.sku ? ` (${v.sku})` : ""}: ${
           v.price != null && v.price > 0 ? formatPriceVND(v.price) : "Theo giá gốc"
         } — tồn ${v.stock}${v.attributes ? ` — ${v.attributes}` : ""}`
     )
