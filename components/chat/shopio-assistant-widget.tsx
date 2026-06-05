@@ -120,6 +120,30 @@ function truncateText(text: string, maxLength: number) {
   return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text
 }
 
+/**
+ * Parse variant name nếu là JSON string thô (ví dụ: {"Khối lượng": "200g"})
+ * → trả về tên đẹp để hiển thị trên UI
+ */
+function parseVariantDisplayName(raw: string): string {
+  if (!raw) return "Mặc định"
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return trimmed
+  try {
+    const obj = JSON.parse(trimmed) as Record<string, unknown>
+    const parts = Object.entries(obj)
+      .map(([k, v]) => {
+        const val = String(v ?? "").trim()
+        const key = k.trim()
+        // Nếu chỉ có 1 key, hiển thị value thôi; nhiều key thì "Key: value"
+        return Object.keys(obj).length === 1 ? val : `${key}: ${val}`
+      })
+      .filter(Boolean)
+    return parts.join(" · ") || trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 function getSessionFilterLabel(filter: SessionFilter) {
   if (filter === "unread") return "Chưa đọc"
   if (filter === "muted") return "Đã tắt thông báo"
@@ -508,7 +532,7 @@ function ProductQuickViewModal({
                      <div className="flex flex-wrap gap-2">
                        {product.variants.map((v) => (
                          <span key={v.id} className="px-2.5 py-1.5 text-[11px] bg-white border rounded-md shadow-sm" style={{ borderColor: "#e5ded6", color: "var(--color-text-main)" }}>
-                           {v.variantName}
+                           {parseVariantDisplayName(v.variantName)}
                          </span>
                        ))}
                      </div>
@@ -599,6 +623,8 @@ export function ShopioAssistantWidget() {
   const [selectedProductsByMessageId, setSelectedProductsByMessageId] = useState<
     Record<string, Record<string, ProductSelection>>
   >({})
+  /** Map variantId → số tồn kho thực tế (lấy từ Main API) */
+  const [stockByVariantId, setStockByVariantId] = useState<Record<string, number>>({})
   const [applyingSelectionMessageId, setApplyingSelectionMessageId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTargetState | null>(null)
   const [quickViewProductId, setQuickViewProductId] = useState<string | null>(null)
@@ -611,6 +637,33 @@ export function ShopioAssistantWidget() {
     () => addresses.find((a) => a.isDefault) ?? addresses[0] ?? null,
     [addresses]
   )
+
+  const fetchStockForMessages = useCallback((msgs: UiMessage[]) => {
+    const productIds = new Set<string>()
+    for (const m of msgs) {
+      if (m.responseMeta?.products) {
+        for (const p of m.responseMeta.products) {
+          if (p.id) productIds.add(p.id)
+        }
+      }
+    }
+    if (productIds.size > 0) {
+      void aiChatService.getStockBatch(Array.from(productIds)).then((stockRes) => {
+        if (!stockRes.success) return
+        const map: Record<string, number> = {}
+        for (const item of stockRes.items) {
+          if (!item.variants.length) {
+            map[item.productId] = item.totalStock
+          } else {
+            for (const v of item.variants) {
+              map[v.variantId] = v.stock
+            }
+          }
+        }
+        setStockByVariantId((prev) => ({ ...prev, ...map }))
+      }).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     if (open) {
@@ -780,8 +833,11 @@ export function ShopioAssistantWidget() {
         const extraFromBe = beMessages.filter((m) => !cachedIds.has(m.id))
         const merged = dedupeMergedChatMessages([...cachedMessages, ...extraFromBe])
         setMessages(merged)
+        fetchStockForMessages(merged)
       } else {
-        setMessages(dedupeMergedChatMessages(beMessages))
+        const merged = dedupeMergedChatMessages(beMessages)
+        setMessages(merged)
+        fetchStockForMessages(merged)
       }
 
       await loadAddresses()
@@ -791,7 +847,7 @@ export function ShopioAssistantWidget() {
     } finally {
       setBootLoading(false)
     }
-  }, [booted, bootLoading, loadAddresses])
+  }, [booted, bootLoading, loadAddresses, fetchStockForMessages])
 
   useEffect(() => {
     if (open && !booted) void boot()
@@ -879,6 +935,27 @@ export function ShopioAssistantWidget() {
       return
     }
 
+    // Validate stock before adding to cart
+    for (const item of selectedItems) {
+      const key = item.variantId ?? (item.variants?.length === 1 ? item.variants[0].id : null)
+      const stock = key != null && key in stockByVariantId
+        ? stockByVariantId[key]
+        : item.id in stockByVariantId
+          ? stockByVariantId[item.id]
+          : null
+      
+      if (stock !== null) {
+        if (stock <= 0) {
+          toast.error(`Sản phẩm "${item.name}" đã hết hàng.`)
+          return
+        }
+        if (item.quantity > stock) {
+          toast.error(`Sản phẩm "${item.name}" chỉ còn tối đa ${stock} sản phẩm trong kho.`)
+          return
+        }
+      }
+    }
+
     setApplyingSelectionMessageId(message.id)
     try {
       for (const item of selectedItems) {
@@ -913,7 +990,7 @@ export function ShopioAssistantWidget() {
     } finally {
       setApplyingSelectionMessageId(null)
     }
-  }, [getSelectedProducts])
+  }, [getSelectedProducts, stockByVariantId])
 
   const handleSend = useCallback(async () => {
     if (!sessionId || !input.trim() || sending) return
@@ -1061,6 +1138,21 @@ export function ShopioAssistantWidget() {
           }, {})
           return { ...prev, [assistantMsg.id]: nextMap }
         })
+
+        // Fetch tồn kho thực tế cho sản phẩm mới nhận được (fire-and-forget, không block UI)
+        void aiChatService.getStockBatch(res.products.map((p) => p.id)).then((stockRes) => {
+          if (!stockRes.success) return
+          const map: Record<string, number> = {}
+          for (const item of stockRes.items) {
+            if (!item.variants.length) {
+              // Sản phẩm không có variant → dùng productId làm key
+              map[item.productId] = item.totalStock
+            } else {
+              for (const v of item.variants) map[v.variantId] = v.stock
+            }
+          }
+          setStockByVariantId((prev) => ({ ...prev, ...map }))
+        }).catch(() => { /* silent */ })
       }
 
       const shouldConfirm =
@@ -1229,8 +1321,13 @@ export function ShopioAssistantWidget() {
   }, [sessionId])
 
   const handleNewConversation = useCallback(async () => {
-    // Xoá cache session cũ
-    if (sessionId) removeAiChatUiCache(sessionId)
+    // Flush cache của session hiện tại trước khi reset (tránh mất tin nhắn chưa được ghi)
+    if (sessionId && messages.length > 0) {
+      writeAiChatUiCache(
+        sessionId,
+        JSON.stringify({ messages, confirmTarget, selectedAddressId, selectedProductsByMessageId })
+      )
+    }
 
     // Reset UI ngay lập tức
     setMessages([])
@@ -1253,7 +1350,7 @@ export function ShopioAssistantWidget() {
     } finally {
       setBootLoading(false)
     }
-  }, [sessionId, loadSessions])
+  }, [sessionId, messages, confirmTarget, selectedAddressId, selectedProductsByMessageId, loadSessions])
 
   const openSession = useCallback(async (sid: string) => {
     setView("chat")
@@ -1285,23 +1382,32 @@ export function ShopioAssistantWidget() {
           })
         )
 
+        let finalMessages: UiMessage[]
         if (cachedMessages.length > 0) {
           const cachedIds = new Set(cachedMessages.map((m) => m.id))
           const extra = beMessages.filter((m) => !cachedIds.has(m.id))
-          const merged = dedupeMergedChatMessages([...cachedMessages, ...extra])
-          setMessages(merged)
+          finalMessages = dedupeMergedChatMessages([...cachedMessages, ...extra])
         } else {
-          setMessages(dedupeMergedChatMessages(beMessages))
+          finalMessages = dedupeMergedChatMessages(beMessages)
         }
 
+        // Fix: set sessionId TRƯỚC setMessages để tránh race condition
+        // (useEffect ghi cache sử dụng sessionId state — nếu set sau thì sẽ ghi nhầm cache của session cũ)
         setSessionId(sid)
         setConfirmTarget(null)
         setSelectedProductsByMessageId({})
+        setMessages(finalMessages)
+        fetchStockForMessages(finalMessages)
         setBooted(true)
+
+        // Ghi cache ngay lập tức để lần sau mở lại vẫn có (không chờ useEffect)
+        if (finalMessages.length > 0) {
+          writeAiChatUiCache(sid, JSON.stringify({ messages: finalMessages }))
+        }
       }
     } catch { toast.error("Không thể tải cuộc trò chuyện") }
     finally { setBootLoading(false) }
-  }, [sessionId])
+  }, [sessionId, fetchStockForMessages])
 
   const handleMarkSessionRead = useCallback(async (sid: string) => {
     try {
@@ -1753,6 +1859,16 @@ export function ShopioAssistantWidget() {
                                     resolvedVariant?.price != null ? resolvedVariant.price : p.basePrice
                                   const needVariantPick = (p.variants?.length ?? 0) > 1
                                   const variantMissing = checked && needVariantPick && !sel?.variantId
+                                  // Tồn kho: ưu tiên variant đang chọn, fallback product tổng
+                                  const stockKey = sel?.variantId ?? (p.variants?.length === 1 ? p.variants[0].id : null)
+                                  const stockForCurrentVariant: number | null =
+                                    stockKey != null && stockKey in stockByVariantId
+                                      ? stockByVariantId[stockKey]
+                                      : p.id in stockByVariantId
+                                        ? stockByVariantId[p.id]
+                                        : null
+                                  const isOutOfStock = stockForCurrentVariant !== null && stockForCurrentVariant === 0
+                                  const maxQty = stockForCurrentVariant != null ? Math.min(99, stockForCurrentVariant) : 99
                                   return (
                                     <div
                                       key={p.id}
@@ -1838,7 +1954,7 @@ export function ShopioAssistantWidget() {
                                                       color: picked ? "var(--color-primary)" : "#57534e",
                                                     }}
                                                   >
-                                                    {v.variantName}
+                                                    {parseVariantDisplayName(v.variantName)}
                                                   </button>
                                                 )
                                               })}
@@ -1847,35 +1963,32 @@ export function ShopioAssistantWidget() {
                                           {variantMissing ? (
                                             <p className="text-[9px] text-amber-700">Chọn phân loại trước khi thêm giỏ.</p>
                                           ) : null}
+                                          {isOutOfStock && (
+                                            <p className="text-[9px] font-medium text-red-600">⚠ Hết hàng</p>
+                                          )}
+                                          {stockForCurrentVariant !== null && stockForCurrentVariant > 0 && stockForCurrentVariant <= 5 && (
+                                            <p className="text-[9px] text-amber-700">Còn {stockForCurrentVariant} sản phẩm</p>
+                                          )}
                                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                             <span className="text-[11px] font-bold shrink-0" style={{ color: "var(--color-primary)" }}>
                                               {formatPrice(linePrice)}
                                             </span>
                                             <div className="flex items-center gap-1 shrink-0">
                                               <span className="text-[10px] text-muted-foreground">SL</span>
-                                              <input
-                                                type="number" min={1} value={quantity}
-                                                onChange={(e) => {
-                                                  const nextQty = Math.max(1, Math.floor(Number(e.target.value) || 1))
-                                                  setSelectedProductsByMessageId((prev) => {
-                                                    const mm = prev[m.id] ?? {}
-                                                    const cur = mm[p.id] ?? {
-                                                      checked: false,
-                                                      quantity: 1,
-                                                      variantId: defaultVariantIdForProduct(p),
-                                                    }
-                                                    return {
-                                                      ...prev,
-                                                      [m.id]: {
-                                                        ...mm,
-                                                        [p.id]: { ...cur, quantity: nextQty },
-                                                      },
-                                                    }
-                                                  })
-                                                }}
-                                                className="h-5 w-11 rounded border px-1 text-[10px] focus:outline-none text-center"
-                                                style={{ borderColor: "#e3d3b7" }}
-                                              />
+                                              <div className="flex items-center border rounded overflow-hidden" style={{ borderColor: isOutOfStock ? "#fca5a5" : "#e3d3b7" }}>
+                                                <button type="button" aria-label="Giam" disabled={quantity <= 1 || isOutOfStock}
+                                                  onClick={() => { const q = Math.max(1, quantity - 1); setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                                  className="h-5 w-5 flex items-center justify-center text-[12px] font-bold disabled:opacity-30 hover:bg-orange-50 transition-colors" style={{ color: "var(--color-primary)" }}
+                                                >−</button>
+                                                <input type="number" min={1} max={maxQty} value={quantity} disabled={isOutOfStock}
+                                                  onChange={(e) => { const n = parseInt(e.target.value, 10); const q = Number.isFinite(n) ? Math.min(maxQty, Math.max(1, n)) : 1; setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                                  className="h-5 w-8 text-[10px] focus:outline-none text-center bg-transparent disabled:opacity-50" style={{ color: "var(--color-text-main)" }}
+                                                />
+                                                <button type="button" aria-label="Tang" disabled={quantity >= maxQty || isOutOfStock}
+                                                  onClick={() => { const q = Math.min(maxQty, quantity + 1); setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                                  className="h-5 w-5 flex items-center justify-center text-[12px] font-bold disabled:opacity-30 hover:bg-orange-50 transition-colors" style={{ color: "var(--color-primary)" }}
+                                                >+</button>
+                                              </div>
                                             </div>
                                             <button
                                               type="button"

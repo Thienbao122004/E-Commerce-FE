@@ -101,3 +101,21 @@ export interface AiSessionMessagesResponse {
   sessionId: string
   messages: AiSessionMessage[]
 }
+
+/** Stock của một variant */
+export interface VariantStock {
+  variantId: string
+  stock: number
+}
+
+/** Stock của một product (tổng + từng variant) */
+export interface ProductStock {
+  productId: string
+  totalStock: number
+  variants: VariantStock[]
+}
+
+export interface ProductStockBatchResponse {
+  success: boolean
+  items: ProductStock[]
+}

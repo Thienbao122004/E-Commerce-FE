@@ -36,6 +36,24 @@ import {
 } from '@/lib/ai-chat-order-intent'
 import type { AddressResponse } from '@/types/profile'
 
+function parseVariantDisplayName(raw: string): string {
+  if (!raw) return 'Mặc định'
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return trimmed
+  try {
+    const obj = JSON.parse(trimmed) as Record<string, unknown>
+    const parts = Object.entries(obj)
+      .map(([k, v]) => {
+        const val = String(v ?? '').trim()
+        const key = k.trim()
+        return Object.keys(obj).length === 1 ? val : `${key}: ${val}`
+      })
+      .filter(Boolean)
+    return parts.join(' · ') || trimmed
+  } catch {
+    return trimmed
+  }
+}
 const CART_UPDATED_EVENT = 'cart:updated'
 
 type UiMessage = {
@@ -158,6 +176,8 @@ export default function UserAiChatPage() {
   const [selectedProductsByMessageId, setSelectedProductsByMessageId] = useState<
     Record<string, Record<string, ProductSelection>>
   >({})
+  /** Map variantId / productId → số tồn kho thực tế */
+  const [stockByVariantId, setStockByVariantId] = useState<Record<string, number>>({})
   const [applyingSelectionMessageId, setApplyingSelectionMessageId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<ConfirmTargetState | null>(null)
   const [currentCart, setCurrentCart] = useState<Cart | null>(null)
@@ -277,6 +297,33 @@ export default function UserAiChatPage() {
     }
   }, [])
 
+  const fetchStockForMessages = useCallback((msgs: UiMessage[]) => {
+    const productIds = new Set<string>()
+    for (const m of msgs) {
+      if (m.responseMeta?.products) {
+        for (const p of m.responseMeta.products) {
+          if (p.id) productIds.add(p.id)
+        }
+      }
+    }
+    if (productIds.size > 0) {
+      void aiChatService.getStockBatch(Array.from(productIds)).then((stockRes) => {
+        if (!stockRes.success) return
+        const map: Record<string, number> = {}
+        for (const item of stockRes.items) {
+          if (!item.variants.length) {
+            map[item.productId] = item.totalStock
+          } else {
+            for (const v of item.variants) {
+              map[v.variantId] = v.stock
+            }
+          }
+        }
+        setStockByVariantId((prev) => ({ ...prev, ...map }))
+      }).catch(() => {})
+    }
+  }, [])
+
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -320,9 +367,13 @@ export default function UserAiChatPage() {
         if (cachedMessages.length > 0) {
           const cachedIds = new Set(cachedMessages.map((m) => m.id))
           const extraFromBe = beMessages.filter((m) => !cachedIds.has(m.id))
-          setMessages(dedupeMergedChatMessages([...cachedMessages, ...extraFromBe]))
+          const merged = dedupeMergedChatMessages([...cachedMessages, ...extraFromBe])
+          setMessages(merged)
+          fetchStockForMessages(merged)
         } else {
-          setMessages(dedupeMergedChatMessages(beMessages))
+          const merged = dedupeMergedChatMessages(beMessages)
+          setMessages(merged)
+          fetchStockForMessages(merged)
         }
         await loadAddresses()
       } catch (err) {
@@ -333,7 +384,7 @@ export default function UserAiChatPage() {
       }
     })()
     return () => { mounted = false }
-  }, [loadAddresses])
+  }, [loadAddresses, fetchStockForMessages])
 
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
@@ -415,6 +466,27 @@ export default function UserAiChatPage() {
         return
       }
 
+      // Validate stock before adding to cart
+      for (const item of selectedItems) {
+        const key = item.variantId ?? (item.variants?.length === 1 ? item.variants[0].id : null)
+        const stock = key != null && key in stockByVariantId
+          ? stockByVariantId[key]
+          : item.id in stockByVariantId
+            ? stockByVariantId[item.id]
+            : null
+        
+        if (stock !== null) {
+          if (stock <= 0) {
+            toast.error(`Sản phẩm "${item.name}" đã hết hàng.`)
+            return
+          }
+          if (item.quantity > stock) {
+            toast.error(`Sản phẩm "${item.name}" chỉ còn tối đa ${stock} sản phẩm trong kho.`)
+            return
+          }
+        }
+      }
+
       setApplyingSelectionMessageId(message.id)
       try {
         for (const item of selectedItems) {
@@ -473,7 +545,7 @@ export default function UserAiChatPage() {
         setApplyingSelectionMessageId(null)
       }
     },
-    [getSelectedProducts]
+    [getSelectedProducts, stockByVariantId]
   )
 
   const handleSend = useCallback(async () => {
@@ -626,6 +698,17 @@ export default function UserAiChatPage() {
           }, {})
           return { ...prev, [assistantMsg.id]: nextMap }
         })
+
+        // Fetch tồn kho thực tế (fire-and-forget)
+        void aiChatService.getStockBatch(res.products.map((p) => p.id)).then((stockRes) => {
+          if (!stockRes.success) return
+          const map: Record<string, number> = {}
+          for (const item of stockRes.items) {
+            if (!item.variants.length) { map[item.productId] = item.totalStock } 
+            else { for (const v of item.variants) map[v.variantId] = v.stock }
+          }
+          setStockByVariantId((prev) => ({ ...prev, ...map }))
+        }).catch(() => {})
       }
 
       const shouldOpenConfirm =
@@ -842,14 +925,36 @@ export default function UserAiChatPage() {
     })
   }, [confirmTarget, messages, getSelectedProducts])
 
-  const handleNewConversation = useCallback(() => {
+  const handleNewConversation = useCallback(async () => {
     if (!sessionId) return
+
+    // Flush cache của session hiện tại trước khi reset (tránh mất tin nhắn chưa được ghi)
+    if (messages.length > 0) {
+      writeAiChatUiCache(
+        sessionId,
+        JSON.stringify({ messages, confirmTarget, selectedAddressId, selectedProductsByMessageId })
+      )
+    }
+
+    // Reset UI ngay lập tức
     setMessages([])
     setConfirmTarget(null)
     setSelectedProductsByMessageId({})
     setInput('')
-    removeAiChatUiCache(sessionId)
-  }, [sessionId])
+
+    // Gọi BE tạo session mới thật sự (trước đây chỉ xóa cache local)
+    setBootLoading(true)
+    try {
+      const newSession = await aiChatService.createNewSession()
+      setSessionId(newSession.sessionId)
+    } catch {
+      toast.error('Không thể tạo cuộc trò chuyện mới')
+      // Fallback: giữ session cũ nhưng chỉ xóa cache
+      removeAiChatUiCache(sessionId)
+    } finally {
+      setBootLoading(false)
+    }
+  }, [sessionId, messages, confirmTarget, selectedAddressId, selectedProductsByMessageId])
 
   /* ─── Loading screen ─── */
   if (bootLoading) {
@@ -921,7 +1026,6 @@ export default function UserAiChatPage() {
             title="Cuộc trò chuyện mới"
           >
             <Plus size={12} /> Mới
-            Mới
           </button>
         </div>
       </div>
@@ -975,6 +1079,15 @@ export default function UserAiChatPage() {
                             resolvedVariant?.price != null ? resolvedVariant.price : p.basePrice
                           const needVariantPick = (p.variants?.length ?? 0) > 1
                           const variantMissing = checked && needVariantPick && !selection?.variantId
+                          const stockKey = selection?.variantId ?? (p.variants?.length === 1 ? p.variants[0].id : null)
+                          const stockForCurrentVariant: number | null =
+                            stockKey != null && stockKey in stockByVariantId
+                              ? stockByVariantId[stockKey]
+                              : p.id in stockByVariantId
+                                ? stockByVariantId[p.id]
+                                : null
+                          const isOutOfStock = stockForCurrentVariant !== null && stockForCurrentVariant === 0
+                          const maxQty = stockForCurrentVariant != null ? Math.min(99, stockForCurrentVariant) : 99
 
                           return (
                             <div
@@ -1069,7 +1182,7 @@ export default function UserAiChatPage() {
                                               color: picked ? 'var(--color-primary)' : '#57534e',
                                             }}
                                           >
-                                            {v.variantName}
+                                            {parseVariantDisplayName(v.variantName)}
                                           </button>
                                         )
                                       })}
@@ -1078,38 +1191,32 @@ export default function UserAiChatPage() {
                                   {variantMissing ? (
                                     <p className="text-[10px] text-amber-700">Chọn phân loại trước khi thêm giỏ.</p>
                                   ) : null}
+                                  {isOutOfStock && (
+                                    <p className="text-[10px] font-medium text-red-600">⚠ Hết hàng</p>
+                                  )}
+                                  {stockForCurrentVariant !== null && stockForCurrentVariant > 0 && stockForCurrentVariant <= 5 && (
+                                    <p className="text-[10px] text-amber-700">Còn {stockForCurrentVariant} sản phẩm</p>
+                                  )}
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-bold" style={{ color: 'var(--color-primary)' }}>
                                       {formatPrice(linePrice)}
                                     </span>
                                     <div className="flex items-center gap-1">
                                       <label className="text-[11px] text-muted-foreground">SL</label>
-                                      <input
-                                        type="number"
-                                        min={1}
-                                        value={quantity}
-                                        onChange={(e) => {
-                                          const parsed = Number(e.target.value)
-                                          const nextQty = Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : 1
-                                          setSelectedProductsByMessageId((prev) => {
-                                            const messageMap = prev[m.id] ?? {}
-                                            const current = messageMap[p.id] ?? {
-                                              checked: false,
-                                              quantity: 1,
-                                              variantId: defaultVariantIdForProduct(p),
-                                            }
-                                            return {
-                                              ...prev,
-                                              [m.id]: {
-                                                ...messageMap,
-                                                [p.id]: { ...current, quantity: nextQty },
-                                              },
-                                            }
-                                          })
-                                        }}
-                                        className="h-6 w-12 rounded border px-1.5 text-[11px] focus:outline-none text-center"
-                                        style={{ borderColor: '#e3d3b7' }}
-                                      />
+                                      <div className="flex items-center border rounded overflow-hidden" style={{ borderColor: isOutOfStock ? '#fca5a5' : '#e3d3b7' }}>
+                                        <button type="button" aria-label="Giảm" disabled={quantity <= 1 || isOutOfStock}
+                                          onClick={() => { const q = Math.max(1, quantity - 1); setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                          className="h-6 w-6 flex items-center justify-center text-sm font-bold disabled:opacity-30 hover:bg-orange-50 transition-colors" style={{ color: 'var(--color-primary)' }}
+                                        >−</button>
+                                        <input type="number" min={1} max={maxQty} value={quantity} disabled={isOutOfStock}
+                                          onChange={(e) => { const n = parseInt(e.target.value, 10); const q = Number.isFinite(n) ? Math.min(maxQty, Math.max(1, n)) : 1; setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                          className="h-6 w-10 text-[11px] focus:outline-none text-center bg-transparent disabled:opacity-50" style={{ color: 'var(--color-text-main)' }}
+                                        />
+                                        <button type="button" aria-label="Tăng" disabled={quantity >= maxQty || isOutOfStock}
+                                          onClick={() => { const q = Math.min(maxQty, quantity + 1); setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
+                                          className="h-6 w-6 flex items-center justify-center text-sm font-bold disabled:opacity-30 hover:bg-orange-50 transition-colors" style={{ color: 'var(--color-primary)' }}
+                                        >+</button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>

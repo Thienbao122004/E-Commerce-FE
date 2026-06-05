@@ -10,6 +10,7 @@ import type {
   AiChatShopShippingOption,
   AiSessionsResponse,
   AiSessionMessagesResponse,
+  ProductStockBatchResponse,
 } from "@/types/ai-chat"
 
 export type {
@@ -24,6 +25,7 @@ export type {
   AiSessionsResponse,
   AiSessionMessage,
   AiSessionMessagesResponse,
+  ProductStockBatchResponse,
 } from "@/types/ai-chat"
 
 async function aiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -116,5 +118,16 @@ export const aiChatService = {
   deleteSession: (sessionId: string) =>
     aiRequest<{ success: boolean; sessionId: string }>(`/api/ai/sessions/${sessionId}`, {
       method: "DELETE",
+    }),
+
+  /**
+   * Lấy tồn kho thực tế của nhiều sản phẩm cùng lúc từ Main API.
+   * Dùng sau khi AI trả về danh sách sản phẩm để validate số lượng chọn.
+   * Endpoint: POST /api/products/stock-batch (Main API, không cần auth)
+   */
+  getStockBatch: (productIds: string[]) =>
+    apiRequest<ProductStockBatchResponse>("/api/products/stock-batch", {
+      method: "POST",
+      body: JSON.stringify({ productIds }),
     }),
 }
