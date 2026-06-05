@@ -15,6 +15,7 @@ import type { AnalyzeImageResponse, CategorySuggestion, TagSuggestion, MaterialS
 import type { MaterialDto } from "@/services/admin-materials"
 import type { Tag } from "@/types/tag"
 import { newVariantDraftRow, type VariantDraftRow, parseAttributesStr } from "./product-variants"
+import { formatNumberVN } from "@/lib/formatters"
 import {
   parseTagIdFromSuggestion, tagConfidenceForCommit, isPersistableMaterialId,
   buildSuggestedMaterialsForCommit, materialSelectionKey,
@@ -251,8 +252,38 @@ export function useCreateProductForm() {
     return filled.every((r) => { const q = Math.floor(Number(r.quantity)); return Number.isFinite(q) && q >= 0 })
   }, [useVariants, variantRows])
 
+  const variantPriceValues = React.useMemo(() => {
+    if (!useVariants) return []
+    return variantRows
+      .map((r) => Number(r.price.replace(/[^0-9]/g, "")))
+      .filter((v) => Number.isFinite(v) && v > 0)
+  }, [useVariants, variantRows])
+
+  const variantPriceStats = React.useMemo(() => {
+    if (variantPriceValues.length === 0) return null
+    const min = Math.min(...variantPriceValues)
+    const max = Math.max(...variantPriceValues)
+    return { min, max }
+  }, [variantPriceValues])
+
+  const variantPriceDisplayValue = React.useMemo(() => {
+    if (!variantPriceStats) return ""
+    return formatNumberVN(variantPriceStats.min)
+  }, [variantPriceStats])
+
+  const variantPriceHint = React.useMemo(() => {
+    if (!variantPriceStats) return null
+    return `${formatNumberVN(variantPriceStats.min)}đ`
+  }, [variantPriceStats])
+
+  const isPriceLockedByVariants = useVariants && variantPriceValues.length > 0
+  const effectiveBasePriceRaw = isPriceLockedByVariants && variantPriceStats
+    ? variantPriceStats.min
+    : priceRaw
+
   const hasInput = name.trim().length > 0 || description.trim().length > 0
-  const canSubmit = name.trim().length > 0 && priceRaw > 0 && Boolean(selCategory?.categoryId) && variantRowsValid && !uploadingImages
+  const hasImages = imageUrls.length > 0
+  const canSubmit = name.trim().length > 0 && effectiveBasePriceRaw > 0 && Boolean(selCategory?.categoryId) && variantRowsValid && hasImages && !uploadingImages
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -323,8 +354,48 @@ export function useCreateProductForm() {
   }
 
   const handleSubmit = async () => {
-    if (!name.trim() || !price) return
-    if (!selCategory?.categoryId) { toast.error("Vui lòng chọn danh mục sản phẩm."); return }
+    if (!name.trim()) {
+      toast.error("Vui lòng nhập tên sản phẩm.")
+      return
+    }
+    if (!price || priceRaw <= 0) {
+      toast.error("Vui lòng nhập giá bán cơ bản hợp lệ (lớn hơn 0).")
+      return
+    }
+    if (!selCategory?.categoryId) {
+      toast.error("Vui lòng chọn danh mục sản phẩm.")
+      return
+    }
+    if (imageUrls.length === 0) {
+      toast.error("Vui lòng tải lên ít nhất 1 hình ảnh sản phẩm.")
+      return
+    }
+    if (useVariants) {
+      const filled = variantRows.filter((r) => r.variantName.trim().length > 0)
+      if (filled.length === 0) {
+        toast.error("Vui lòng nhập thông tin cho ít nhất một biến thể.")
+        return
+      }
+      const allQuantitiesValid = filled.every((r) => {
+        const q = Math.floor(Number(r.quantity))
+        return Number.isFinite(q) && q >= 0
+      })
+      if (!allQuantitiesValid) {
+        toast.error("Số lượng tồn kho của biến thể phải là số nguyên không âm.")
+        return
+      }
+    }
+    if (localProfiles.length > 0) {
+      if (!selLocalProfileId) {
+        toast.error("Vui lòng chọn loại cà phê đặc sản để xác thực Local Brand.")
+        return
+      }
+      if (selLocalTraits.length < MIN_TRAITS) {
+        toast.error(`Vui lòng chọn tối thiểu ${MIN_TRAITS} đặc điểm nổi bật để xác thực Local Brand.`)
+        return
+      }
+    }
+
     setUploadingImages(true)
     let persistedImageUrls: string[] | undefined
     try {
@@ -336,7 +407,7 @@ export function useCreateProductForm() {
     finally { setUploadingImages(false) }
 
     const basePayload = {
-      name: name.trim(), basePrice: priceRaw, description: description.trim() || undefined,
+      name: name.trim(), basePrice: effectiveBasePriceRaw, description: description.trim() || undefined,
       currency: "VND",
       imageUrls: persistedImageUrls && persistedImageUrls.length > 0 ? persistedImageUrls : undefined,
       categoryId: selCategory?.categoryId ?? undefined,
@@ -401,6 +472,7 @@ export function useCreateProductForm() {
     selLocalProfile, isMeaningfulDescription, verificationScore, scoreColor, scoreLabel, localMismatch,
     // Computed
     hasInput, canSubmit, actionLoading, commissionPercent, platformFeeLoading,
+    effectiveBasePriceRaw, isPriceLockedByVariants, variantPriceDisplayValue, variantPriceHint,
     // Handlers
     runAiAnalysis, handleSelectCategory, handleSubmit,
     toggleTag, toggleMat, togglePlatformMat, togglePlatformTag, toggleLocalTrait,

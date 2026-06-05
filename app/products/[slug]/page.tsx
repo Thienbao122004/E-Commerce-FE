@@ -23,6 +23,7 @@ import {
   formatPriceVND as formatPrice,
   formatSoldCount as formatSold,
 } from "@/lib/formatters"
+import { resolveMinVariantPrice } from "@/lib/product-pricing"
 const CART_UPDATED_EVENT = "cart:updated"
 
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
@@ -404,7 +405,8 @@ export default function ProductDetailPage() {
     }
   }
 
-  const displayPrice = selectedVariant?.price ?? product?.basePrice ?? 0
+  const minVariantPrice = resolveMinVariantPrice(product?.basePrice ?? 0, product?.variants)
+  const displayPrice = selectedVariant?.price ?? (selectedVariant ? product?.basePrice ?? 0 : minVariantPrice)
   const activeVariants = useMemo(
     () => product?.variants?.filter((v) => v.isActive) ?? [],
     [product?.variants]
@@ -422,18 +424,19 @@ export default function ProductDetailPage() {
        attrSet.add(key)
     }
 
-    if (hasCollision) {
+     if (hasCollision) {
        list = list.map(v => {
-          const nameValue = v.variantName.trim() || "Mặc định"
-          return {
-             ...v,
-             parsedAttributes: {
-                "Loại": nameValue,
-                ...v.parsedAttributes
-             }
-          }
+         const nameValue = v.variantName.trim() || "Mặc định"
+         const priceValue = formatPrice(v.price ?? minVariantPrice)
+         return {
+           ...v,
+           parsedAttributes: {
+             "Loại": `${nameValue} - ${priceValue}`,
+             ...v.parsedAttributes
+           }
+         }
        })
-    }
+     }
     
     return list;
   }, [activeVariants])
@@ -693,9 +696,9 @@ export default function ProductDetailPage() {
                           }`}
                         >
                           {v.variantName}
-                          {v.price != null && v.price !== product.basePrice && (
+                          {v.price != null && v.price !== minVariantPrice && (
                             <span className="ml-1 font-normal text-xs text-gray-400">
-                              +{formatPrice(v.price - product.basePrice)}
+                              +{formatPrice(v.price - minVariantPrice)}
                             </span>
                           )}
                         </button>

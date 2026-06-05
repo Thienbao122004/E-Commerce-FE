@@ -36,10 +36,13 @@ export default function CreateProductPage() {
               nameTouched={f.nameTouched}
               onNameBlur={() => f.setNameTouched(true)}
               price={f.price}
+              priceDisplayValue={f.variantPriceDisplayValue}
               priceRaw={f.priceRaw}
               onPriceChange={(formatted, raw) => { f.setPrice(formatted); f.setPriceRaw(raw) }}
               priceTouched={f.priceTouched}
               onPriceBlur={() => f.setPriceTouched(true)}
+              priceDisabled={f.isPriceLockedByVariants}
+              priceHint={f.variantPriceHint}
               commissionPercent={f.commissionPercent}
               platformFeeLoading={f.platformFeeLoading}
               useVariants={f.useVariants}
@@ -82,7 +85,7 @@ export default function CreateProductPage() {
               <Button
                 type="button"
                 onClick={f.handleSubmit}
-                disabled={f.actionLoading || f.uploadingImages || !f.canSubmit}
+                disabled={f.actionLoading || f.uploadingImages}
                 className="h-10"
               >
                 {f.uploadingImages ? (
