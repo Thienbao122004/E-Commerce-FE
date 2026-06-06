@@ -785,6 +785,28 @@ export default function PurchaseOrderDetailPage() {
             </div>
           )}
 
+          {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-text-main)' }}>
+                Bằng chứng giao hàng
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
+                {order.deliveryProofUrls.map((url, i) => (
+                  <div key={i} className="relative size-24 shrink-0 rounded-md overflow-hidden border snap-start cursor-pointer hover:opacity-90 transition-opacity">
+                    <a href={url} target="_blank" rel="noreferrer">
+                      <Image
+                        src={url}
+                        alt={`Bằng chứng giao hàng ${i + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="96px"
+                      />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
           {order.cancelRequestedAt && order.status === 3 && (
