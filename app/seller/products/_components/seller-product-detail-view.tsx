@@ -318,7 +318,8 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
   const [savingVariant, setSavingVariant] = React.useState(false)
 
   const minVariantPrice = product ? resolveMinVariantPrice(product.basePrice, product.variants) : 0
-  const displayPriceLabel = (product?.variants?.length ?? 0) > 0 ? "Giá thấp nhất" : "Giá gốc"
+  const hasVariants = !!(product?.variants && product.variants.length > 0)
+  const displayPriceLabel = hasVariants ? "Giá thấp nhất" : "Giá gốc"
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -353,7 +354,9 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
         setProduct(p)
         setEditName(p.name)
         setEditDesc(p.description ?? "")
-        setEditPrice(String(p.basePrice))
+        const hasVars = p.variants && p.variants.length > 0
+        const minPrice = hasVars ? resolveMinVariantPrice(p.basePrice, p.variants) : p.basePrice
+        setEditPrice(String(minPrice))
         setEditStatus(String(p.status))
         setEditCategoryId(p.categoryId ?? null)
         setEditTagIds(p.tagIds ?? [])
@@ -473,13 +476,30 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
       if (!res.success) throw new Error(res.message ?? "Lỗi cập nhật biến thể")
       setProduct(prev => {
         if (!prev) return prev
+        const updatedVariants = prev.variants?.map(v =>
+          v.id === editVariant.id
+            ? { ...v, variantName: name, sku: evSku.trim() || null, price: price, attributes: finalAttrsStr, isActive: evActive }
+            : v
+        ) ?? null
+        const activePrices = updatedVariants
+          ?.filter(v => v.isActive && v.price != null && v.price > 0)
+          .map(v => v.price!) ?? []
+        const newBasePrice = activePrices.length > 0 ? Math.min(...activePrices) : prev.basePrice
+        setEditPrice(String(newBasePrice))
+        
+        const newStatus = prev.status === ProductStatus.Active
+          ? ProductStatus.PendingApproval
+          : prev.status
+
+        if (newStatus === ProductStatus.PendingApproval) {
+          setEditStatus(String(ProductStatus.PendingApproval))
+        }
+
         return {
           ...prev,
-          variants: prev.variants?.map(v =>
-            v.id === editVariant.id
-              ? { ...v, variantName: name, sku: evSku.trim() || null, price: price, attributes: finalAttrsStr, isActive: evActive }
-              : v
-          ) ?? null
+          basePrice: newBasePrice,
+          variants: updatedVariants,
+          status: newStatus
         }
       })
       toast.success("Đã cập nhật biến thể")
@@ -1098,15 +1118,22 @@ export function SellerProductDetailView({ productId, onBack }: Props) {
                           inputMode="numeric"
                           value={editPrice === "" ? "" : formatNumberVN(Number(editPrice))}
                           onChange={(e) => {
+                            if (hasVariants) return
                             const digits = e.target.value.replace(/\D/g, "")
                             setEditPrice(digits)
                             mark()
                           }}
-                          className="h-10 text-sm font-semibold text-primary rounded-xl bg-muted/20 border-muted focus-visible:bg-background tabular-nums pr-8"
+                          disabled={hasVariants}
+                          className="h-10 text-sm font-semibold text-primary rounded-xl bg-muted/20 border-muted focus-visible:bg-background tabular-nums pr-8 disabled:opacity-80 disabled:cursor-not-allowed"
                           placeholder="0"
                         />
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₫</span>
                       </div>
+                      {hasVariants && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Giá được khóa theo biến thể thấp nhất.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label
