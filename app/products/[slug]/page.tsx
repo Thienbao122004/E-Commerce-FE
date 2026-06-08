@@ -29,6 +29,7 @@ const CART_UPDATED_EVENT = "cart:updated"
 import { MainStorefrontHeader } from "@/components/layout/main-storefront-header"
 import { StorefrontFooter } from "@/components/layout/storefront-footer"
 import { ProductReviewsSection } from "./_components/product-reviews-section"
+import { IconAward, IconCheck, IconMapPin } from "@tabler/icons-react"
 
 function parseVariantAttributes(raw?: string | null): Record<string, string> {
   if (!raw) return {}
@@ -51,71 +52,71 @@ function parseVariantAttributes(raw?: string | null): Record<string, string> {
   } catch {
     attrStr = raw;
   }
-  
+
   if (!attrStr) return {};
 
   const result: Record<string, string> = {};
   const leftoverSegments: string[] = [];
-  
+
   const segments = attrStr.split(',');
   for (const seg of segments) {
-     let text = seg.trim();
-     if (!text) continue;
-     const firstColon = text.indexOf(':');
-     if (firstColon > 0) {
-        let k = text.substring(0, firstColon).trim();
-        let v = text.substring(firstColon + 1).trim();
-        
-        if (k.toLowerCase() === 'size') {
-           k = 'Size';
-           v = v.toUpperCase();
-        } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
-           k = 'Màu';
-           v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
-        } else {
-           k = k.charAt(0).toUpperCase() + k.slice(1);
-        }
+    let text = seg.trim();
+    if (!text) continue;
+    const firstColon = text.indexOf(':');
+    if (firstColon > 0) {
+      let k = text.substring(0, firstColon).trim();
+      let v = text.substring(firstColon + 1).trim();
 
-        if (k) {
-           if (result[k]) result[k] += `, ${v}`;
-           else result[k] = v;
-        } else {
-           leftoverSegments.push(text);
-        }
-     } else {
-        const lower = text.toLowerCase();
-        if (lower.startsWith('size ') || lower.startsWith('size')) {
-           const val = text.substring(4).trim();
-           if (val) {
-             const finalVal = val.toUpperCase();
-             if (result['Size']) result['Size'] += `, ${finalVal}`;
-             else result['Size'] = finalVal;
-             continue;
-           }
-        } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
-           const idx = lower.startsWith('màu sắc') ? 7 : 3;
-           const val = text.substring(idx).trim();
-           if (val) {
-             const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
-             if (result['Màu']) result['Màu'] += `, ${finalVal}`;
-             else result['Màu'] = finalVal;
-             continue;
-           }
-        }
-        
-        const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
-        leftoverSegments.push(capitalizedText);
-     }
-  }
-  
-  if (leftoverSegments.length > 0) {
-      if (Object.keys(result).length === 0) {
-         result["Phân loại"] = leftoverSegments.join(", ");
+      if (k.toLowerCase() === 'size') {
+        k = 'Size';
+        v = v.toUpperCase();
+      } else if (k.toLowerCase() === 'màu' || k.toLowerCase() === 'màu sắc') {
+        k = 'Màu';
+        v = v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
       } else {
-         result["Thuộc tính khác"] = leftoverSegments.join(", ");
+        k = k.charAt(0).toUpperCase() + k.slice(1);
       }
+
+      if (k) {
+        if (result[k]) result[k] += `, ${v}`;
+        else result[k] = v;
+      } else {
+        leftoverSegments.push(text);
+      }
+    } else {
+      const lower = text.toLowerCase();
+      if (lower.startsWith('size ') || lower.startsWith('size')) {
+        const val = text.substring(4).trim();
+        if (val) {
+          const finalVal = val.toUpperCase();
+          if (result['Size']) result['Size'] += `, ${finalVal}`;
+          else result['Size'] = finalVal;
+          continue;
+        }
+      } else if (lower.startsWith('màu ') || lower.startsWith('màu')) {
+        const idx = lower.startsWith('màu sắc') ? 7 : 3;
+        const val = text.substring(idx).trim();
+        if (val) {
+          const finalVal = val.charAt(0).toUpperCase() + val.slice(1).toLowerCase();
+          if (result['Màu']) result['Màu'] += `, ${finalVal}`;
+          else result['Màu'] = finalVal;
+          continue;
+        }
+      }
+
+      const capitalizedText = text.charAt(0).toUpperCase() + text.slice(1);
+      leftoverSegments.push(capitalizedText);
+    }
   }
-  
+
+  if (leftoverSegments.length > 0) {
+    if (Object.keys(result).length === 0) {
+      result["Phân loại"] = leftoverSegments.join(", ");
+    } else {
+      result["Thuộc tính khác"] = leftoverSegments.join(", ");
+    }
+  }
+
   return result;
 }
 
@@ -413,31 +414,31 @@ export default function ProductDetailPage() {
   )
   const variantsWithParsedAttributes = useMemo(() => {
     let list = activeVariants.map((v) => ({ ...v, parsedAttributes: parseVariantAttributes(v.attributes) }))
-    
+
     const attrSet = new Set<string>()
     let hasCollision = false
     for (const v of list) {
-       const key = JSON.stringify(v.parsedAttributes, Object.keys(v.parsedAttributes).sort())
-       if (attrSet.has(key)) {
-          hasCollision = true; break;
-       }
-       attrSet.add(key)
+      const key = JSON.stringify(v.parsedAttributes, Object.keys(v.parsedAttributes).sort())
+      if (attrSet.has(key)) {
+        hasCollision = true; break;
+      }
+      attrSet.add(key)
     }
 
-     if (hasCollision) {
-       list = list.map(v => {
-         const nameValue = v.variantName.trim() || "Mặc định"
-         const priceValue = formatPrice(v.price ?? minVariantPrice)
-         return {
-           ...v,
-           parsedAttributes: {
-             "Loại": `${nameValue} - ${priceValue}`,
-             ...v.parsedAttributes
-           }
-         }
-       })
-     }
-    
+    if (hasCollision) {
+      list = list.map(v => {
+        const nameValue = v.variantName.trim() || "Mặc định"
+        const priceValue = formatPrice(v.price ?? minVariantPrice)
+        return {
+          ...v,
+          parsedAttributes: {
+            "Loại": `${nameValue} - ${priceValue}`,
+            ...v.parsedAttributes
+          }
+        }
+      })
+    }
+
     return list;
   }, [activeVariants])
   const variantAttributeGroups = useMemo(() => {
@@ -458,7 +459,7 @@ export default function ProductDetailPage() {
 
   const handleSelectAttribute = useCallback((groupKey: string, groupValue: string) => {
     let nextAttributes = { ...selectedAttributes, [groupKey]: groupValue }
-    
+
     let matched = variantsWithParsedAttributes.find((variant) =>
       Object.entries(nextAttributes).every(([key, value]) => variant.parsedAttributes[key] === value)
     )
@@ -466,7 +467,7 @@ export default function ProductDetailPage() {
     if (!matched) {
       matched = variantsWithParsedAttributes.find((variant) => variant.parsedAttributes[groupKey] === groupValue)
       if (matched) {
-         nextAttributes = { ...matched.parsedAttributes }
+        nextAttributes = { ...matched.parsedAttributes }
       }
     }
 
@@ -610,11 +611,10 @@ export default function ProductDetailPage() {
                       <button
                         key={i}
                         onClick={() => setSelectedImage(i)}
-                        className={`shrink-0 size-16 rounded-lg overflow-hidden border-2 transition-all ${
-                          i === selectedImage
-                            ? "border-[var(--color-primary)] shadow-sm"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
+                        className={`shrink-0 size-16 rounded-lg overflow-hidden border-2 transition-all ${i === selectedImage
+                          ? "border-[var(--color-primary)] shadow-sm"
+                          : "border-gray-200 hover:border-gray-300"
+                          }`}
                       >
                         <img src={url} alt={`Ảnh ${i + 1}`} className="w-full h-full object-cover" />
                       </button>
@@ -667,11 +667,10 @@ export default function ProductDetailPage() {
                                 key={`${group.key}-${value}`}
                                 type="button"
                                 onClick={() => handleSelectAttribute(group.key, value)}
-                                className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${
-                                  selected
-                                    ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
-                                    : "border-gray-200 text-gray-600 hover:border-gray-300"
-                                }`}
+                                className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${selected
+                                  ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
+                                  : "border-gray-200 text-gray-600 hover:border-gray-300"
+                                  }`}
                               >
                                 {value}
                               </button>
@@ -689,11 +688,10 @@ export default function ProductDetailPage() {
                         <button
                           key={v.id}
                           onClick={() => setSelectedVariant(selectedVariant?.id === v.id ? null : v)}
-                          className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${
-                            selectedVariant?.id === v.id
-                              ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
-                              : "border-gray-200 text-gray-600 hover:border-gray-300"
-                          }`}
+                          className={`px-4 py-2 text-sm rounded-lg border-2 transition-all font-medium ${selectedVariant?.id === v.id
+                            ? "border-[var(--color-primary)] bg-[rgba(236,127,19,0.08)] text-[var(--color-primary)]"
+                            : "border-gray-200 text-gray-600 hover:border-gray-300"
+                            }`}
                         >
                           {v.variantName}
                           {v.price != null && v.price !== minVariantPrice && (
@@ -801,29 +799,32 @@ export default function ProductDetailPage() {
 
                 {/* ══ Local Specialty Badge ══ */}
                 {product.localMeta && (
-                  <div className="py-4 border-t border-gray-100">
-                    <div className="rounded-2xl border border-[#d4a96a] bg-gradient-to-br from-[#fffbf2] to-[#fef3dc] p-4 flex flex-col gap-3">
+                  <div className="pt-5 border-t border-gray-100">
+                    <div className="rounded-xl border border-[#efd4b7] bg-white p-4 flex flex-col gap-3">
                       {/* Header */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="material-symbols-outlined text-[18px]" style={{ color: "#b06017" }}>eco</span>
-                        <span className="text-sm font-bold" style={{ color: "#7a4a1e" }}>
+                        <IconAward className="size-4 shrink-0 text-[#b06017]" />
+                        <span className="text-sm font-semibold text-foreground">
                           {product.localMeta.archetypeName}
                         </span>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold border" style={{ background: "#fde8c8", color: "#b06017", borderColor: "#f0c890" }}>
-                          Local Brand · {product.localMeta.provinceName}
+                        <span className="flex items-center gap-1 rounded-full border border-[#f0c890] bg-[#fde8c8] px-2 py-0.5 text-[11px] font-semibold text-[#b06017]">
+                          <IconMapPin className="size-3" />
+                          {product.localMeta.provinceName}
+                        </span>
+                        <span className="ml-auto rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                          Local Brand
                         </span>
                       </div>
 
                       {/* Đặc điểm nổi bật */}
                       {product.localMeta.selectedTraits.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-1.5">
                           {product.localMeta.selectedTraits.map((trait) => (
                             <span
                               key={trait}
-                              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border font-medium"
-                              style={{ background: "#fff7ed", color: "#92400e", borderColor: "#fcd38d" }}
+                              className="inline-flex items-center gap-1 rounded-xl border border-[#efd4b7] bg-white px-2.5 py-1 text-xs font-medium text-[#b06017]"
                             >
-                              <span className="material-symbols-outlined text-[12px]" style={{ color: "#b45309" }}>check_circle</span>
+                              <IconCheck className="size-3 text-[#b06017]" />
                               {trait}
                             </span>
                           ))}
@@ -832,13 +833,13 @@ export default function ProductDetailPage() {
 
                       {/* Display note */}
                       {product.localMeta.displayNote && (
-                        <p className="text-[12px] leading-relaxed" style={{ color: "#78480f" }}>
+                        <p className="text-xs leading-relaxed text-muted-foreground">
                           {product.localMeta.displayNote}
                         </p>
                       )}
 
                       {/* Footer note */}
-                      <p className="text-[10px]" style={{ color: "#a07040" }}>
+                      <p className="text-[10px] text-muted-foreground/70">
                         Thông tin đặc sản được xác nhận theo hồ sơ chuẩn của nền tảng.
                       </p>
                     </div>
@@ -943,7 +944,7 @@ export default function ProductDetailPage() {
                   <p className="text-sm text-gray-500">Tham Gia</p>
                   <p className="text-sm" style={{ color: "var(--color-primary)" }}>{formatJoinTime(shopInfo?.createdAt)}</p>
                 </div>
-                
+
                 <div>
                   <p className="text-sm text-gray-500">Người Theo Dõi</p>
                   <p className="text-sm" style={{ color: "var(--color-primary)" }}>{shopInfo ? formatCompactNumber(shopInfo.followerCount) : "Đang cập nhật"}</p>
