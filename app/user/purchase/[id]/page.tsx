@@ -786,28 +786,74 @@ export default function PurchaseOrderDetailPage() {
             </div>
           )}
 
-          {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-text-main)' }}>
-                Bằng chứng giao hàng
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-2 snap-x">
-                {order.deliveryProofUrls.map((url, i) => (
-                  <div key={i} className="relative size-24 shrink-0 rounded-md overflow-hidden border snap-start cursor-pointer hover:opacity-90 transition-opacity">
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <Image
-                        src={url}
-                        alt={`Bằng chứng giao hàng ${i + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="96px"
-                      />
-                    </a>
-                  </div>
-                ))}
+
+          {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (() => {
+            // Group images by orderStatus
+            const groups = order.deliveryProofUrls!.reduce<Record<number, typeof order.deliveryProofUrls>>((acc, entry) => {
+              const s = entry.orderStatus
+              if (!acc[s]) acc[s] = []
+              acc[s]!.push(entry)
+              return acc
+            }, {})
+
+            const statusMeta: Record<number, { label: string; color: string; dot: string }> = {
+              3: { label: 'Đang chuẩn bị', color: 'text-violet-700', dot: 'bg-violet-500' },
+              4: { label: 'Đang giao hàng', color: 'text-orange-700', dot: 'bg-orange-500' },
+              5: { label: 'Đã giao hàng',   color: 'text-emerald-700', dot: 'bg-emerald-500' },
+              6: { label: 'Hoàn thành',      color: 'text-emerald-800', dot: 'bg-emerald-600' },
+            }
+
+            return (
+              <div className="mt-3 space-y-2.5">
+                {Object.entries(groups).map(([statusKey, entries]) => {
+                  const st = Number(statusKey)
+                  const meta = statusMeta[st] ?? { label: STATUS_LABELS[st] ?? `Trạng thái ${st}`, color: 'text-muted-foreground', dot: 'bg-gray-400' }
+                  // Use the earliest uploadedAt in the group as the group timestamp
+                  const groupTime = entries!
+                    .map(e => e.uploadedAt)
+                    .filter(Boolean)
+                    .sort()[0]
+
+                  return (
+                    <div key={statusKey} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3">
+                      <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+                        <div className={`size-2 rounded-full ${meta.dot} shrink-0`} />
+                        <span className={`text-xs font-semibold ${meta.color}`}>
+                          {meta.label} · Bằng chứng từ shipper
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          ({entries!.length} ảnh)
+                        </span>
+                        {groupTime && (
+                          <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+                            {formatDateTimeVN(groupTime)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
+                        {entries!.map((entry, i) => (
+                          <div
+                            key={i}
+                            className="relative size-24 shrink-0 rounded-md overflow-hidden border border-gray-200 snap-start cursor-pointer hover:opacity-90 transition-opacity"
+                          >
+                            <a href={entry.url} target="_blank" rel="noreferrer">
+                              <Image
+                                src={entry.url}
+                                alt={`Bằng chứng ${meta.label} ${i + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="96px"
+                              />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
 
           {order.cancelRequestedAt && order.status === 3 && (
