@@ -7,6 +7,14 @@ export type OrderStatusStep = {
   reachedAt?: string | null
 }
 
+/** Ảnh bằng chứng giao hàng kèm trạng thái đơn tại thời điểm upload */
+export type DeliveryProofEntry = {
+  url: string
+  /** Giá trị OrderStatus: 3=ĐangChuẩnBị, 4=ĐangGiao, 5=ĐãGiao, ... */
+  orderStatus: number
+  uploadedAt?: string
+}
+
 export interface OrderItem {
   id: string
   productId: string
@@ -54,8 +62,8 @@ export interface OrderDetail extends OrderSummary {
   actualDeliveryDate?: string | null
   trackingCode?: string | null
   shippingProvider?: string | null
-  /** URL ảnh bằng chứng giao hàng từ shipper */
-  deliveryProofUrls?: string[] | null
+  /** URL ảnh bằng chứng giao hàng từ shipper, kèm trạng thái đơn tại thời điểm chụp */
+  deliveryProofUrls?: DeliveryProofEntry[] | null
   /** Null = không có yêu cầu hủy đang chờ. Có giá trị = đơn đang chờ shop duyệt hủy. */
   cancelRequestedAt?: string | null
   /** Hạn shop phải phản hồi (= cancelRequestedAt + 24h). Quá hạn → tự động hủy. */
