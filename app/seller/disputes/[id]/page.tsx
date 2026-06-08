@@ -22,6 +22,7 @@ import { DisputeStatus, DisputeStatusLabels, DisputeStatusColors, DisputeTypeLab
 import type { SellerDispute } from "@/types/dispute"
 import { OrderStatus } from "@/types/seller-dashboard"
 import { EvidenceUploader } from "@/components/common/evidence-uploader"
+import { EvidenceGuidelines } from "@/components/common/evidence-guidelines"
 import { useAuth } from "@/contexts/auth-context"
 import { HubConnectionBuilder, HttpTransportType, LogLevel } from "@microsoft/signalr"
 
@@ -637,11 +638,14 @@ export default function SellerDisputeDetailPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block">Bằng chứng đối soát (Ảnh/Video)</label>
-              <EvidenceUploader
-                urls={respondEvidenceUrls}
-                onChange={setRespondEvidenceUrls}
-                disabled={busy}
-              />
+              <EvidenceGuidelines forSeller dismissible />
+              <div className="mt-2">
+                <EvidenceUploader
+                  urls={respondEvidenceUrls}
+                  onChange={setRespondEvidenceUrls}
+                  disabled={busy}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
