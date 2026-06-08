@@ -29,6 +29,7 @@ import type { CancelOrderResponse } from '@/types/customer-order'
 import { createDispute } from '@/services/disputes'
 import { DisputeType } from '@/types/dispute'
 import { EvidenceUploader } from '@/components/common/evidence-uploader'
+import { EvidenceGuidelines } from '@/components/common/evidence-guidelines'
 
 const STATUS_COLORS: Record<number, string> = {
   0: '#d97706',
@@ -1026,6 +1027,7 @@ export default function PurchaseOrderDetailPage() {
                 Bằng chứng
                 <span className="ml-1.5 text-xs text-muted-foreground font-normal">ảnh / video từ thiết bị, tối đa 10</span>
               </Label>
+              <EvidenceGuidelines disputeType={Number(disputeForm.type)} />
               <EvidenceUploader
                 urls={disputeEvidenceUrls}
                 onChange={setDisputeEvidenceUrls}
