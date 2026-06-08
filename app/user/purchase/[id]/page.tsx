@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Lock, MessageCircle, Package, Store, StoreIcon, Truck } from 'lucide-react'
+import { ArrowLeft, Camera, Check, Lock, MessageCircle, Package, Store, StoreIcon, Truck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +25,7 @@ import {
 import { formatDateTimeVN, formatDateVN as formatDate, formatPhoneVn, formatPriceVND as formatPrice } from '@/lib/formatters'
 import { openShopChatWithOrderProduct } from '@/lib/open-shop-chat'
 import { ordersService, type OrderDetail, type OrderStatusStep } from '@/services/orders'
-import type { CancelOrderResponse } from '@/types/customer-order'
+import type { CancelOrderResponse, DeliveryProofEntry } from '@/types/customer-order'
 import { createDispute } from '@/services/disputes'
 import { DisputeType } from '@/types/dispute'
 import { EvidenceUploader } from '@/components/common/evidence-uploader'
@@ -88,17 +88,35 @@ const DISPUTE_TYPE_OPTIONS = [
 function StatusTimeline({
   currentStatus,
   statusTimeline,
+  deliveryProofUrls,
 }: {
   currentStatus: number
   statusTimeline?: OrderStatusStep[] | null
+  deliveryProofUrls?: DeliveryProofEntry[] | null
 }) {
+  const [proofViewStatus, setProofViewStatus] = useState<number | null>(null)
+
+  const proofByStatus = useMemo(() => {
+    if (!deliveryProofUrls?.length) return {} as Record<number, DeliveryProofEntry[]>
+    return deliveryProofUrls.reduce<Record<number, DeliveryProofEntry[]>>((acc, entry) => {
+      const s = entry.orderStatus
+      if (!acc[s]) acc[s] = []
+      acc[s]!.push(entry)
+      return acc
+    }, {})
+  }, [deliveryProofUrls])
+
+  const proofImages = proofViewStatus != null ? (proofByStatus[proofViewStatus] ?? []) : []
+
   const isCancelled = currentStatus === 7
   const isRefunded = currentStatus === 8
   const terminalAt = statusTimeline?.find((s) => s.value === currentStatus)?.reachedAt
 
+  let timelineContent
+
   if (isCancelled || isRefunded) {
     const statusColor = STATUS_COLORS[currentStatus] || '#6b7280'
-    return (
+    timelineContent = (
       <div
         className="flex flex-col gap-1 sm:flex-row sm:items-center sm:flex-wrap gap-x-2.5 gap-y-1 rounded-xl border px-4 py-3"
         style={{ borderColor: `${statusColor}55`, backgroundColor: `${statusColor}14`, color: statusColor }}
@@ -115,105 +133,173 @@ function StatusTimeline({
         )}
       </div>
     )
-  }
+  } else {
+    const mainFromApi = statusTimeline?.filter((s) => s.value >= 0 && s.value <= 6) ?? []
 
-  const mainFromApi = statusTimeline?.filter((s) => s.value >= 0 && s.value <= 6) ?? []
-  if (mainFromApi.length > 0) {
-    return (
-      <div className="overflow-x-auto">
-        <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
-          {mainFromApi.map((step, idx) => {
-            const isLast = idx === mainFromApi.length - 1
-            const isDone = step.state === 'completed'
-            const isCurrent = step.state === 'current'
-            const showTime = (isDone || isCurrent) && step.reachedAt
-            return (
-              <div key={step.value} className="contents">
-                <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-[72px] max-w-[100px]">
-                  <div
-                    className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isDone
-                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                        : isCurrent
-                          ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
-                          : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
-                    }`}
-                  >
-                    {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
-                  </div>
-                  <span
-                    className={`text-[10px] font-semibold text-center leading-tight ${
-                      isDone
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : isCurrent
-                          ? 'text-primary'
-                          : 'text-muted-foreground/50'
-                    }`}
-                  >
-                    {step.displayName || (STATUS_LABELS[step.value] ?? `Bước ${idx + 1}`)}
-                  </span>
-                  {showTime ? (
-                    <span className="text-[9px] text-center leading-tight text-muted-foreground tabular-nums max-w-full">
-                      {formatDateTimeVN(step.reachedAt!)}
+    if (mainFromApi.length > 0) {
+      timelineContent = (
+        <div className="overflow-x-auto">
+          <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
+            {mainFromApi.map((step, idx) => {
+              const isLast = idx === mainFromApi.length - 1
+              const isDone = step.state === 'completed'
+              const isCurrent = step.state === 'current'
+              const showTime = (isDone || isCurrent) && step.reachedAt
+              const stepProofs = proofByStatus[step.value] ?? []
+              return (
+                <div key={step.value} className="contents">
+                  <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-[72px] max-w-[100px]">
+                    <div
+                      className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                        isDone
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : isCurrent
+                            ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
+                            : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
+                      }`}
+                    >
+                      {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold text-center leading-tight ${
+                        isDone
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : isCurrent
+                            ? 'text-primary'
+                            : 'text-muted-foreground/50'
+                      }`}
+                    >
+                      {step.displayName || (STATUS_LABELS[step.value] ?? `Bước ${idx + 1}`)}
                     </span>
-                  ) : null}
+                    {showTime ? (
+                      <span className="text-[9px] text-center leading-tight text-muted-foreground tabular-nums max-w-full">
+                        {formatDateTimeVN(step.reachedAt!)}
+                      </span>
+                    ) : null}
+                    {stepProofs.length > 0 && (
+                      <button
+                        onClick={() => setProofViewStatus(step.value)}
+                        className="mt-0.5 flex items-center gap-0.5 text-[9px] text-primary/80 hover:text-primary transition-colors cursor-pointer"
+                        title="Xem bằng chứng giao hàng"
+                      >
+                        <Camera className="size-2.5" />
+                        <span>{stepProofs.length} ảnh</span>
+                      </button>
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div
+                      className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`}
+                    />
+                  )}
                 </div>
-                {!isLast && (
-                  <div
-                    className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`}
-                  />
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
-    )
+      )
+    } else {
+      timelineContent = (
+        <div className="overflow-x-auto">
+          <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
+            {STATUS_STEPS.map((step, idx) => {
+              const isDone = currentStatus > step
+              const isCurrent = currentStatus === step
+              const isLast = idx === STATUS_STEPS.length - 1
+              const label = STATUS_LABELS[step] ?? `Bước ${idx + 1}`
+              const stepProofs = proofByStatus[step] ?? []
+              return (
+                <div key={step} className="contents">
+                  <div className="flex flex-col items-center gap-1.5 shrink-0">
+                    <div
+                      className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                        isDone
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : isCurrent
+                            ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
+                            : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
+                      }`}
+                    >
+                      {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${
+                        isDone
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : isCurrent
+                            ? 'text-primary'
+                            : 'text-muted-foreground/50'
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    {stepProofs.length > 0 && (
+                      <button
+                        onClick={() => setProofViewStatus(step)}
+                        className="mt-0.5 flex items-center gap-0.5 text-[9px] text-primary/80 hover:text-primary transition-colors cursor-pointer"
+                        title="Xem bằng chứng giao hàng"
+                      >
+                        <Camera className="size-2.5" />
+                        <span>{stepProofs.length} ảnh</span>
+                      </button>
+                    )}
+                  </div>
+                  {!isLast && (
+                    <div className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex items-center gap-0 w-full min-w-[680px] md:min-w-0">
-        {STATUS_STEPS.map((step, idx) => {
-          const isDone = currentStatus > step
-          const isCurrent = currentStatus === step
-          const isLast = idx === STATUS_STEPS.length - 1
-          const label = STATUS_LABELS[step] ?? `Bước ${idx + 1}`
-
-          return (
-            <div key={step} className="contents">
-              <div className="flex flex-col items-center gap-1.5 shrink-0">
-                <div
-                  className={`size-8 rounded-full border-2 flex items-center justify-center transition-all ${
-                    isDone
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : isCurrent
-                        ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/30'
-                        : 'bg-muted/50 border-muted-foreground/20 text-muted-foreground/40'
-                  }`}
-                >
-                  {isDone ? <Check className="size-3.5" /> : <span className="text-[10px] font-bold">{idx + 1}</span>}
-                </div>
-                <span
-                  className={`text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${
-                    isDone
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : isCurrent
-                        ? 'text-primary'
-                        : 'text-muted-foreground/50'
-                  }`}
-                >
-                  {label}
+    <>
+      {timelineContent}
+      <Dialog
+        open={proofViewStatus !== null}
+        onOpenChange={(open) => { if (!open) setProofViewStatus(null) }}
+      >
+        <DialogContent className="max-w-sm sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="size-4" />
+              Bằng chứng từ shipper
+              {proofViewStatus != null && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  · {STATUS_LABELS[proofViewStatus] ?? ''}
                 </span>
-              </div>
-              {!isLast && (
-                <div className={`flex-1 h-0.5 mb-5 mx-1 rounded-full ${isDone ? 'bg-emerald-400' : 'bg-muted-foreground/15'}`} />
               )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+            </DialogTitle>
+            <DialogDescription>
+              {proofImages.length} ảnh · Nhấn ảnh để xem đầy đủ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="gap-3 mt-1">
+            {proofImages.map((entry, i) => (
+              <a
+                key={i}
+                href={entry.url}
+                target="_blank"
+                rel="noreferrer"
+                className="relative aspect-square hover:opacity-90 transition-opacity block"
+              >
+                <Image
+                  src={entry.url}
+                  alt={`Bằng chứng ${i + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="200px"
+                />
+              </a>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -731,10 +817,10 @@ export default function PurchaseOrderDetailPage() {
       </div>
 
       {isEndedOrder ? (
-        <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
+        <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} deliveryProofUrls={order.deliveryProofUrls ?? undefined} />
       ) : (
         <div className="bg-white rounded-[5px] shadow-sm border p-4" style={{ borderColor: '#e5ded6' }}>
-          <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} />
+          <StatusTimeline currentStatus={order.status} statusTimeline={order.statusTimeline} deliveryProofUrls={order.deliveryProofUrls ?? undefined} />
         </div>
       )}
 
@@ -785,77 +871,7 @@ export default function PurchaseOrderDetailPage() {
               )}
             </div>
           )}
-
-
-          {order.deliveryProofUrls && order.deliveryProofUrls.length > 0 && (() => {
-            // Group images by orderStatus
-            const groups = order.deliveryProofUrls!.reduce<Record<number, typeof order.deliveryProofUrls>>((acc, entry) => {
-              const s = entry.orderStatus
-              if (!acc[s]) acc[s] = []
-              acc[s]!.push(entry)
-              return acc
-            }, {})
-
-            const statusMeta: Record<number, { label: string; color: string; dot: string }> = {
-              3: { label: 'Đang chuẩn bị', color: 'text-violet-700', dot: 'bg-violet-500' },
-              4: { label: 'Đang giao hàng', color: 'text-orange-700', dot: 'bg-orange-500' },
-              5: { label: 'Đã giao hàng',   color: 'text-emerald-700', dot: 'bg-emerald-500' },
-              6: { label: 'Hoàn thành',      color: 'text-emerald-800', dot: 'bg-emerald-600' },
-            }
-
-            return (
-              <div className="mt-3 space-y-2.5">
-                {Object.entries(groups).map(([statusKey, entries]) => {
-                  const st = Number(statusKey)
-                  const meta = statusMeta[st] ?? { label: STATUS_LABELS[st] ?? `Trạng thái ${st}`, color: 'text-muted-foreground', dot: 'bg-gray-400' }
-                  // Use the earliest uploadedAt in the group as the group timestamp
-                  const groupTime = entries!
-                    .map(e => e.uploadedAt)
-                    .filter(Boolean)
-                    .sort()[0]
-
-                  return (
-                    <div key={statusKey} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3">
-                      <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-                        <div className={`size-2 rounded-full ${meta.dot} shrink-0`} />
-                        <span className={`text-xs font-semibold ${meta.color}`}>
-                          {meta.label} · Bằng chứng từ shipper
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          ({entries!.length} ảnh)
-                        </span>
-                        {groupTime && (
-                          <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
-                            {formatDateTimeVN(groupTime)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
-                        {entries!.map((entry, i) => (
-                          <div
-                            key={i}
-                            className="relative size-24 shrink-0 rounded-md overflow-hidden border border-gray-200 snap-start cursor-pointer hover:opacity-90 transition-opacity"
-                          >
-                            <a href={entry.url} target="_blank" rel="noreferrer">
-                              <Image
-                                src={entry.url}
-                                alt={`Bằng chứng ${meta.label} ${i + 1}`}
-                                fill
-                                className="object-cover"
-                                sizes="96px"
-                              />
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
         </div>
-
           {order.cancelRequestedAt && order.status === 3 && (
             <div className="p-4 border-b" style={{ borderColor: '#e5ded6' }}>
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 space-y-1">
