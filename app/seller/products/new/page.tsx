@@ -143,6 +143,7 @@ export default function CreateProductPage() {
                 localProfiles={f.localProfiles}
                 selLocalProfileId={f.selLocalProfileId}
                 onSelectProfile={(id) => { f.setSelLocalProfileId(id); f.setSelLocalTraits([]) }}
+                onClear={() => { f.setSelLocalProfileId(null); f.setSelLocalTraits([]) }}
                 selLocalTraits={f.selLocalTraits}
                 onToggleTrait={f.toggleLocalTrait}
                 name={f.name}
