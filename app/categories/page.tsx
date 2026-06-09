@@ -44,7 +44,7 @@ export default function CategoriesPage() {
   useEffect(() => {
     getCategories({ pageSize: 100, level: 1 })
       .then((res) => { if (res.success) setCategories(res.categories) })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false))
   }, [])
 

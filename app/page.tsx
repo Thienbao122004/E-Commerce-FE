@@ -518,31 +518,31 @@ export default function LandingPage() {
                 <div key={i} className="relative flex-1 rounded-2xl overflow-hidden bg-gradient-to-br from-stone-200 to-stone-300 animate-pulse" />
               ))
               : sideBanners.map((b) => (
-              <Link
-                key={b.id}
-                href={b.link}
-                className="relative flex-1 rounded-2xl overflow-hidden cursor-pointer group block"
-              >
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-107"
-                  style={{ backgroundImage: `url(${b.image})` }}
-                />
-                <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-80" style={{ background: b.overlay }} />
-                <div className="relative z-10 h-full flex flex-col justify-end p-4">
-                  <span
-                    className="self-start px-2 py-0.5 rounded text-white/80 text-[10px] font-bold uppercase tracking-wider mb-1"
-                    style={{ backgroundColor: "rgba(0,0,0,0.30)" }}
-                  >
-                    {b.sub}
-                  </span>
-                  <h3 className="font-black text-white text-[0.95rem] leading-snug whitespace-pre-line drop-shadow">{b.title}</h3>
-                  <span className="mt-2 text-white/60 text-[11px] flex items-center gap-0.5 font-medium group-hover:text-white/90 transition-colors">
-                    Xem ngay
-                    <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>arrow_forward</span>
-                  </span>
-                </div>
-              </Link>
-            ))}
+                <Link
+                  key={b.id}
+                  href={b.link}
+                  className="relative flex-1 rounded-2xl overflow-hidden cursor-pointer group block"
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-107"
+                    style={{ backgroundImage: `url(${b.image})` }}
+                  />
+                  <div className="absolute inset-0 transition-opacity duration-300 group-hover:opacity-80" style={{ background: b.overlay }} />
+                  <div className="relative z-10 h-full flex flex-col justify-end p-4">
+                    <span
+                      className="self-start px-2 py-0.5 rounded text-white/80 text-[10px] font-bold uppercase tracking-wider mb-1"
+                      style={{ backgroundColor: "rgba(0,0,0,0.30)" }}
+                    >
+                      {b.sub}
+                    </span>
+                    <h3 className="font-black text-white text-[0.95rem] leading-snug whitespace-pre-line drop-shadow">{b.title}</h3>
+                    <span className="mt-2 text-white/60 text-[11px] flex items-center gap-0.5 font-medium group-hover:text-white/90 transition-colors">
+                      Xem ngay
+                      <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>arrow_forward</span>
+                    </span>
+                  </div>
+                </Link>
+              ))}
           </div>
         </section>
 
