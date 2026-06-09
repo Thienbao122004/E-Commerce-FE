@@ -1056,8 +1056,8 @@ export default function RegisterSellerPage() {
                   <SelectValue placeholder="Chọn loại hình kinh doanh" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="individual">Cá nhân (Không có Giấy phép kinh doanh)</SelectItem>
-                  <SelectItem value="company">Doanh nghiệp / Hộ kinh doanh (Có Giấy phép & Mã số thuế)</SelectItem>
+                  <SelectItem value="individual">Cá nhân</SelectItem>
+                  <SelectItem value="company">Doanh nghiệp / Hộ kinh doanh</SelectItem>
                 </SelectContent>
               </Select>
             </div>

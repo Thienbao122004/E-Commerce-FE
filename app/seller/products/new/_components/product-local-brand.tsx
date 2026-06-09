@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/drawer"
 import type { LocalSpecialtyProfile } from "@/services/local-specialty"
 
-const MIN_TRAITS = 3
+const MIN_TRAITS = 1
 
 interface ProductLocalBrandProps {
   localProfiles: LocalSpecialtyProfile[]

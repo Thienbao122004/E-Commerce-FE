@@ -103,7 +103,7 @@ function findBestLocalProfile(
   return !isTie && maxScore >= 10 ? bestProfileId : null
 }
 
-const MIN_TRAITS = 3
+const MIN_TRAITS = 1
 
 export function useCreateProductForm() {
   const router = useRouter()
@@ -533,7 +533,7 @@ export function useCreateProductForm() {
       toast.error("Vui lòng nhập tên sản phẩm.")
       return
     }
-    if (!price || priceRaw <= 0) {
+    if (!useVariants && (!price || priceRaw <= 0)) {
       toast.error("Vui lòng nhập giá bán cơ bản hợp lệ (lớn hơn 0).")
       return
     }
@@ -551,6 +551,15 @@ export function useCreateProductForm() {
         toast.error("Vui lòng nhập thông tin cho ít nhất một biến thể.")
         return
       }
+      const allPricesValid = filled.every((r) => {
+        const pStr = r.price.replace(/[^0-9]/g, "")
+        const p = pStr ? Number(pStr) : 0
+        return Number.isFinite(p) && p > 0
+      })
+      if (!allPricesValid) {
+        toast.error("Vui lòng nhập giá bán hợp lệ cho tất cả biến thể (lớn hơn 0).")
+        return
+      }
       const allQuantitiesValid = filled.every((r) => {
         const q = Math.floor(Number(r.quantity))
         return Number.isFinite(q) && q >= 0
@@ -560,6 +569,7 @@ export function useCreateProductForm() {
         return
       }
     }
+
     if (localProfiles.length > 0) {
       if (!selLocalProfileId) {
         toast.error("Vui lòng chọn loại cà phê đặc sản để xác thực Local Brand.")
