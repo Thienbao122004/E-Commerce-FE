@@ -148,6 +148,20 @@ export function ProductLocalBrand({
           <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col gap-5 px-4 py-4">
 
+              {localMismatch && (
+                <div className="flex items-start gap-3 rounded-xl border-2 border-red-300 bg-red-50/90 p-2 shadow-sm">
+                  <IconAlertTriangle className="size-5 shrink-0 text-red-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-red-800">
+                      Phát hiện thông tin không hợp lệ
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium leading-relaxed text-red-700">
+                      {localMismatch}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* 1. Chọn loại */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs">
@@ -230,14 +244,6 @@ export function ProductLocalBrand({
                       Local Brand · Chờ duyệt
                     </span>
                   </div>
-                </div>
-              )}
-
-              {/* Mismatch */}
-              {localMismatch && (
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
-                  <IconAlertTriangle className="size-3.5 mt-0.5 shrink-0 text-red-500" />
-                  <p className="text-[11px] leading-relaxed text-red-700">{localMismatch}</p>
                 </div>
               )}
 
