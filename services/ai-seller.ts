@@ -11,6 +11,8 @@ import type {
   AnalyzeProductResponse,
   TagSuggestionLogResponse,
   MaterialSuggestionLogResponse,
+  ValidateLocalBrandRequest,
+  ValidateLocalBrandResponse,
 } from "@/types/ai-seller"
 
 export type {
@@ -28,6 +30,8 @@ export type {
   MaterialLogSuggested,
   MaterialSuggestionLogItem,
   MaterialSuggestionLogResponse,
+  ValidateLocalBrandRequest,
+  ValidateLocalBrandResponse,
 } from "@/types/ai-seller"
 
 async function aiPost<T>(endpoint: string, body: unknown): Promise<T> {
@@ -191,4 +195,9 @@ export function aiGetMaterialSuggestionLogs(page = 1, pageSize = 20) {
   return aiGet<MaterialSuggestionLogResponse>(
     `/api/ai/seller/material-suggestions?page=${page}&pageSize=${pageSize}`
   )
+}
+
+/** Xác thực Local Brand claim bằng AI */
+export function aiValidateLocalBrand(params: ValidateLocalBrandRequest) {
+  return aiPost<ValidateLocalBrandResponse>("/api/ai/seller/validate-local-brand", params)
 }

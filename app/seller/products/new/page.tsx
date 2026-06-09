@@ -152,6 +152,7 @@ export default function CreateProductPage() {
                 scoreColor={f.scoreColor}
                 scoreLabel={f.scoreLabel}
                 localMismatch={f.localMismatch}
+                aiValidationLoading={f.aiValidationLoading}
               />
             )}
           </div>

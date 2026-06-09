@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useSellerProducts } from "@/hooks/use-seller-products"
 import { useSellerPlatformFee } from "@/hooks/use-seller-platform-fee"
-import { aiAnalyzeProduct, aiAnalyzeImage, aiCommitProductTagSession } from "@/services/ai-seller"
+import { aiAnalyzeProduct, aiAnalyzeImage, aiCommitProductTagSession, aiValidateLocalBrand } from "@/services/ai-seller"
 import { getCategoryTree, type StorefrontCategory } from "@/services/storefront-categories"
 import { getLocalSpecialtyProfiles, type LocalSpecialtyProfile } from "@/services/local-specialty"
 import { supabase } from "@/lib/supabase"
@@ -47,12 +47,6 @@ async function resolveImageUrlForProduct(u: string): Promise<string> {
   const { data: pub } = supabase.storage.from("product-images").getPublicUrl(data.path)
   return pub.publicUrl
 }
-
-const COFFEE_KEYWORDS = [
-  "cà phê","cafe","coffee","robusta","arabica","rang","xay","hạt","vị","đắng","chua",
-  "thơm","hương","caffeine","espresso","phin","nguyên chất","blend","mộc","đặc sản",
-  "buôn ma thuột","cầu đất","sơn la","khe sanh","pleiku","tây nguyên","quảng trị",
-]
 
 const MIN_TRAITS = 3
 
@@ -122,6 +116,14 @@ export function useCreateProductForm() {
   const [selLocalProfileId, setSelLocalProfileId] = React.useState<number | null>(null)
   const [selLocalTraits, setSelLocalTraits] = React.useState<string[]>([])
 
+  // AI Local Brand validation
+  const [aiValidationLoading, setAiValidationLoading] = React.useState(false)
+  const [aiValidationResult, setAiValidationResult] = React.useState<{
+    isValid: boolean
+    confidence: number
+    reason: string
+  } | null>(null)
+
   // ── Effects ──────────────────────────────────────────────────────────────
 
   React.useEffect(() => {
@@ -165,6 +167,54 @@ export function useCreateProductForm() {
     })()
     return () => { mounted = false }
   }, [])
+
+  React.useEffect(() => {
+    if (!selLocalProfile || !name.trim()) {
+      setAiValidationResult(null)
+      setAiValidationLoading(false)
+      return
+    }
+
+    setAiValidationLoading(true)
+    const activeProvince = selLocalProfile.provinceName
+    const activeArchetype = selLocalProfile.archetypeName
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await aiValidateLocalBrand({
+          title: name.trim(),
+          description: description.trim(),
+          provinceName: activeProvince,
+          archetypeName: activeArchetype,
+        })
+        if (response.success) {
+          setAiValidationResult({
+            isValid: response.isValid,
+            confidence: response.confidence,
+            reason: response.reason,
+          })
+        } else {
+          setAiValidationResult({
+            isValid: false,
+            confidence: 0,
+            reason: response.errorMessage || "Không thể xác thực thông tin.",
+          })
+        }
+      } catch (err) {
+        setAiValidationResult({
+          isValid: false,
+          confidence: 0,
+          reason: err instanceof Error ? err.message : "Lỗi kết nối dịch vụ xác thực.",
+        })
+      } finally {
+        setAiValidationLoading(false)
+      }
+    }, 1500)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [name, description, selLocalProfileId])
 
   const loadPlatformMaterials = React.useCallback(async () => {
     if (matLoadingRef.current || allPlatformMaterials.length > 0) return
@@ -210,40 +260,48 @@ export function useCreateProductForm() {
 
   const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
 
-  const isMeaningfulDescription = React.useMemo(() => {
-    const text = description.trim().toLowerCase()
-    if (text.length < 30) return false
-    const charCount: Record<string, number> = {}
-    for (const ch of text) charCount[ch] = (charCount[ch] ?? 0) + 1
-    if (Math.max(...Object.values(charCount)) / text.length > 0.5) return false
-    if (text.split(/\s+/).filter(Boolean).length < 4) return false
-    const allKws = [...COFFEE_KEYWORDS, ...(selLocalProfile?.keywords ?? [])]
-    return allKws.some((kw) => text.includes(kw.toLowerCase()))
-  }, [description, selLocalProfile])
-
-  const verificationScore = React.useMemo(() => {
-    let score = 0
-    if (selLocalProfile) score += 25
-    if (selLocalProfile) score += 25
-    if (selLocalTraits.length >= MIN_TRAITS) score += 25
-    if (isMeaningfulDescription) score += 25
-    return score
-  }, [selLocalProfile, selLocalTraits, isMeaningfulDescription])
-
-  const scoreColor = verificationScore >= 75 ? "#3a6b30" : verificationScore >= 50 ? "#b06017" : "#c0392b"
-  const scoreLabel = verificationScore >= 100 ? "Verified Local Brand" : verificationScore >= 75 ? "Gần đạt chuẩn" : verificationScore >= 50 ? "Đang xác thực" : "Chưa đủ điều kiện"
-
   const localMismatch = React.useMemo(() => {
     if (!selLocalProfile) return null
-    const text = `${name} ${description}`.toLowerCase()
-    for (const p of localProfiles) {
-      if (p.id === selLocalProfileId) continue
-      if (p.keywords.filter((kw) => kw.length >= 5 && text.includes(kw.toLowerCase())).length >= 2) {
-        return `Tên/mô tả có vẻ liên quan đến "${p.archetypeName}" (${p.provinceName}). Kiểm tra lại cho đúng loại cà phê đã chọn.`
-      }
+    if (aiValidationResult && !aiValidationResult.isValid) {
+      return aiValidationResult.reason || "Thông tin sản phẩm chưa phù hợp với chỉ dẫn địa lý đã chọn."
     }
     return null
-  }, [selLocalProfile, selLocalProfileId, localProfiles, name, description])
+  }, [selLocalProfile, aiValidationResult])
+
+  const isMeaningfulDescription = React.useMemo(() => {
+    return !!(aiValidationResult && aiValidationResult.isValid)
+  }, [aiValidationResult])
+
+  const verificationScore = React.useMemo(() => {
+    if (!selLocalProfile) return 0
+    // Nếu kết quả AI trả về là KHÔNG hợp lệ (isValid = false) -> Điểm giảm ngay về 0
+    if (aiValidationResult && !aiValidationResult.isValid) return 0
+
+    let score = 50
+    if (aiValidationResult?.isValid) {
+      score += 25
+    }
+    if (selLocalTraits.length >= MIN_TRAITS) {
+      score += 25
+    }
+    return score
+  }, [selLocalProfile, aiValidationResult, selLocalTraits])
+
+  const localValidationError = localMismatch
+
+  const scoreColor = localValidationError
+    ? "#c0392b"
+    : verificationScore >= 75 ? "#3a6b30" : verificationScore >= 50 ? "#b06017" : "#c0392b"
+
+  const scoreLabel = React.useMemo(() => {
+    if (localValidationError) return "Không đạt chuẩn"
+    if (aiValidationLoading) return "Đang phân tích AI..."
+    if (verificationScore >= 100) return "Verified Local Brand"
+    if (verificationScore >= 75) return "Gần đạt chuẩn"
+    if (verificationScore >= 50) return "Đang xác thực"
+    return "Chưa đủ điều kiện"
+  }, [localValidationError, aiValidationLoading, verificationScore])
+
 
   const variantRowsValid = React.useMemo(() => {
     if (!useVariants) return true
@@ -394,6 +452,14 @@ export function useCreateProductForm() {
         toast.error(`Vui lòng chọn tối thiểu ${MIN_TRAITS} đặc điểm nổi bật để xác thực Local Brand.`)
         return
       }
+      if (aiValidationLoading) {
+        toast.error("Hệ thống đang chạy xác thực AI cho Local Brand, vui lòng đợi giây lát.")
+        return
+      }
+      if (!aiValidationResult || !aiValidationResult.isValid) {
+        toast.error(aiValidationResult?.reason || "Thông tin sản phẩm chưa hợp lệ để xác thực Local Brand.")
+        return
+      }
     }
 
     setUploadingImages(true)
@@ -470,6 +536,7 @@ export function useCreateProductForm() {
     // Local brand
     localProfiles, selLocalProfileId, setSelLocalProfileId, selLocalTraits, setSelLocalTraits,
     selLocalProfile, isMeaningfulDescription, verificationScore, scoreColor, scoreLabel, localMismatch,
+    aiValidationLoading, aiValidationResult,
     // Computed
     hasInput, canSubmit, actionLoading, commissionPercent, platformFeeLoading,
     effectiveBasePriceRaw, isPriceLockedByVariants, variantPriceDisplayValue, variantPriceHint,
