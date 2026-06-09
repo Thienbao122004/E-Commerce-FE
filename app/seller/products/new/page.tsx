@@ -153,6 +153,7 @@ export default function CreateProductPage() {
                 scoreLabel={f.scoreLabel}
                 localMismatch={f.localMismatch}
                 aiValidationLoading={f.aiValidationLoading}
+                aiValidationResult={f.aiValidationResult}
               />
             )}
           </div>

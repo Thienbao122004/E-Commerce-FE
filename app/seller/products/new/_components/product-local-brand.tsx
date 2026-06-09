@@ -9,6 +9,7 @@ import {
   IconMapPin,
   IconAlertTriangle,
   IconInfoCircle,
+  IconLoader2,
 } from "@tabler/icons-react"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,6 +38,11 @@ interface ProductLocalBrandProps {
   scoreLabel: string
   localMismatch: string | null
   aiValidationLoading?: boolean
+  aiValidationResult?: {
+    isValid: boolean
+    confidence: number
+    reason: string
+  } | null
 }
 
 export function ProductLocalBrand({
@@ -51,6 +57,7 @@ export function ProductLocalBrand({
   scoreLabel,
   localMismatch,
   aiValidationLoading = false,
+  aiValidationResult = null,
 }: ProductLocalBrandProps) {
   const [open, setOpen] = React.useState(false)
   const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
@@ -264,6 +271,17 @@ export function ProductLocalBrand({
                       Vùng xuất xứ:{" "}
                       <strong>{selLocalProfile.provinceName}</strong>
                     </span>
+                    {aiValidationLoading ? (
+                      <span className="flex items-center gap-1.5 text-[11px] text-emerald-600/80 border-t border-emerald-200/50 pt-1.5 mt-1 animate-pulse">
+                        <IconLoader2 className="size-3.5 shrink-0 animate-spin" />
+                        <span>AI đang kiểm tra tính hợp lệ của thông tin sản phẩm...</span>
+                      </span>
+                    ) : aiValidationResult?.reason ? (
+                      <span className="flex items-start gap-1.5 text-[11px] text-emerald-700 border-t border-emerald-200/50 pt-1.5 mt-1">
+                        <IconCheck className="size-3.5 shrink-0 mt-0.5" />
+                        <span>AI nhận định: <em>"{aiValidationResult.reason}"</em></span>
+                      </span>
+                    ) : null}
                   </div>
                   <p className="border-t border-emerald-200 pt-2 text-[10px] leading-normal text-emerald-600">
                     Nhãn Local Brand sẽ được admin xem xét trước khi hiển thị chính thức.
