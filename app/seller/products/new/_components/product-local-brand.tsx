@@ -36,6 +36,7 @@ interface ProductLocalBrandProps {
   scoreColor: string
   scoreLabel: string
   localMismatch: string | null
+  aiValidationLoading?: boolean
 }
 
 export function ProductLocalBrand({
@@ -49,15 +50,15 @@ export function ProductLocalBrand({
   scoreColor,
   scoreLabel,
   localMismatch,
+  aiValidationLoading = false,
 }: ProductLocalBrandProps) {
   const [open, setOpen] = React.useState(false)
   const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
 
   const checklistItems = [
-    { label: "Chọn loại", done: !!selLocalProfile },
-    { label: "Vùng miền", done: !!selLocalProfile },
+    { label: "Chọn loại cà phê", done: !!selLocalProfile },
     { label: `Đủ ${MIN_TRAITS} đặc điểm`, done: selLocalTraits.length >= MIN_TRAITS },
-    { label: "Mô tả chuẩn hóa", done: isMeaningfulDescription },
+    { label: aiValidationLoading ? "AI đang xác thực..." : "AI xác thực xuất xứ", done: isMeaningfulDescription },
   ]
 
   return (

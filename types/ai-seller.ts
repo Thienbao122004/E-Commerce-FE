@@ -97,3 +97,19 @@ export type MaterialSuggestionLogResponse = {
   modified: number
   rejected: number
 }
+
+export type ValidateLocalBrandRequest = {
+  title: string
+  description: string
+  provinceName: string
+  archetypeName: string
+}
+
+export type ValidateLocalBrandResponse = {
+  isValid: boolean
+  confidence: number
+  reason: string
+  success: boolean
+  errorMessage?: string
+}
+
