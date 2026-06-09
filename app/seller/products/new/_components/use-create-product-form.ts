@@ -48,6 +48,61 @@ async function resolveImageUrlForProduct(u: string): Promise<string> {
   return pub.publicUrl
 }
 
+function findBestLocalProfile(
+  name: string,
+  description: string,
+  profiles: LocalSpecialtyProfile[]
+): number | null {
+  const titleLower = name.toLowerCase()
+  const descLower = description.toLowerCase()
+
+  let bestProfileId: number | null = null
+  let maxScore = 0
+  let isTie = false
+
+  for (const profile of profiles) {
+    let score = 0
+
+    // 1. Kiểm tra tên archetype trùng khớp trực tiếp trong tên sản phẩm (trọng số cao)
+    if (profile.archetypeName && titleLower.includes(profile.archetypeName.toLowerCase())) {
+      score += 100
+    }
+
+    // 2. Kiểm tra tên tỉnh trùng khớp trực tiếp trong tên sản phẩm (trọng số vừa)
+    if (profile.provinceName && titleLower.includes(profile.provinceName.toLowerCase())) {
+      score += 50
+    }
+
+    // 3. Khớp các từ khóa phụ
+    if (profile.keywords && profile.keywords.length > 0) {
+      for (const kw of profile.keywords) {
+        const kwLower = kw.toLowerCase().trim()
+        if (!kwLower) continue
+
+        if (titleLower.includes(kwLower)) {
+          // Điểm cao hơn cho từ khóa dài hơn/cụ thể hơn
+          score += kwLower.length * 2
+        }
+
+        if (descLower.includes(kwLower)) {
+          score += kwLower.length * 0.5
+        }
+      }
+    }
+
+    if (score > maxScore) {
+      maxScore = score
+      bestProfileId = profile.id
+      isTie = false
+    } else if (score === maxScore && score > 0) {
+      isTie = true
+    }
+  }
+
+  // Chỉ tự động chọn nếu có một cấu hình duy nhất vượt trội và vượt qua ngưỡng tối thiểu
+  return !isTie && maxScore >= 10 ? bestProfileId : null
+}
+
 const MIN_TRAITS = 3
 
 export function useCreateProductForm() {
@@ -115,6 +170,9 @@ export function useCreateProductForm() {
   const [localProfiles, setLocalProfiles] = React.useState<LocalSpecialtyProfile[]>([])
   const [selLocalProfileId, setSelLocalProfileId] = React.useState<number | null>(null)
   const [selLocalTraits, setSelLocalTraits] = React.useState<string[]>([])
+  const lastMatchedIdRef = React.useRef<number | null>(null)
+  const lastDetectedTraitsRef = React.useRef<string[]>([])
+  const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
 
   // AI Local Brand validation
   const [aiValidationLoading, setAiValidationLoading] = React.useState(false)
@@ -167,6 +225,67 @@ export function useCreateProductForm() {
     })()
     return () => { mounted = false }
   }, [])
+
+  // Tự động chọn hồ sơ đặc sản địa phương dựa trên tên/mô tả sản phẩm
+  React.useEffect(() => {
+    if (localProfiles.length === 0) return
+
+    const matchedId = findBestLocalProfile(name, description, localProfiles)
+
+    if (matchedId !== lastMatchedIdRef.current) {
+      lastMatchedIdRef.current = matchedId
+      if (matchedId !== null) {
+        setSelLocalProfileId(matchedId)
+        setSelLocalTraits([])
+      } else if (selLocalProfileId === lastMatchedIdRef.current) {
+        setSelLocalProfileId(null)
+        setSelLocalTraits([])
+      }
+    }
+  }, [name, description, localProfiles])
+
+  // Tự động quét và check các đặc tính nổi bật từ mô tả sản phẩm
+  React.useEffect(() => {
+    if (!selLocalProfile) {
+      lastDetectedTraitsRef.current = []
+      return
+    }
+
+    const descLower = description.toLowerCase()
+    const currentMatches = selLocalProfile.expectedTraits.filter((trait) =>
+      descLower.includes(trait.toLowerCase())
+    )
+
+    const hasChanged =
+      currentMatches.length !== lastDetectedTraitsRef.current.length ||
+      currentMatches.some((t) => !lastDetectedTraitsRef.current.includes(t))
+
+    if (hasChanged) {
+      const newlyAdded = currentMatches.filter(
+        (t) => !lastDetectedTraitsRef.current.includes(t)
+      )
+      const removed = lastDetectedTraitsRef.current.filter(
+        (t) => !currentMatches.includes(t)
+      )
+
+      lastDetectedTraitsRef.current = currentMatches
+
+      setSelLocalTraits((prev) => {
+        const updated = prev.filter((t) => !removed.includes(t))
+        let changed = false
+
+        for (const t of newlyAdded) {
+          if (!updated.includes(t)) {
+            updated.push(t)
+            changed = true
+          }
+        }
+
+        if (prev.length !== updated.length) changed = true
+        return changed ? updated : prev
+      })
+    }
+  }, [description, selLocalProfileId, selLocalProfile])
 
   React.useEffect(() => {
     if (!selLocalProfile || !name.trim()) {
@@ -257,8 +376,6 @@ export function useCreateProductForm() {
     if (platformTagQuery.trim()) return platformTags.length > 0 ? [{ label: "Kết quả tìm kiếm", items: platformTags }] : []
     return groupTagsForPicker(platformTags)
   }, [platformTags, platformTagQuery])
-
-  const selLocalProfile = localProfiles.find((p) => p.id === selLocalProfileId) ?? null
 
   const localMismatch = React.useMemo(() => {
     if (!selLocalProfile) return null
