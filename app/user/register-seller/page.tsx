@@ -53,6 +53,7 @@ type SellerFormState = {
   districtId: string;
   provinceId: string;
   city: string;
+  businessType: "individual" | "company";
   businessLicenseNumber: string;
   taxCode: string;
   bankName: string;
@@ -90,6 +91,7 @@ const INITIAL_FORM: SellerFormState = {
   districtId: "",
   provinceId: "",
   city: "",
+  businessType: "individual",
   businessLicenseNumber: "",
   taxCode: "",
   bankName: "",
@@ -126,6 +128,21 @@ function getDocSlots(businessType: string): DocSlot[] {
   }
   return slots;
 }
+
+const BUSINESS_DOC_SLOTS: DocSlot[] = [
+  {
+    docType: "business_license",
+    label: "Giấy phép kinh doanh",
+    required: false,
+    hint: "Tải lên ảnh giấy phép kinh doanh — tối đa 5MB",
+  },
+  {
+    docType: "tax_cert",
+    label: "Chứng nhận đăng ký thuế",
+    required: false,
+    hint: "Tải lên ảnh chứng nhận đăng ký thuế — tối đa 5MB",
+  },
+];
 
 type IdCardFormState = {
   name: string;
@@ -344,12 +361,28 @@ export default function RegisterSellerPage() {
 
   // ── File pick ──────────────────────────────────────────────────────────────
   const handleDocFilePick = (docType: string, file: File) => {
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Chỉ hỗ trợ ảnh JPEG, PNG, WEBP");
-      return;
+    const isCccd = docType === "cccd_front" || docType === "cccd_back";
+    if (isCccd) {
+      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+        toast.error("Ảnh CCCD chỉ hỗ trợ JPEG, PNG, WEBP");
+        return;
+      }
+    } else {
+      const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Chỉ hỗ trợ file ảnh (JPEG, PNG, WEBP) hoặc tài liệu (PDF, Word)");
+        return;
+      }
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Ảnh không được vượt quá 5 MB");
+      toast.error("File không được vượt quá 5 MB");
       return;
     }
     // Revoke previous preview if any
@@ -371,6 +404,8 @@ export default function RegisterSellerPage() {
       setIdCardForm((p) => clearBackOcrPart(p));
     }
   };
+
+
 
   const analyzeIdCards = async () => {
     const front = docFiles.cccd_front?.file;
@@ -515,6 +550,41 @@ export default function RegisterSellerPage() {
         return false;
       }
     }
+    if (targetStep === 3) {
+      // Bank info is mandatory for payout
+      if (!form.bankName.trim()) {
+        toast.error("Vui lòng nhập tên ngân hàng");
+        return false;
+      }
+      if (!form.bankAccountNumber.trim()) {
+        toast.error("Vui lòng nhập số tài khoản ngân hàng");
+        return false;
+      }
+      if (!form.bankAccountName.trim()) {
+        toast.error("Vui lòng nhập tên chủ tài khoản");
+        return false;
+      }
+
+      // If businessType is company, business license & tax code are mandatory
+      if (form.businessType === "company") {
+        if (!form.businessLicenseNumber.trim()) {
+          toast.error("Vui lòng nhập số giấy phép kinh doanh");
+          return false;
+        }
+        if (!docFiles.business_license) {
+          toast.error("Vui lòng tải lên ảnh/file giấy phép kinh doanh");
+          return false;
+        }
+        if (!form.taxCode.trim()) {
+          toast.error("Vui lòng nhập mã số thuế");
+          return false;
+        }
+        if (!docFiles.tax_cert) {
+          toast.error("Vui lòng tải lên ảnh/file chứng nhận đăng ký thuế");
+          return false;
+        }
+      }
+    }
     if (targetStep === 4) {
       const required = docSlots.filter((s) => s.required);
       for (const slot of required) {
@@ -542,7 +612,7 @@ export default function RegisterSellerPage() {
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!validateStep(1) || !validateStep(2) || !validateStep(4)) return;
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
 
     const provinceId = Number(form.provinceId);
     const districtId = Number(form.districtId);
@@ -564,13 +634,12 @@ export default function RegisterSellerPage() {
     try {
       setSubmitting(true);
 
-      const fileDocTypes = new Set(["business_license", "tax_cert"]);
+      const fileDocTypes = ["business_license", "tax_cert"];
       const documents: ShopDocumentInput[] = [];
-      for (const slot of docSlots) {
-        if (!fileDocTypes.has(slot.docType)) continue;
-        if (!docFiles[slot.docType]) continue;
-        const fileUrl = await uploadDoc(slot.docType, userId);
-        documents.push({ docType: slot.docType, fileUrl });
+      for (const docType of fileDocTypes) {
+        if (!docFiles[docType]) continue;
+        const fileUrl = await uploadDoc(docType, userId);
+        documents.push({ docType, fileUrl });
       }
 
       const identity: SellerIdentityInfo = {
@@ -603,13 +672,14 @@ export default function RegisterSellerPage() {
         districtId,
         provinceId,
         city: form.city.trim(),
-        businessLicenseNumber: form.businessLicenseNumber.trim() || null,
-        taxCode: form.taxCode.trim() || null,
+        businessType: form.businessType,
+        businessLicenseNumber: form.businessType === "company" ? form.businessLicenseNumber.trim() || null : null,
+        taxCode: form.businessType === "company" ? form.taxCode.trim() || null : null,
         bankName: form.bankName.trim() || null,
         bankAccountNumber: form.bankAccountNumber.trim() || null,
         bankAccountName: form.bankAccountName.trim() || null,
         identity,
-        documents: documents.length ? documents : undefined,
+        documents: form.businessType === "company" && documents.length ? documents : undefined,
       };
 
       const res = await profileService.registerSeller(payload);
@@ -780,14 +850,60 @@ export default function RegisterSellerPage() {
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Step indicators */}
-        <div className="flex flex-wrap gap-2">
-          {([1, 2, 3, 4] as Step[]).map((n) => (
-            <Badge key={n} variant={step === n ? "default" : "outline"}>
-              Bước {n}: {STEP_LABELS[n]}
-            </Badge>
-          ))}
+        {/* Step indicators (Horizontal Timeline Stepper) */}
+        <div className="relative flex items-center justify-between w-full max-w-3xl mx-auto my-6 px-6 select-none">
+          {/* Progress Connecting Line */}
+          <div className="absolute top-1/2 left-8 right-8 h-0.5 bg-gray-200 -translate-y-1/2 z-0" />
+          
+          {/* Active Progress Line */}
+          <div
+            className="absolute top-1/2 left-8 h-0.5 transition-all duration-500 -translate-y-1/2 z-0 bg-[var(--color-primary)]"
+            style={{
+              width: `calc((100% - 64px) * ${(step - 1) / 3})`,
+            }}
+          />
+
+          {([1, 2, 3, 4] as Step[]).map((n) => {
+            const isCompleted = n < step;
+            const isActive = n === step;
+            return (
+              <div key={n} className="relative z-10 flex flex-col items-center">
+                <div
+                  className={cn(
+                    "size-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 border-2 shadow-sm",
+                    isCompleted
+                      ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white"
+                      : isActive
+                      ? "bg-white border-[var(--color-primary)] text-[var(--color-primary)] ring-4 ring-orange-100"
+                      : "bg-white border-gray-300 text-gray-400"
+                  )}
+                >
+                  {isCompleted ? (
+                    <span className="material-symbols-outlined text-[18px] font-bold">check</span>
+                  ) : (
+                    <span>{n}</span>
+                  )}
+                </div>
+                <div className="absolute top-11 w-20 sm:w-28 flex flex-col items-center text-center">
+                  <span
+                    className={cn(
+                      "text-[10px] sm:text-xs font-semibold transition-colors duration-300 mt-1 line-clamp-2",
+                      isActive
+                        ? "text-[var(--color-primary)] font-bold"
+                        : isCompleted
+                        ? "text-gray-700"
+                        : "text-gray-400"
+                    )}
+                  >
+                    {STEP_LABELS[n]}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
+        {/* Spacer to push form content below absolute timeline labels */}
+        <div className="h-6" />
 
         <Separator />
 
@@ -927,48 +1043,70 @@ export default function RegisterSellerPage() {
 
         {/* ── Step 3: Business info ─────────────────────────────────────── */}
         {step === 3 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="license">Số giấy phép kinh doanh</Label>
-              <Input
-                id="license"
-                value={form.businessLicenseNumber}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    businessLicenseNumber: e.target.value,
-                  }))
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="business-type">Loại hình kinh doanh *</Label>
+              <Select
+                value={form.businessType}
+                onValueChange={(val: "individual" | "company") =>
+                  setForm((prev) => ({ ...prev, businessType: val }))
                 }
-                placeholder="Tùy chọn"
-              />
+              >
+                <SelectTrigger id="business-type" className="w-full">
+                  <SelectValue placeholder="Chọn loại hình kinh doanh" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Cá nhân (Không có Giấy phép kinh doanh)</SelectItem>
+                  <SelectItem value="company">Doanh nghiệp / Hộ kinh doanh (Có Giấy phép & Mã số thuế)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="tax-code">Mã số thuế</Label>
-              <Input
-                id="tax-code"
-                value={form.taxCode}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, taxCode: e.target.value }))
-                }
-                placeholder="Tùy chọn"
-              />
-            </div>
+            {form.businessType === "company" && (
+              <>
+                <div className="space-y-2 animate-slide-down">
+                  <Label htmlFor="license">Số giấy phép kinh doanh *</Label>
+                  <Input
+                    id="license"
+                    value={form.businessLicenseNumber}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        businessLicenseNumber: e.target.value,
+                      }))
+                    }
+                    placeholder="Nhập số GPKD"
+                  />
+                </div>
+
+                <div className="space-y-2 animate-slide-down">
+                  <Label htmlFor="tax-code">Mã số thuế *</Label>
+                  <Input
+                    id="tax-code"
+                    value={form.taxCode}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, taxCode: e.target.value }))
+                    }
+                    placeholder="Nhập mã số thuế"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="bank-name">Ngân hàng</Label>
+              <Label htmlFor="bank-name">Ngân hàng *</Label>
               <Input
                 id="bank-name"
                 value={form.bankName}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, bankName: e.target.value }))
                 }
-                placeholder="Tùy chọn"
+                placeholder="Ví dụ: Vietcombank, Techcombank"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bank-number">Số tài khoản</Label>
+              <Label htmlFor="bank-number">Số tài khoản *</Label>
               <Input
                 id="bank-number"
                 value={form.bankAccountNumber}
@@ -978,12 +1116,12 @@ export default function RegisterSellerPage() {
                     bankAccountNumber: e.target.value,
                   }))
                 }
-                placeholder="Tùy chọn"
+                placeholder="Nhập số tài khoản ngân hàng"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="bank-owner">Tên chủ tài khoản</Label>
+              <Label htmlFor="bank-owner">Tên chủ tài khoản *</Label>
               <Input
                 id="bank-owner"
                 value={form.bankAccountName}
@@ -993,9 +1131,48 @@ export default function RegisterSellerPage() {
                     bankAccountName: e.target.value,
                   }))
                 }
-                placeholder="Tùy chọn"
+                placeholder="Nhập tên chủ tài khoản (viết hoa không dấu)"
               />
             </div>
+
+            {form.businessType === "company" && (
+              <div className="space-y-2 md:col-span-2 mt-4 animate-slide-down">
+                <Label className="text-sm font-semibold">Tài liệu doanh nghiệp *</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  {BUSINESS_DOC_SLOTS.map((slot) => {
+                    const doc = docFiles[slot.docType];
+                    const isUploading = uploadingDocs[slot.docType];
+                    return (
+                      <DocUploadCard
+                        key={slot.docType}
+                        slot={{
+                          ...slot,
+                          required: true,
+                          hint: "Bắt buộc — Tải lên tài liệu (PDF, Word, Ảnh) tối đa 5MB"
+                        }}
+                        doc={doc}
+                        isUploading={isUploading}
+                        inputRef={(el) => {
+                          fileInputRefs.current[slot.docType] = el;
+                        }}
+                        onPickFile={(file) =>
+                          handleDocFilePick(slot.docType, file)
+                        }
+                        onRemove={() => {
+                          const prev = docFiles[slot.docType];
+                          if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+                          setDocFiles((d) => {
+                            const copy = { ...d };
+                            delete copy[slot.docType];
+                            return copy;
+                          });
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1260,12 +1437,22 @@ export default function RegisterSellerPage() {
                 {form.city ? `, ${form.city}` : ""}
               </p>
               <p className="text-muted-foreground mt-1">
-                Tài liệu:{" "}
+                Tài liệu định danh:{" "}
                 {docSlots
                   .map((s) =>
                     docFiles[s.docType]
                       ? `✓ ${s.label}`
                       : `✗ ${s.label}${s.required ? " (bắt buộc)" : ""}`,
+                  )
+                  .join(" · ")}
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Tài liệu doanh nghiệp:{" "}
+                {BUSINESS_DOC_SLOTS
+                  .map((s) =>
+                    docFiles[s.docType]
+                      ? `✓ ${s.label}`
+                      : `✗ ${s.label}`,
                   )
                   .join(" · ")}
               </p>
@@ -1349,6 +1536,13 @@ function DocUploadCard({
   onPickFile,
   onRemove,
 }: DocUploadCardProps) {
+  const isCccd = slot.docType === "cccd_front" || slot.docType === "cccd_back";
+  const acceptTypes = isCccd
+    ? "image/jpeg,image/png,image/webp"
+    : "image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  const isImage = doc ? doc.file.type.startsWith("image/") : false;
+
   return (
     <div
       className="rounded-lg border overflow-hidden"
@@ -1370,7 +1564,7 @@ function DocUploadCard({
             type="button"
             onClick={onRemove}
             className="text-muted-foreground hover:text-red-500 transition-colors"
-            title="Xoá ảnh"
+            title="Xoá"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -1379,13 +1573,29 @@ function DocUploadCard({
 
       {/* Preview / Drop zone */}
       {doc ? (
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={doc.previewUrl}
-            alt={slot.label}
-            className="w-full h-36 object-cover"
-          />
+        <div className="relative animate-fade-in">
+          {isImage ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={doc.previewUrl}
+              alt={slot.label}
+              className="w-full h-36 object-cover"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-36 bg-amber-50/10 border-b gap-2 p-3" style={{ borderColor: "#e5ded6" }}>
+              <span className="material-symbols-outlined text-[40px] text-amber-600">
+                description
+              </span>
+              <div className="text-center w-full px-2">
+                <p className="text-xs font-semibold text-foreground truncate max-w-full" title={doc.file.name}>
+                  {doc.file.name}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {(doc.file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            </div>
+          )}
           {isUploading && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
               <span className="text-white text-xs">Đang tải lên…</span>
@@ -1398,31 +1608,33 @@ function DocUploadCard({
           )}
         </div>
       ) : (
-        <label
-          className="flex flex-col items-center justify-center h-36 cursor-pointer hover:bg-muted/30 transition-colors gap-1"
+        <div
+          className="flex flex-col items-center justify-center h-36 gap-1 relative p-2"
           style={{ color: "var(--color-text-main)" }}
         >
-          <span className="material-symbols-outlined text-[32px] text-muted-foreground">
-            add_photo_alternate
-          </span>
-          <span className="text-xs text-muted-foreground text-center px-2">
-            {slot.hint}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            JPEG · PNG · WEBP · tối đa 5 MB
-          </span>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            ref={inputRef}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onPickFile(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
+          <label className="flex flex-col items-center justify-center cursor-pointer hover:bg-muted/30 transition-colors w-full h-full rounded-md">
+            <span className="material-symbols-outlined text-[28px] text-muted-foreground">
+              {isCccd ? "add_photo_alternate" : "upload_file"}
+            </span>
+            <span className="text-[11px] text-muted-foreground text-center px-2 line-clamp-1">
+              {slot.hint}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              {isCccd ? "JPEG · PNG · WEBP" : "PDF · Word · Ảnh"} · tối đa 5 MB
+            </span>
+            <input
+              type="file"
+              accept={acceptTypes}
+              className="hidden"
+              ref={inputRef}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onPickFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
       )}
 
       {/* Change button when already selected */}
@@ -1432,12 +1644,12 @@ function DocUploadCard({
           style={{ borderColor: "#e5ded6", color: "var(--color-primary)" }}
         >
           <span className="material-symbols-outlined text-[15px]">
-            photo_camera
+            {isImage ? "photo_camera" : "upload_file"}
           </span>
-          Đổi ảnh
+          {isImage ? "Đổi ảnh" : "Đổi file"}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={acceptTypes}
             className="hidden"
             ref={inputRef}
             onChange={(e) => {
