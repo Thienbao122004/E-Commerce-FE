@@ -138,9 +138,9 @@ function parseVariantDisplayName(raw: string): string {
         return Object.keys(obj).length === 1 ? val : `${key}: ${val}`
       })
       .filter(Boolean)
-    return parts.join(" · ") || trimmed
+    return parts.join(" · ") || "Mặc định"
   } catch {
-    return trimmed
+    return trimmed === "{}" || trimmed === "[]" ? "Mặc định" : trimmed
   }
 }
 
@@ -1909,7 +1909,6 @@ export function ShopioAssistantWidget() {
                                         </button>
                                         <div className="size-10 rounded-lg overflow-hidden bg-gray-100 shrink-0">
                                           {p.imageUrl ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
                                             <img src={p.imageUrl} alt={p.name} className="size-full object-cover" />
                                           ) : (
                                             <div className="size-full flex items-center justify-center">
@@ -1982,7 +1981,7 @@ export function ShopioAssistantWidget() {
                                                 >−</button>
                                                 <input type="number" min={1} max={maxQty} value={quantity} disabled={isOutOfStock}
                                                   onChange={(e) => { const n = parseInt(e.target.value, 10); const q = Number.isFinite(n) ? Math.min(maxQty, Math.max(1, n)) : 1; setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
-                                                  className="h-5 w-8 text-[10px] focus:outline-none text-center bg-transparent disabled:opacity-50" style={{ color: "var(--color-text-main)" }}
+                                                  className="h-5 w-8 text-[10px] focus:outline-none text-center bg-transparent disabled:opacity-50 appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-moz-number-spin-box]:hidden" style={{ color: "var(--color-text-main)" }}
                                                 />
                                                 <button type="button" aria-label="Tang" disabled={quantity >= maxQty || isOutOfStock}
                                                   onClick={() => { const q = Math.min(maxQty, quantity + 1); setSelectedProductsByMessageId((prev) => { const mm = prev[m.id] ?? {}; const cur = mm[p.id] ?? { checked: false, quantity: 1, variantId: defaultVariantIdForProduct(p) }; return { ...prev, [m.id]: { ...mm, [p.id]: { ...cur, quantity: q } } } }) }}
