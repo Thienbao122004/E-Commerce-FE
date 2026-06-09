@@ -103,7 +103,7 @@ function findBestLocalProfile(
   return !isTie && maxScore >= 10 ? bestProfileId : null
 }
 
-const MIN_TRAITS = 3
+const MIN_TRAITS = 1
 
 export function useCreateProductForm() {
   const router = useRouter()
