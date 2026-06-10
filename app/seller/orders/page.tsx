@@ -63,6 +63,7 @@ export default function SellerOrdersPage() {
       width: "w-[180px]",
       options: [
         { value: "all", label: "Tất cả trạng thái" },
+        { value: "-1", label: "Có khiếu nại" },
         { value: String(OrderStatus.PendingPayment), label: "Chờ thanh toán" },
         { value: String(OrderStatus.PendingConfirmation), label: "Chờ xác nhận" },
         { value: String(OrderStatus.Confirmed), label: "Đã xác nhận" },

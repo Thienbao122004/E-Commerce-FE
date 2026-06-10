@@ -12,6 +12,8 @@ import type { SellerOrder } from "@/types/seller-dashboard"
 import { SortableTableHead } from "@/components/common/table-sorting"
 import type { SortConfig } from "@/components/common/table-sorting"
 import TablePagination from "@/components/common/table-pagination"
+import { DisputeStatusLabels } from "@/types/dispute"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { formatDateVN as formatDate, formatPhoneVn, formatPriceVND as currency } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
@@ -130,10 +132,24 @@ export function OrderTable({
                           #{order.orderCode}
                         </Link>
                         {order.hasActiveDispute && (
-                          <Badge variant="destructive" className="h-5 px-1.5 text-[10px] gap-1">
-                            <IconAlertTriangle className="size-3" />
-                            Khiếu nại
-                          </Badge>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="h-5 px-1.5 text-[10px] gap-1 cursor-help">
+                                  <IconAlertTriangle className="size-3" />
+                                  Khiếu nại
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" align="center">
+                                <p>
+                                  Trạng thái:{" "}
+                                  {order.activeDisputeStatus !== null && order.activeDisputeStatus !== undefined
+                                    ? DisputeStatusLabels[order.activeDisputeStatus] || "Đang xử lý"
+                                    : "Đang xử lý"}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </div>
                     </TableCell>
