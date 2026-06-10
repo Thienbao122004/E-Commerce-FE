@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 
 export type StatsGridProps = {
   children: React.ReactNode
-  cols?: 2 | 3 | 4
+  cols?: 2 | 3 | 4 | 5
   gap?: "sm" | "md"
   className?: string
 }
@@ -17,6 +17,7 @@ export function StatsGrid({ children, cols = 4, gap = "md", className }: StatsGr
     2: "grid-cols-2",
     3: "grid-cols-2 md:grid-cols-3",
     4: "grid-cols-2 md:grid-cols-4",
+    5: "grid-cols-2 md:grid-cols-3 lg:grid-cols-5",
   }
   return (
     <div className={cn("grid", colsClass[cols], gap === "sm" ? "gap-3" : "gap-4", className)}>
